@@ -1,0 +1,193 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1.0"
+    />
+    <title>Applications</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-image: url('../pictures/background.png');
+        background-size: cover;
+      }
+      body {
+        display: flex;
+      }
+
+      #toolbar {
+        border-radius: 10px;
+        margin-top: 10px;
+        margin-left: 10px;
+        width: 42px;
+        height: calc(100% - 50px);
+        color: var(--color-scheme-text, black);
+        background-color: var(--color-scheme, white);
+        margin-bottom: 10px;
+      }
+
+      #add {
+        aspect-ratio: 1 / 1;
+        margin-top: 10px;
+        margin-left: 6px;
+        margin-bottom: 10px;
+        pointer-events: none;
+        border-color: transparent;
+      }
+
+      rotomeca-toolbar-button {
+        pointer-events: none;
+        padding: 0;
+        margin: 5px;
+        width: 30px;
+      }
+
+      rotomeca-toolbar-button {
+        margin-top: 10px;
+      }
+
+      rotomeca-primary-pressed-button {
+        border-color: transparent;
+      }
+
+      html.without-button #up {
+        display: none;
+      }
+
+      html.without-button #toolbar {
+        height: calc(100% - 20px);
+      }
+
+      #settings {
+        width: 100%;
+        height: calc(100% - 40px);
+        background-color: var(--color-scheme);
+        color: var(--color-scheme-text);
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+      }
+    </style>
+    <script
+      src="../scripts/components/HTMLToolbarButton.js"
+      type="module"
+    ></script>
+    <script src="../scripts/components/HTMLSeparator.js" type="module"></script>
+    <script src="./settings.js" type="module"></script>
+    <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
+  </head>
+  <body>
+    <div style="display: flex; flex-direction: column; height: 100%">
+      <div id="toolbar">
+        <rotomeca-primary-button data-form="secondary" id="add"
+          >+</rotomeca-primary-button
+        >
+        <rotomeca-separator></rotomeca-separator>
+        <rotomeca-toolbar-button
+          data-title="Reddit"
+          data-picture="font:reddit"
+          data-url="nop"
+        ></rotomeca-toolbar-button>
+        <rotomeca-toolbar-button
+          data-title="Reddit"
+          data-picture="font:reddit"
+          data-url="nop"
+          data-pressed="true"
+        ></rotomeca-toolbar-button>
+      </div>
+      <rotomeca-primary-button
+        style="
+          width: 42px;
+          border-bottom-right-radius: 0;
+          border-bottom-left-radius: 0;
+          padding: 0;
+          height: 28px;
+          margin-left: 10px;
+          border-color: transparent;
+          text-align: center;
+          pointer-events: none;
+        "
+        data-form="secondary"
+        id="up"
+        ><img
+          src="../pictures/keyboard_arrow_up_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
+      /></rotomeca-primary-button>
+    </div>
+    <div id="settings">
+      <div>
+        <label>Mode d'activation</label>
+        <br />
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="button"
+          class="setting setting-mode"
+          >Bouton</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="mouse"
+          class="setting setting-mode"
+          >Souris à gauche</rotomeca-primary-pressed-button
+        >
+      </div>
+      <div style="margin-top: 15px">
+        <label>Thème</label>
+        <br />
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="system"
+          class="setting setting-theme"
+          >Système</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="dark"
+          class="setting setting-theme"
+          >Sombre</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="red"
+          class="setting setting-theme"
+          >Rouge</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="blue"
+          class="setting setting-theme"
+          >Bleu</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="green"
+          class="setting setting-theme"
+          >Vert</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="white"
+          class="setting setting-theme"
+          >Blanc</rotomeca-primary-pressed-button
+        >
+        <rotomeca-primary-pressed-button
+          data-form="secondary"
+          id="black"
+          class="setting setting-theme"
+          >Noir</rotomeca-primary-pressed-button
+        >
+      </div>
+    </div>
+  </body>
+  <footer></footer>
+</html>

@@ -1,0 +1,101 @@
+:root {
+  --ce-html-button-padding: 0;
+  --ce-html-button-border: none;
+  --ce-html-button-border-hover: none;
+  --ce-html-button-border-active: none;
+  --scrollbar-color-thumb: #363a5b;
+  --scrollbar-color-track: #6d74b5;
+  --scrollbar-width: thin;
+  --scrollbar-width-legacy: 10px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  // overflow: auto;
+}
+
+#main {
+  background-color: var(--color-scheme, white);
+  color: var(--color-scheme-text, black);
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  border-radius: 10px;
+}
+
+#apps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  overflow: auto;
+
+  &.edit {
+    rotomeca-toolbar-button {
+      //animation: tremble 0.5s infinite;
+    }
+  }
+}
+
+rotomeca-toolbar-button {
+  margin: 5px 0;
+}
+
+rotomeca-separator {
+  margin-bottom: 15px;
+  margin-top: 15px;
+  height: 0;
+  padding-top: 0.5px;
+  padding-bottom: 0.5px;
+}
+
+.blur {
+  backdrop-filter: blur(5px);
+}
+
+/* Modern browsers with `scrollbar-*` support */
+@supports (scrollbar-width: auto) {
+  * {
+    scrollbar-color: var(--scrollbar-color-thumb) var(--scrollbar-color-track);
+    scrollbar-width: var(--scrollbar-width);
+  }
+}
+
+/* Legacy browsers with `::-webkit-scrollbar-*` support */
+@supports selector(::-webkit-scrollbar) {
+  * {
+    &::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-color-thumb);
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--scrollbar-color-track);
+    }
+    &::-webkit-scrollbar {
+      max-width: var(--scrollbar-width-legacy);
+      max-height: var(--scrollbar-width-legacy);
+    }
+  }
+}
+
+@keyframes tremble {
+  0% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-10deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}

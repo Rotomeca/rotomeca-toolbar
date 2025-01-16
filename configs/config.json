@@ -1,0 +1,44 @@
+{
+  "default_apps": [
+    {
+      "url": "https://open.spotify.com",
+      "icon": "font:spotify",
+      "title": "Spotify"
+    },
+    {
+      "url": "https://www.youtube.com",
+      "icon": "font:youtube-play",
+      "title": "Youtube"
+    },
+    {
+      "url": "https://www.messenger.com",
+      "icon": "font:facebook-messenger",
+      "title": "Messenger"
+    },
+    {
+      "url": "https://www.reddit.com",
+      "icon": "font:reddit",
+      "title": "Reddit"
+    },
+    {
+      "url": "https://discord.com",
+      "icon": "font:discord",
+      "title": "Discord"
+    },
+    {
+      "url": "https://www.twitch.tv",
+      "icon": "font:twitch",
+      "title": "Twitch"
+    },
+    {
+      "url": "https://www.instagram.com",
+      "icon": "font:instagram",
+      "title": "Instagram"
+    },
+    {
+      "url": "https://copilot.microsoft.com",
+      "icon": "font:brand-bing",
+      "title": "Copilot"
+    }
+  ]
+}

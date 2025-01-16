@@ -1,0 +1,23 @@
+:root {
+  --ce-html-button-background-color: var(--color-scheme-primary);
+  --ce-html-button-background-color-hover: var(--color-scheme-primary-hover);
+  --ce-html-button-background-color-active: var(--color-scheme-primary-active);
+  --ce-html-button-text-color: var(--color-scheme-text-primary);
+  --ce-html-button-text-color-hover: var(--color-scheme-text-hover);
+  --ce-html-button-text-color-active: var(--color-scheme-text-active);
+  --ce-html-button-background-color-pressed: var(
+    --ce-html-button-background-color-active
+  );
+  --ce-html-button-background-color-pressed-hover: var(
+    --ce-html-button-background-color-hover
+  );
+  --ce-html-button-background-color-pressed-active: var(
+    --ce-html-button-background-color
+  );
+  /**/
+  --ce-html-button-text-color-pressed: var(--ce-html-button-text-color-active);
+  --ce-html-button-text-color-pressed-hover: var(
+    --ce-html-button-text-color-hover
+  );
+  --ce-html-button-text-color-pressed-active: var(--ce-html-button-text-color);
+}

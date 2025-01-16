@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1.0"
+    />
+    <title>Applications</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+      }
+
+      rotomeca-primary-button {
+        margin-right: 0;
+        height: 20px;
+        border-radius: 0;
+        padding: 0 10px;
+        border: none;
+        font-size: 10px;
+        line-height: 1.7;
+      }
+
+      rotomeca-primary-button#close {
+        --ce-html-button-background-color: red;
+      }
+      rotomeca-primary-button#kill {
+        --ce-html-button-background-color: black;
+      }
+    </style>
+    <link rel="stylesheet" href="./apps.css" />
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <rotomeca-primary-button
+      id="refresh"
+      data-form="secondary"
+      title="Recharger la page"
+      ><img
+        src="../pictures/refresh_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
+        style="max-width: 13px; margin-top: 2px"
+    /></rotomeca-primary-button>
+    <rotomeca-primary-button
+      id="open"
+      data-form="secondary"
+      title="Arrêter et ouvrir dans le navigateur"
+      style="margin-left: -4px"
+      ><img
+        src="../pictures/open_in_new_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
+        style="max-width: 13px; margin-top: 2px"
+    /></rotomeca-primary-button>
+    <div style="float: right; display: flex">
+      <rotomeca-primary-button
+        id="kill"
+        data-form="secondary"
+        title="Arrêter la fenêtre"
+        >🗑</rotomeca-primary-button
+      >
+      <rotomeca-primary-button
+        id="close"
+        data-form="secondary"
+        title="Fermer la fenêtre"
+        style="padding-left: 15px; padding-right: 15px"
+        >X</rotomeca-primary-button
+      >
+    </div>
+  </body>
+  <footer>
+    <script></script>
+  </footer>
+</html>

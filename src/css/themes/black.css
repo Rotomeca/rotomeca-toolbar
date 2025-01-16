@@ -1,0 +1,10 @@
+:root {
+  --color-scheme: #000000;
+  --color-scheme-primary: #9c9c9c;
+  --color-scheme-primary-hover: #cecece;
+  --color-scheme-primary-active: #ebebeb;
+  --color-scheme-text: #ffffff;
+  --color-scheme-text-primary: #ffffff;
+  --color-scheme-text-hover: black;
+  --color-scheme-text-active: black;
+}

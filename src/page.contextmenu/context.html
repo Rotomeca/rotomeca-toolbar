@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1.0"
+    />
+    <title>Applications</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      :root {
+        --color-scheme: #1f2933;
+        --color-scheme-primary: #323f4b;
+        --color-scheme-primary-hover: #96845f;
+        --color-scheme-primary-active: #3e4c59;
+        --color-scheme-text: #c7dfff;
+        --color-scheme-text-primary: #c7dfff;
+        --color-scheme-text-hover: #1f2933;
+        --color-scheme-text-active: #e1c58f;
+      }
+
+      #layout {
+        width: calc(100% - 2px);
+        height: calc(100% - 2px);
+        background-color: var(--color-scheme);
+        border-radius: 10px;
+        border: solid thin white;
+        display: flex;
+        flex-direction: column;
+      }
+
+      rotomeca-primary-button {
+        border-radius: 0;
+      }
+
+      rotomeca-primary-button:first-of-type {
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+      }
+
+      rotomeca-primary-button:last-of-type {
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+      }
+    </style>
+    <!-- <script
+      src="../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js"
+      type="module"
+    ></script> -->
+    <script src="./main.js" type="module"></script>
+  </head>
+  <body>
+    <div id="layout"></div>
+  </body>
+  <footer></footer>
+</html>

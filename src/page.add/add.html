@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1.0"
+    />
+    <title>Ajouter une application</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+      }
+
+      #layout {
+        height: 100%;
+        width: calc(100% - 40px);
+        padding: 0 20px;
+        color: var(--color-scheme-text, black);
+        background-color: var(--color-scheme, white);
+        /* border-radius: 8px; */
+      }
+
+      #predefined-apps {
+        width: 100%;
+        display: flex;
+        justify-content: space-evenly;
+      }
+
+      rotomeca-toolbar-button {
+        padding: 0;
+      }
+    </style>
+    <script src="./page.js" type="module"></script>
+    <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
+  </head>
+  <body>
+    <div id="layout">
+      <h1 style="margin-top: 0; padding-top: 10px">Populaire</h1>
+      <div id="predefined-apps"></div>
+      <h1>Chercher un lien</h1>
+      <div id="search">
+        <iframe
+          style="
+            width: 100%;
+            height: 313px;
+            border: none;
+            border-radius: 15px;
+            background-color: white;
+          "
+          data-src="./search.html"
+        ></iframe>
+      </div>
+    </div>
+  </body>
+  <footer></footer>
+</html>
