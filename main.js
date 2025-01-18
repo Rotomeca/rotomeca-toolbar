@@ -19,6 +19,7 @@ const {
   JsEvent,
 } = require('./lib/RotomecaWebComponents/libs/events_electron.js');
 const { appEventList } = require('./src/scripts/events/AppEventList.js');
+const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 
 /**
  * @callback SavesUpdatedCallback
@@ -460,7 +461,7 @@ class AppMain extends BaseAppObject {
         if (!this.started) {
           this.started = true;
           if (await this.load()) {
-            this.toolbarWindow.webContents.postMessage('init', {
+            this.toolbarWindow.webContents.postMessage(pageEventList.init, {
               saves: this.saves,
               settings: {
                 isButton: this.settingIsButton,
@@ -479,7 +480,10 @@ class AppMain extends BaseAppObject {
     } else {
       this.appsWindow.hide();
       this.toolbarWindow.hide();
-      this.toolbarWindow.webContents.postMessage('windowAppsClosed', true);
+      this.toolbarWindow.webContents.postMessage(
+        pageEventList.windowAppsClosed,
+        true,
+      );
 
       if (!this.settingIsButton) {
         this.startDetectMousePosition();
@@ -488,7 +492,10 @@ class AppMain extends BaseAppObject {
   }
 
   async event_toolbar_add_button_click(data = null) {
-    this.toolbarWindow.webContents.postMessage('windowAppsClosed', true);
+    this.toolbarWindow.webContents.postMessage(
+      pageEventList.windowAppsClosed,
+      true,
+    );
     // this.toolbarWindow.hide();
     // this.mainWindow.hide();
 
@@ -496,12 +503,15 @@ class AppMain extends BaseAppObject {
     this.addDialogWindow.on('closed', () => {
       // app.quit();
       this.toolbarWindow.show();
-      this.toolbarWindow.webContents.postMessage('appEdited', false);
+      this.toolbarWindow.webContents.postMessage(
+        pageEventList.appEdited,
+        false,
+      );
 
       if (this.settingIsButton) this.mainWindow.show();
     });
 
-    this.toolbarWindow.webContents.postMessage('appEdited', true);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appEdited, true);
 
     if (data?.url) {
       this.addDialogWindow.loadFile(
@@ -509,41 +519,22 @@ class AppMain extends BaseAppObject {
       );
       this.addDialogWindow.title = 'Modifier une application';
       this.addDialogWindow.webContents.on('dom-ready', () => {
-        this.addDialogWindow.webContents.postMessage('mode_edit', data);
-        //this.addDialogWindow.webContents.openDevTools();
+        this.addDialogWindow.webContents.postMessage(
+          pageEventList.modeEdit,
+          data,
+        );
       });
     } else
       this.addDialogWindow.loadFile(
         path.join(__dirname, '/src/page.add/add.html'),
       );
 
-    // let win = new BrowserWindow({
-    //   frame: false,
-    //   alwaysOnTop: true,
-    //   useContentSize: true,
-    //   y: this.addDialogWindow.getBounds().y + 10 + 210,
-    //   x: this.addDialogWindow.getBounds().x + 10 + 15,
-    //   width: this.addDialogWindow.getBounds().width - 45,
-    //   height: this.addDialogWindow.getBounds().height - 250,
-    //   resizable: false,
-    //   webPreferences: {
-    //     preload: path.join(__dirname, './src/page.add/search.js'),
-    //     nodeIntegration: false,
-    //     contextIsolation: true,
-    //   },
-    // });
-    // win.loadURL('https://google.com');
-    // win.setParentWindow(this.addDialogWindow);
-    // win.show();
-    // win.webContents.openDevTools();
-
     this.addDialogWindow.show();
-    //this.addDialogWindow.webContents.openDevTools();
   }
 
   event_request_add_data(_, data) {
     this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage('appAdded', data);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
 
     this.saves.push(data);
     this.save();
@@ -556,10 +547,13 @@ class AppMain extends BaseAppObject {
 
     if (index !== null && index !== false) {
       if (index + 1 >= this.saves.length) {
-        this.toolbarWindow.webContents.postMessage('appAdded', 'separator');
+        this.toolbarWindow.webContents.postMessage(
+          pageEventList.appAdded,
+          'separator',
+        );
         this.saves.push('separator');
       } else {
-        this.toolbarWindow.webContents.postMessage('appInserted', {
+        this.toolbarWindow.webContents.postMessage(pageEventList.appInserted, {
           url,
           index,
           data: 'separator',
@@ -574,7 +568,7 @@ class AppMain extends BaseAppObject {
 
   event_request_add_data_edit(_, data) {
     this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage('appAdded', data);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
 
     this.saves.push(data);
     this.save();
@@ -592,14 +586,17 @@ class AppMain extends BaseAppObject {
     this.saves[id].url = url;
     this.saves[id].picture = picture;
 
-    this.toolbarWindow.webContents.postMessage('appUpdated', data);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, data);
 
     this.save();
   }
 
   event_close_app() {
     this.appsWindow.hide();
-    this.toolbarWindow.webContents.postMessage('windowAppsClosed', true);
+    this.toolbarWindow.webContents.postMessage(
+      pageEventList.windowAppsClosed,
+      true,
+    );
   }
 
   event_close_frame(_, url) {
@@ -655,7 +652,7 @@ class AppMain extends BaseAppObject {
     this.appsWindow.show();
 
     this.appsWindow.contentView.children[0].webContents.postMessage(
-      'frameOpen',
+      pageEventList.frameOpen,
       url,
     );
   }
@@ -666,7 +663,10 @@ class AppMain extends BaseAppObject {
       delete this.views[url];
     }
 
-    this.toolbarWindow.webContents.postMessage('toolbarAppDeleted', url);
+    this.toolbarWindow.webContents.postMessage(
+      pageEventList.toolbarAppDeleted,
+      url,
+    );
 
     this.toolbarWindow.focus();
 
@@ -683,7 +683,7 @@ class AppMain extends BaseAppObject {
         this.saves[index + 1] === 'separator'
       ) {
         this.toolbarWindow.webContents.postMessage(
-          'toolbarAppSeparatorDelete',
+          pageEventList.toolbarAppSeparatorDelete,
           this.saves[index - (1 + corrector)].url,
         );
         ++corrector;
@@ -748,7 +748,10 @@ class AppMain extends BaseAppObject {
     args.modifier = modifier;
 
     //On déplace l'élément
-    this.toolbarWindow.webContents.postMessage('windowAppMovement', args);
+    this.toolbarWindow.webContents.postMessage(
+      pageEventList.windowAppMovement,
+      args,
+    );
 
     //On supprime les separator en double
     let tmp = [];
@@ -758,7 +761,7 @@ class AppMain extends BaseAppObject {
 
       if (index === 0 && element === 'separator') {
         this.toolbarWindow.webContents.postMessage(
-          'toolbarAppSeparatorDelete',
+          pageEventList.toolbarAppSeparatorDelete,
           0,
         );
         continue;
@@ -770,7 +773,7 @@ class AppMain extends BaseAppObject {
         this.saves[index + 1] === 'separator'
       ) {
         this.toolbarWindow.webContents.postMessage(
-          'toolbarAppSeparatorDelete',
+          pageEventList.toolbarAppSeparatorDelete,
           this.saves[index - (1 + corrector)].url,
         );
         ++corrector;
@@ -801,11 +804,17 @@ class AppMain extends BaseAppObject {
       delete this.views[url];
     }
 
-    this.toolbarWindow.webContents.postMessage('windowAppsClosed', true);
+    this.toolbarWindow.webContents.postMessage(
+      pageEventList.windowAppsClosed,
+      true,
+    );
 
     if (open) {
       if (this.settingIsButton)
-        this.mainWindow.webContents.postMessage('toolbarClosed', true);
+        this.mainWindow.webContents.postMessage(
+          pageEventList.toolbarClosed,
+          true,
+        );
       else this.toolbarWindow.hide();
 
       shell.openExternal(url);
