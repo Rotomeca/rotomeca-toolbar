@@ -1,6 +1,6 @@
 const config = {
   feedUrl: 'https://rotomeca-toolbar-deployement.vercel.app',
-  dev: true,
+  dev: false,
 };
 
 module.exports = config;
