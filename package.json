@@ -1,6 +1,6 @@
 {
   "name": "rotomecatoolbar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Application toolbar pour avoir des sites en arrière plan",
   "main": "main.js",
   "scripts": {
