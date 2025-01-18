@@ -921,19 +921,19 @@ class AppMain extends BaseAppObject {
         }
       });
 
-      autoUpdater.on('error', (error) => {
-        const dialogOpts = {
-          type: 'error',
-          buttons: ['Ok'],
-          title: 'App error',
-          message: error.message,
-          detail: error.stack,
-        };
+      // autoUpdater.on('error', (error) => {
+      //   const dialogOpts = {
+      //     type: 'error',
+      //     buttons: ['Ok'],
+      //     title: 'App error',
+      //     message: error.message,
+      //     detail: error.stack,
+      //   };
 
-        dialog.showMessageBox(dialogOpts).then((returnValue) => {
-          if (returnValue.response === 0) app.quit();
-        });
-      });
+      //   dialog.showMessageBox(dialogOpts).then((returnValue) => {
+      //     if (returnValue.response === 0) app.quit();
+      //   });
+      // });
 
       autoUpdater.checkForUpdates();
       checked = true;
