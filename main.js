@@ -14,7 +14,6 @@ const {
 const path = require('path');
 const { BaseAppObject } = require('./src/scripts/BaseAppObject.js');
 const { BaseWindow } = require('electron/main');
-const { dev } = require('./configs/appConfig.js');
 const {
   JsEvent,
 } = require('./lib/RotomecaWebComponents/libs/events_electron.js');
@@ -355,7 +354,7 @@ class AppMain extends BaseAppObject {
       },
     ];
 
-    if (dev) {
+    if (AppMain.IsDev) {
       menu.splice(0, 0, {
         label: '[DEBUG]Ouvrir une console',
         click: () => {
@@ -872,7 +871,7 @@ class AppMain extends BaseAppObject {
   }
 
   static InitAutoUpdater() {
-    if (dev) return this;
+    if (AppMain.IsDev) return this;
 
     const server = require('./configs/appConfig.js').feedUrl;
 
@@ -886,7 +885,7 @@ class AppMain extends BaseAppObject {
   }
 
   static CheckForUpdate() {
-    if (dev) return false;
+    if (AppMain.IsDev) return false;
 
     let checked = false;
     if (this.hasAutoUpdater) {
@@ -949,6 +948,18 @@ class AppMain extends BaseAppObject {
    */
   static get hasAutoUpdater() {
     return !!this.InitAutoUpdater.hasAutoUpdater;
+  }
+
+  /**
+   * @type {boolean}
+   * @readonly
+   */
+  static get IsDev() {
+    if (AppMain.Run.isdev === null || AppMain.Run.isdev === undefined) {
+      AppMain.Run.isdev = process.argv[2] === '--dev';
+    }
+
+    return AppMain.Run.isdev;
   }
 }
 
