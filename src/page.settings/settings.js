@@ -23,8 +23,11 @@ export class PageSettings {
     this.settings ??= {};
     this.settings.isButtonModeEnabled ??= true;
     this.settings.theme ??= 'system';
+
     document.querySelectorAll('.setting-mode').forEach((button) => {
       if (this.settings.isButtonModeEnabled && button.id === 'button')
+        button.press({ enableEvent: false });
+      else if (!this.settings.isButtonModeEnabled && button.id === 'mouse')
         button.press({ enableEvent: false });
 
       button.addEventListener('event:custom:state.pressed', (event) => {
