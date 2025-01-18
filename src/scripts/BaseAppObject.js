@@ -87,7 +87,9 @@ class BaseAppObject {
         const fs = require('fs');
         this.#_css_root =
           fs
-            .readFileSync(`./src/css/themes/${this.settings.theme}.css`)
+            .readFileSync(
+              path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
+            )
             ?.toString?.() ?? '';
       }
     }
