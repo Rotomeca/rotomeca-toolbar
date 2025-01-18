@@ -4,7 +4,7 @@
   "description": "Application toolbar pour avoir des sites en arrière plan",
   "main": "main.js",
   "scripts": {
-    "debug": "electron .",
+    "debug": "electron . --dev",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
