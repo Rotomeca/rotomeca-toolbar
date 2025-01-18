@@ -865,7 +865,6 @@ class AppMain extends BaseAppObject {
       const url = `${server}/update/${process.platform}/${app.getVersion()}`;
       autoUpdater.setFeedURL({ url });
       this.InitAutoUpdater.hasAutoUpdater = true;
-      new Notification({ title: 'Url set !!', body: url }).show();
     }
 
     return this;
@@ -921,9 +920,6 @@ class AppMain extends BaseAppObject {
           }).show();
         }
       });
-      autoUpdater.on('update-not-available', () => {
-        new Notification({ title: 'No update....' }).show();
-      });
 
       autoUpdater.on('error', (error) => {
         const dialogOpts = {
@@ -939,7 +935,6 @@ class AppMain extends BaseAppObject {
         });
       });
 
-      new Notification({ title: 'Check update', body: 'checking !' }).show();
       autoUpdater.checkForUpdates();
       checked = true;
     }
@@ -965,7 +960,7 @@ app.on('ready', async () => {
       buttons: ['Ok'],
       title: 'App error',
       message: error.message,
-      detail: error.stack,
+      // detail: error.stack,
     };
 
     dialog.showMessageBox(dialogOpts).then((returnValue) => {});
