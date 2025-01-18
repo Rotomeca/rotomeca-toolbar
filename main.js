@@ -466,8 +466,14 @@ class AppMain extends BaseAppObject {
                 isButton: this.settingIsButton,
               },
             });
+          } else {
+            this.toolbarWindow.webContents.postMessage('init', {
+              saves: [],
+              settings: {
+                isButton: this.settingIsButton,
+              },
+            });
           }
-          //this.toolbarWindow.webContents.openDevTools();
         }
       });
     } else {
@@ -920,20 +926,6 @@ class AppMain extends BaseAppObject {
           }).show();
         }
       });
-
-      // autoUpdater.on('error', (error) => {
-      //   const dialogOpts = {
-      //     type: 'error',
-      //     buttons: ['Ok'],
-      //     title: 'App error',
-      //     message: error.message,
-      //     detail: error.stack,
-      //   };
-
-      //   dialog.showMessageBox(dialogOpts).then((returnValue) => {
-      //     if (returnValue.response === 0) app.quit();
-      //   });
-      // });
 
       autoUpdater.checkForUpdates();
       checked = true;
