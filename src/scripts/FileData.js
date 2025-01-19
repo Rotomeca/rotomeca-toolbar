@@ -5,6 +5,7 @@ const {
 var loadedModules = {};
 
 class FileData {
+  static #_basePath;
   #_name;
   constructor(name) {
     this.#_name = name;
@@ -77,7 +78,19 @@ class FileData {
    * @readonly
    */
   static get BasePath() {
-    return `${FileData.os.homedir()}\\.rotomeca-toolbar-data`;
+    if (!this.#_basePath) {
+      let path = '';
+      if (process.platform === 'win32') {
+        //Vérification si AppData/Roaming existe
+        const roaming = `${FileData.os.homedir()}\\AppData\\Roaming`;
+        if (fs.existsSync(roaming)) path = roaming;
+        else path = FileData.os.homedir();
+      } else path = FileData.os.homedir();
+
+      this.#_basePath = `${path}\\.rotomeca-toolbar-data`;
+    }
+
+    return this.#_basePath;
   }
 
   /**
