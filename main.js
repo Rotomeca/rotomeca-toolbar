@@ -14,7 +14,6 @@ const {
 const path = require('path');
 const { BaseAppObject } = require('./src/scripts/BaseAppObject.js');
 const { BaseWindow } = require('electron/main');
-const { dev } = require('./configs/appConfig.js');
 const {
   JsEvent,
 } = require('./lib/RotomecaWebComponents/libs/events_electron.js');
@@ -58,6 +57,22 @@ class AppMain extends BaseAppObject {
       this.main.preload = path.join(__dirname, './preload.js');
 
     return this.main.preload;
+  }
+
+  /**
+   * @type {FileData}
+   * @readonly
+   */
+  get userFileData() {
+    if (!this.main.userFileData) {
+      const { FileData } = require('./src/scripts/FileData.js');
+      let fd = new FileData('data.rsft');
+      fd.onsave.push((data) => this.onsave.call(data));
+      fd.onload.push((data) => this.onload.call(data || {}));
+      this.main.userFileData = fd;
+    }
+
+    return this.main.userFileData;
   }
 
   // #region Windows
@@ -355,7 +370,7 @@ class AppMain extends BaseAppObject {
       },
     ];
 
-    if (dev) {
+    if (AppMain.IsDev) {
       menu.splice(0, 0, {
         label: '[DEBUG]Ouvrir une console',
         click: () => {
@@ -383,37 +398,19 @@ class AppMain extends BaseAppObject {
   }
 
   async save() {
-    const fs = require('fs');
     try {
-      fs.writeFileSync('data.rsft', JSON.stringify(this.saves) /*, 'utf-8'*/);
-      this.onsave.call(this.saves);
+      this.userFileData.save(this.saves);
     } catch (e) {
       alert('Failed to save the file !');
     }
   }
 
   async load() {
-    const fs = require('fs');
-    let loaded = false;
-    await new Promise((ok, nok) => {
-      fs.readFile('data.rsft', 'utf-8', (err, data) => {
-        if (!err) {
-          try {
-            this.saves = JSON.parse(data.toString());
+    const data = await this.userFileData.loadAsync();
 
-            loaded = true;
-          } catch (error) {
-            this.saves ??= [];
-          }
-        }
+    if (data !== false) this.saves = data;
 
-        ok();
-      });
-    });
-
-    this.onload.call(this.saves);
-
-    return loaded;
+    return data !== false;
   }
 
   event_tray_on_click() {
@@ -424,10 +421,12 @@ class AppMain extends BaseAppObject {
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
       enableRemoteModule: false,
-      preload: path.join(__dirname, './preload.js'), // path to your preload.js file
+      preload: this.preloadPath, // path to your preload.js file
       file: path.join(__dirname, '/src/page.settings/settings.html'),
       show: false,
     });
+
+    win.setMenuBarVisibility(false);
 
     win.addListener('closed', () => {
       this.removeWindow('settings');
@@ -441,6 +440,10 @@ class AppMain extends BaseAppObject {
 
             if (!window.electron.settings) document.querySelector('html').classList.add('without-button');
             `);
+
+    win.webContents.on('dom-ready', () => {
+      win.webContents.postMessage('settingsStart', this.settings.filePath);
+    });
 
     win.show();
 
@@ -658,7 +661,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_app_delete(_, url) {
-    if (!!this.views[url]) {
+    if (this.views[url]) {
       this.appsWindow.contentView.removeChildView(this.views[url].view);
       delete this.views[url];
     }
@@ -793,7 +796,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_kill_app(_, url, open = false) {
-    if (!!this.views[url]) {
+    if (this.views[url]) {
       /**@type {WebContentsView} */
       const view = this.views[url].view;
       view.setVisible(false);
@@ -872,7 +875,7 @@ class AppMain extends BaseAppObject {
   }
 
   static InitAutoUpdater() {
-    if (dev) return this;
+    if (AppMain.IsDev) return this;
 
     const server = require('./configs/appConfig.js').feedUrl;
 
@@ -886,7 +889,7 @@ class AppMain extends BaseAppObject {
   }
 
   static CheckForUpdate() {
-    if (dev) return false;
+    if (AppMain.IsDev) return false;
 
     let checked = false;
     if (this.hasAutoUpdater) {
@@ -949,6 +952,18 @@ class AppMain extends BaseAppObject {
    */
   static get hasAutoUpdater() {
     return !!this.InitAutoUpdater.hasAutoUpdater;
+  }
+
+  /**
+   * @type {boolean}
+   * @readonly
+   */
+  static get IsDev() {
+    if (AppMain.Run.isdev === null || AppMain.Run.isdev === undefined) {
+      AppMain.Run.isdev = process.argv[2] === '--dev';
+    }
+
+    return AppMain.Run.isdev;
   }
 }
 
