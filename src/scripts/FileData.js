@@ -83,7 +83,7 @@ class FileData {
       if (process.platform === 'win32') {
         //Vérification si AppData/Roaming existe
         const roaming = `${FileData.os.homedir()}\\AppData\\Roaming`;
-        if (fs.existsSync(roaming)) path = roaming;
+        if (this.fs.existsSync(roaming)) path = roaming;
         else path = FileData.os.homedir();
       } else path = FileData.os.homedir();
 
