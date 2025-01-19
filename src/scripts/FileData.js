@@ -12,35 +12,51 @@ class FileData {
     this.onload = new JsEvent();
   }
 
+  /**
+   * @type {string}
+   * @readonly
+   */
+  get path() {
+    return `${FileData.BasePath}\\${this.#_name}`;
+  }
+
   save(data) {
     this.#_tryCreateBaseFolder();
 
-    FileData.fs.writeFileSync(
-      `${FileData.BasePath}\\${this.#_name}`,
-      JSON.stringify(data),
-    );
+    FileData.fs.writeFileSync(this.path, JSON.stringify(data));
 
     this.onsave.call(data);
+
+    return this;
   }
 
-  async load() {
+  load() {
+    let data = null;
+    try {
+      data = JSON.parse(FileData.fs.readFileSync(this.path).toString());
+
+      this.onload.call(data);
+    } catch (error) {
+      data = false;
+    }
+
+    return data;
+  }
+
+  async loadAsync() {
     let loaded = false;
     await new Promise((ok, nok) => {
-      FileData.fs.readFile(
-        `${FileData.BasePath}\\${this.#_name}`,
-        'utf-8',
-        (err, data) => {
-          if (!err) {
-            try {
-              loaded = JSON.parse(data.toString());
-            } catch (error) {
-              loaded = false;
-            }
+      FileData.fs.readFile(this.path, 'utf-8', (err, data) => {
+        if (!err) {
+          try {
+            loaded = JSON.parse(data.toString());
+          } catch (error) {
+            loaded = false;
           }
+        }
 
-          ok();
-        },
-      );
+        ok();
+      });
     });
 
     if (loaded !== false) this.onload.call(loaded);
@@ -61,7 +77,7 @@ class FileData {
    * @readonly
    */
   static get BasePath() {
-    return `${FileData.os.homedir()}\\rotomeca-toolbar-data`;
+    return `${FileData.os.homedir()}\\.rotomeca-toolbar-data`;
   }
 
   /**
@@ -104,6 +120,28 @@ class FileData {
       1000 * 60 * 5,
       app,
     );
+  }
+
+  static Save(filename, data) {
+    return new FileData(filename).save(data);
+  }
+
+  /**
+   *
+   * @param {string} filename
+   * @returns {Promise<{fileManipulator:FileData, data:false | any, loadSuccess:boolean}>}
+   * @async
+   * @static
+   */
+  static async Load(filename) {
+    let saver = new FileData(filename);
+    const data = await saver.load();
+
+    return {
+      data,
+      fileManipulator: saver,
+      loadSuccess: data !== false,
+    };
   }
 }
 

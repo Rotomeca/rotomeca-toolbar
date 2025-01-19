@@ -423,7 +423,7 @@ class AppMain extends BaseAppObject {
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
       enableRemoteModule: false,
-      preload: path.join(__dirname, './preload.js'), // path to your preload.js file
+      preload: this.preloadPath, // path to your preload.js file
       file: path.join(__dirname, '/src/page.settings/settings.html'),
       show: false,
     });
@@ -440,6 +440,10 @@ class AppMain extends BaseAppObject {
 
             if (!window.electron.settings) document.querySelector('html').classList.add('without-button');
             `);
+
+    win.webContents.on('dom-ready', () => {
+      win.webContents.postMessage('settingsStart', this.settings.filePath);
+    });
 
     win.show();
 

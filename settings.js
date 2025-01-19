@@ -1,14 +1,12 @@
 class Settings {
   #_settings;
+  #_filedata;
   constructor() {}
 
   get #_config() {
     if (!this.#_settings) {
-      const fs = require('fs');
       try {
-        this.#_settings =
-          fs.readFileSync('settings.rcft')?.toString?.() ?? '{}';
-        this.#_settings = JSON.parse(this.#_settings);
+        this.#_settings = this.fileData.load() || {};
       } catch (error) {
         this.#_settings = {};
       }
@@ -35,15 +33,31 @@ class Settings {
     this.#_settings.theme = value;
   }
 
+  /**
+   * @type {readonly}
+   */
+  get filePath() {
+    return this.fileData.path;
+  }
+
   save() {
-    const fs = require('fs');
-    fs.writeFileSync(
-      'settings.rcft',
-      JSON.stringify({
-        isButtonModeEnabled: this.isButtonModeEnabled,
-        theme: this.theme,
-      }),
-    );
+    this.fileData.save({
+      isButtonModeEnabled: this.isButtonModeEnabled,
+      theme: this.theme,
+    });
+  }
+
+  /**
+   * @type {FileData}
+   * @readonly
+   */
+  get fileData() {
+    if (!this.#_filedata) {
+      const { FileData } = require('./src/scripts/FileData');
+      this.#_filedata = new FileData('settings.rcft');
+    }
+
+    return this.#_filedata;
   }
 }
 
