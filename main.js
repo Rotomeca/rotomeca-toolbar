@@ -442,7 +442,10 @@ class AppMain extends BaseAppObject {
             `);
 
     win.webContents.on('dom-ready', () => {
-      win.webContents.postMessage('settingsStart', this.settings.filePath);
+      win.webContents.postMessage(
+        pageEventList.settingsStart,
+        this.settings.filePath,
+      );
     });
 
     win.show();
