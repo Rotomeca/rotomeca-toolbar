@@ -2,18 +2,54 @@ const {
   JsEvent,
 } = require('../../lib/RotomecaWebComponents/libs/events_electron');
 
+/**
+ * Modules qui seront déchargés toute les 5 minutes pour libérer de la mémoire
+ * @type {Object<string, any>}
+ * @package
+ */
 var loadedModules = {};
 
+/**
+ * @callback OnItemSavedCallback
+ * @param {any} data Données sauvegardés
+ * @returns {void}
+ */
+
+/**
+ * @callback OnItemLoadedCallback
+ * @param {any | false} data Données chargés. `false` si le fichier n'existe pas.
+ * @return {void}
+ */
+
+/**
+ * @class
+ * @classdesc Sauvegarde ou charge des données
+ */
 class FileData {
   static #_basePath;
   #_name;
+  /**
+   *
+   * @param {string} name Nom du fichier avec son extention
+   */
   constructor(name) {
     this.#_name = name;
+    /**
+     * Appelé lorsque des données sont sauvegardés
+     * @type {JsEvent<OnItemSavedCallback>}
+     * @event
+     */
     this.onsave = new JsEvent();
+    /**
+     * Appelé lorsque des données sont sauvegardés
+     * @type {JsEvent<OnItemLoadedCallback>}
+     * @event
+     */
     this.onload = new JsEvent();
   }
 
   /**
+   * Chemin du fichier
    * @type {string}
    * @readonly
    */
@@ -21,6 +57,12 @@ class FileData {
     return `${FileData.BasePath}\\${this.#_name}`;
   }
 
+  /**
+   * Sauvegarde les données dans le fichier
+   * @param {*} data Données à sauvegarder
+   * @returns {FileData} Chaînage
+   * @fires FileData.onsave
+   */
   save(data) {
     this.#_tryCreateBaseFolder();
 
@@ -31,6 +73,10 @@ class FileData {
     return this;
   }
 
+  /**
+   * Charge les données
+   * @returns {any | false} false si le fichier n'éxiste pas
+   */
   load() {
     let data = null;
     try {
@@ -44,9 +90,14 @@ class FileData {
     return data;
   }
 
+  /**
+   * Charge les données
+   * @returns {Promise<any | false>} false si le fichier n'éxiste pas
+   * @async
+   */
   async loadAsync() {
     let loaded = false;
-    await new Promise((ok, nok) => {
+    await new Promise((ok) => {
       FileData.fs.readFile(this.path, 'utf-8', (err, data) => {
         if (!err) {
           try {
@@ -74,8 +125,10 @@ class FileData {
   }
 
   /**
+   * Chemin du "home" de l'utilisateur
    * @type {string}
    * @readonly
+   * @static
    */
   static get BasePath() {
     if (!this.#_basePath) {
@@ -96,6 +149,7 @@ class FileData {
   /**
    * @type {typeof os}
    * @readonly
+   * @static
    */
   static get os() {
     if (!loadedModules.os) {
@@ -110,6 +164,7 @@ class FileData {
   /**
    * @type {typeof fs}
    * @readonly
+   * @static
    */
   static get fs() {
     if (!loadedModules.fs) {
@@ -135,12 +190,18 @@ class FileData {
     );
   }
 
+  /**
+   * Sauvegarde des données dans un fichier
+   * @param {string} filename
+   * @param {*} data
+   * @returns {FileData}
+   */
   static Save(filename, data) {
     return new FileData(filename).save(data);
   }
 
   /**
-   *
+   * Charge les données d'un fichier
    * @param {string} filename
    * @returns {Promise<{fileManipulator:FileData, data:false | any, loadSuccess:boolean}>}
    * @async
