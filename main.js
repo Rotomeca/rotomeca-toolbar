@@ -426,6 +426,8 @@ class AppMain extends BaseAppObject {
       show: false,
     });
 
+    win.setMenuBarVisibility(false);
+
     win.addListener('closed', () => {
       this.removeWindow('settings');
     });
