@@ -4,6 +4,7 @@ const {
   BrowserWindow,
   screen,
   systemPreferences,
+  nativeTheme,
 } = require('electron');
 const path = require('path');
 
@@ -200,7 +201,7 @@ class BaseAppObject {
 
     win.webContents.executeJavaScript(
       `document.querySelector('html').classList.add('dark-mode-${
-        systemPreferences.getEffectiveAppearance === 'dark'
+        nativeTheme.shouldUseDarkColors
           ? 'enabled'
           : 'disabled'
       }')`,
@@ -213,7 +214,7 @@ class BaseAppObject {
 
   addWindow(index, window) {
     if (!this.#_windows[index]) this.#_windows[index] = window;
-    else throw new Error('###[addWindow]Alreday defined index', index);
+    else throw new Error(`###[addWindow]Already defined index: ${index}`);
 
     return this;
   }

@@ -54,7 +54,7 @@ class FileData {
    * @readonly
    */
   get path() {
-    return `${FileData.BasePath}\\${this.#_name}`;
+    return FileData.nodePath.join(FileData.BasePath, this.#_name);
   }
 
   /**
@@ -66,7 +66,18 @@ class FileData {
   save(data) {
     this.#_tryCreateBaseFolder();
 
-    FileData.fs.writeFileSync(this.path, JSON.stringify(data));
+    // Écriture atomique : fichier temporaire puis rename, avec copie .bak
+    const target = this.path;
+    const tmp = `${target}.tmp`;
+    FileData.fs.writeFileSync(tmp, JSON.stringify(data));
+    if (FileData.fs.existsSync(target)) {
+      try {
+        FileData.fs.copyFileSync(target, `${target}.bak`);
+      } catch (error) {
+        console.error('Impossible de créer la sauvegarde', error);
+      }
+    }
+    FileData.fs.renameSync(tmp, target);
 
     this.onsave.call(data);
 
@@ -85,6 +96,7 @@ class FileData {
       this.onload.call(data);
     } catch (error) {
       data = false;
+      this.#_quarantineIfCorrupt(error);
     }
 
     return data;
@@ -104,6 +116,7 @@ class FileData {
             loaded = JSON.parse(data.toString());
           } catch (error) {
             loaded = false;
+            this.#_quarantineIfCorrupt(error);
           }
         }
 
@@ -118,10 +131,26 @@ class FileData {
 
   #_tryCreateBaseFolder() {
     if (!FileData.fs.existsSync(FileData.BasePath)) {
-      FileData.fs.mkdirSync(FileData.BasePath);
+      FileData.fs.mkdirSync(FileData.BasePath, { recursive: true });
     }
 
     return this;
+  }
+
+  /**
+   * Si le fichier existe mais est illisible (JSON invalide), on le renomme
+   * pour qu'il ne soit jamais écrasé par la prochaine sauvegarde.
+   * @param {Error} error
+   */
+  #_quarantineIfCorrupt(error) {
+    if (error && error.code === 'ENOENT') return;
+    try {
+      if (FileData.fs.existsSync(this.path)) {
+        FileData.fs.renameSync(this.path, `${this.path}.corrupt-${Date.now()}`);
+      }
+    } catch (e) {
+      console.error('Impossible de mettre en quarantaine le fichier', e);
+    }
   }
 
   /**
@@ -132,18 +161,31 @@ class FileData {
    */
   static get BasePath() {
     if (!this.#_basePath) {
-      let path = '';
+      let base = '';
       if (process.platform === 'win32') {
         //Vérification si AppData/Roaming existe
-        const roaming = `${FileData.os.homedir()}\\AppData\\Roaming`;
-        if (this.fs.existsSync(roaming)) path = roaming;
-        else path = FileData.os.homedir();
-      } else path = FileData.os.homedir();
+        const roaming = FileData.nodePath.join(
+          FileData.os.homedir(),
+          'AppData',
+          'Roaming',
+        );
+        if (this.fs.existsSync(roaming)) base = roaming;
+        else base = FileData.os.homedir();
+      } else base = FileData.os.homedir();
 
-      this.#_basePath = `${path}\\.rotomeca-toolbar-data`;
+      this.#_basePath = FileData.nodePath.join(base, '.rotomeca-toolbar-data');
     }
 
     return this.#_basePath;
+  }
+
+  /**
+   * @type {typeof import('path')}
+   * @readonly
+   * @static
+   */
+  static get nodePath() {
+    return require('path');
   }
 
   /**
