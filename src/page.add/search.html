@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cse.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://www.google.com https://fonts.googleapis.com https://www.gstatic.com; img-src 'self' data: https:; font-src https://fonts.gstatic.com data:; frame-src https://www.google.com https://cse.google.com; connect-src https://*.google.com https://*.googleapis.com; object-src 'none'; base-uri 'none'"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cse.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://www.google.com https://fonts.googleapis.com https://www.gstatic.com; img-src 'self' data: https: http://clients1.google.com; font-src https://fonts.gstatic.com data:; frame-src https://www.google.com https://cse.google.com; connect-src https://*.google.com https://*.googleapis.com; object-src 'none'; base-uri 'none'"
     />
     <meta
       name="viewport"
@@ -27,7 +27,87 @@
       src="https://cse.google.com/cse.js?cx=b2532872584184b5c"
     ></script>
     <div class="gcse-search"></div>
-    <script src="./search.js"></script>
+    <!--
+      Script inline volontairement : cette page est dans une iframe sandboxée
+      (origine opaque, sans accès à l'IPC) qui ne peut pas charger de fichier
+      local (« Not allowed to load local resource »). Elle demande l'ajout d'un
+      lien à la page parente par postMessage ; la page parente valide la demande.
+    -->
+    <script>
+      (function () {
+        var MESSAGE_ADD = 'requestAddData';
+        var MESSAGE_ADD_EDIT = 'requestAddDataEdit';
+        // Icône "ajouter une image" (même SVG que src/pictures/add_photo_alternate_*.svg)
+        var ICON_SRC =
+          'data:image/svg+xml;utf8,' +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></svg>',
+          );
+
+        function createButton(content, type, name, url) {
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.style.cssText =
+            'margin-left:5px;padding:2px 8px;border:0;border-radius:4px;' +
+            'background:#3b4a6b;color:#fff;cursor:pointer;vertical-align:middle;';
+
+          if (typeof content === 'string') button.textContent = content;
+          else button.appendChild(content);
+
+          button.addEventListener('click', function () {
+            parent.postMessage({ type: type, name: name, url: url }, '*');
+          });
+
+          return button;
+        }
+
+        function decorate() {
+          // Neutralise les liens des résultats : on ne navigue pas dans l'iframe
+          document
+            .querySelectorAll(
+              '.gsc-results-wrapper-nooverlay.gsc-results-wrapper-visible a',
+            )
+            .forEach(function (link) {
+              if (link.hasAttribute('href')) {
+                link.setAttribute('data-href', link.getAttribute('href'));
+                link.removeAttribute('href');
+              }
+              link.style.pointerEvents = 'none';
+            });
+
+          document
+            .querySelectorAll('.gsc-webResult a.gs-title')
+            .forEach(function (link) {
+              if (link.parentElement.querySelector('[data-rotomeca-add]'))
+                return;
+
+              var url = link.getAttribute('data-href');
+              if (!url) return;
+              var name = link.textContent;
+
+              var add = createButton('+', MESSAGE_ADD, name, url);
+              add.setAttribute('data-rotomeca-add', '');
+              link.parentElement.appendChild(add);
+
+              var img = document.createElement('img');
+              img.setAttribute('src', ICON_SRC);
+              img.style.width = '12px';
+              link.parentElement.appendChild(
+                createButton(img, MESSAGE_ADD_EDIT, name, url),
+              );
+            });
+        }
+
+        var observer = new MutationObserver(function () {
+          // Évite de se redéclencher sur nos propres modifications du DOM
+          observer.disconnect();
+          decorate();
+          observer.observe(document.body, { childList: true, subtree: true });
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
   </body>
   <footer></footer>
 </html>
