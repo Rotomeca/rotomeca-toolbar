@@ -37,6 +37,15 @@ class BaseAppObject {
     return screen.getPrimaryDisplay();
   }
 
+  /**
+   * Zone utilisable (hors barre des tâches) de l'écran principal, avec son origine.
+   * @type {Electron.Rectangle}
+   * @readonly
+   */
+  get workArea() {
+    return this.primaryScreen.workArea;
+  }
+
   get primaryScreenSize() {
     return this.primaryScreen.workAreaSize;
   }
@@ -240,7 +249,21 @@ class BaseAppObject {
    * @returns
    */
   addEventListener(name, callback) {
-    ipcMain.handle(name, callback);
+    ipcMain.handle(name, (event, ...args) => {
+      // Seule la page principale d'une de nos fenêtres locales peut appeler l'IPC :
+      // ni un sous-cadre (iframe), ni un site distant.
+      const frame = event.senderFrame;
+      if (
+        !frame ||
+        frame !== event.sender.mainFrame ||
+        !frame.url.startsWith('file://')
+      ) {
+        console.warn(`IPC '${name}' refusé depuis`, frame?.url);
+        return;
+      }
+
+      return callback(event, ...args);
+    });
     return this;
   }
 

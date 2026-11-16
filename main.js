@@ -99,8 +99,8 @@ class AppMain extends BaseAppObject {
       this.createBrowserWindow('main', {
         width: 64,
         height: 32,
-        x: 10,
-        y: this.primaryScreenSize.height - 32,
+        x: this.workArea.x + 10,
+        y: this.workArea.y + this.workArea.height - 32,
         alwaysOnTop: true,
         frame: false,
         useContentSize: true,
@@ -125,10 +125,9 @@ class AppMain extends BaseAppObject {
       this.getWindow('toolbar') ??
       this.createBrowserWindow('toolbar', {
         width: 64,
-        height:
-          this.primaryScreenSize.height - (this.settingIsButton ? 52 : 20),
-        x: 10,
-        y: 10,
+        height: this.workArea.height - (this.settingIsButton ? 52 : 20),
+        x: this.workArea.x + 10,
+        y: this.workArea.y + 10,
         alwaysOnTop: true,
         frame: false,
         transparent: true,
@@ -155,7 +154,7 @@ class AppMain extends BaseAppObject {
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
       const win = this.createBrowserWindow('add_dialog', {
         title: 'Ajouter une application',
-        width: this.primaryScreenSize.width / 4,
+        width: this.workArea.width / 4,
         height: this.toolbarWindow.getBounds().height / 2,
         y: this.toolbarWindow.getBounds().y,
         x:
@@ -202,10 +201,10 @@ class AppMain extends BaseAppObject {
 
     if (!win) {
       win = new BaseWindow({
-        width: this.primaryScreenSize.width / 4,
+        width: this.workArea.width / 4,
         height: this.toolbarWindow.getBounds().height,
-        x: 64 + 20,
-        y: 10,
+        x: this.workArea.x + 64 + 20,
+        y: this.workArea.y + 10,
         alwaysOnTop: true,
         frame: false,
         skipTaskbar: true,
@@ -342,19 +341,62 @@ class AppMain extends BaseAppObject {
         this.event_settings_updated.bind(this),
       );
 
+    for (const eventName of [
+      'display-metrics-changed',
+      'display-added',
+      'display-removed',
+    ])
+      screen.on(eventName, () => this.repositionWindows());
+
     if (!this.settingIsButton) this.startDetectMousePosition();
   }
 
   startDetectMousePosition() {
     if (!this.mouseInterval) {
       this.mouseInterval = setInterval(() => {
-        if (screen.getCursorScreenPoint().x <= 10) {
+        // Bord gauche de l'écran principal uniquement (pas d'un écran voisin)
+        const { bounds } = this.primaryScreen;
+        const cursor = screen.getCursorScreenPoint();
+        if (
+          cursor.x >= bounds.x &&
+          cursor.x <= bounds.x + 10 &&
+          cursor.y >= bounds.y &&
+          cursor.y < bounds.y + bounds.height
+        ) {
           clearInterval(this.mouseInterval);
           this.mouseInterval = null;
           this.event_main_click();
         }
       }, 100);
     }
+  }
+
+  /**
+   * Replace les fenêtres existantes quand la configuration des écrans change.
+   */
+  repositionWindows() {
+    const wa = this.workArea;
+    const main = this.getWindow('main');
+    const toolbar = this.getWindow('toolbar');
+    const apps = this.getWindow('apps');
+
+    if (toolbar && !toolbar.isDestroyed())
+      toolbar.setBounds({
+        x: wa.x + 10,
+        y: wa.y + 10,
+        width: 64,
+        height: wa.height - (this.settingIsButton ? 52 : 20),
+      });
+
+    if (main && !main.isDestroyed())
+      main.setBounds({
+        x: wa.x + 10,
+        y: wa.y + wa.height - 32,
+        width: 64,
+        height: 32,
+      });
+
+    if (apps && !apps.isDestroyed()) apps.setPosition(wa.x + 64 + 20, wa.y + 10);
   }
 
   initContextMenu() {

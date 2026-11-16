@@ -1,80 +1,70 @@
-import { HTMLPrimaryButton } from '../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
-import { appEventList } from '../scripts/events/AppEventListModule.js';
+// Script classique (pas de module ni d'import) : la page est dans une iframe
+// sandboxée (origine opaque) qui charge un script Google distant. Elle n'a
+// aucun accès à l'IPC : elle ne peut que demander à la page parente, par
+// `postMessage`, d'ajouter un lien (la page parente valide la demande).
+(function () {
+  const MESSAGE_ADD = 'requestAddData';
+  const MESSAGE_ADD_EDIT = 'requestAddDataEdit';
+  const ICON_PATH =
+    '../pictures/add_photo_alternate_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg';
 
-export class Search {
-  constructor() {
-    this.main();
+  function createButton(content, type, name, url) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.style.cssText =
+      'margin-left:5px;padding:2px 8px;border:0;border-radius:4px;' +
+      'background:#3b4a6b;color:#fff;cursor:pointer;vertical-align:middle;';
+
+    if (typeof content === 'string') button.textContent = content;
+    else button.appendChild(content);
+
+    button.addEventListener('click', () => {
+      parent.postMessage({ type, name, url }, '*');
+    });
+
+    return button;
   }
 
-  main() {
-    const observer = new MutationObserver(() => {
-      observer.disconnect();
-      const a = document.querySelectorAll(
+  function decorate() {
+    // Neutralise les liens des résultats : on ne navigue pas dans l'iframe
+    document
+      .querySelectorAll(
         '.gsc-results-wrapper-nooverlay.gsc-results-wrapper-visible a',
-      );
-      a.forEach((link) => {
-        link.setAttribute('data-href', link.getAttribute('href'));
-        link.removeAttribute('href');
+      )
+      .forEach((link) => {
+        if (link.hasAttribute('href')) {
+          link.setAttribute('data-href', link.getAttribute('href'));
+          link.removeAttribute('href');
+        }
         link.style.pointerEvents = 'none';
       });
 
-      const links = document.querySelectorAll('.gsc-webResult a.gs-title');
-      links.forEach((link) => {
-        let button = HTMLPrimaryButton.CreateNode({ content: '+' });
-        button.setAttribute('data-form', 'secondary');
-        button.style.color = 'white';
-        button.style.marginLeft = '5px';
-        button.addEventListener(
-          'click',
-          function (href, title) {
-            parent.api.invoke(appEventList.requestAddData, {
-              name: title,
-              url: href,
-              picture: null,
-            });
-          }.bind(this, link.getAttribute('data-href'), link.textContent),
-        );
-        link.parentElement.appendChild(button);
-        button = null;
+    document.querySelectorAll('.gsc-webResult a.gs-title').forEach((link) => {
+      if (link.parentElement.querySelector('[data-rotomeca-add]')) return;
 
-        let img = document.createElement('img');
-        img.setAttribute(
-          'src',
-          '../pictures/add_photo_alternate_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg',
-        );
-        img.style.width = '12px';
-        button = HTMLPrimaryButton.CreateNode({ content: img });
-        button.setAttribute('data-form', 'secondary');
-        button.style.color = 'white';
-        button.style.marginLeft = '5px';
-        button.addEventListener(
-          'click',
-          function (href, title) {
-            parent.api.invoke(appEventList.requestAddDataEdit, {
-              name: title,
-              url: href,
-              picture: null,
-            });
-          }.bind(this, link.getAttribute('data-href'), link.textContent),
-        );
-        link.parentElement.appendChild(button);
-        button = null;
-        img = null;
-      });
+      const url = link.getAttribute('data-href');
+      if (!url) return;
+      const name = link.textContent;
 
-      observer.observe(document.body, { childList: true, subtree: true });
+      const add = createButton('+', MESSAGE_ADD, name, url);
+      add.setAttribute('data-rotomeca-add', '');
+      link.parentElement.appendChild(add);
+
+      const img = document.createElement('img');
+      img.setAttribute('src', ICON_PATH);
+      img.style.width = '12px';
+      link.parentElement.appendChild(
+        createButton(img, MESSAGE_ADD_EDIT, name, url),
+      );
     });
+  }
 
+  const observer = new MutationObserver(() => {
+    // Évite de se redéclencher sur nos propres modifications du DOM
+    observer.disconnect();
+    decorate();
     observer.observe(document.body, { childList: true, subtree: true });
-  }
+  });
 
-  /**
-   * Démarre le module
-   * @returns {Search}
-   */
-  static Run() {
-    return new Search();
-  }
-}
-
-Search.Run();
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
