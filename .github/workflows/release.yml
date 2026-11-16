@@ -1,0 +1,61 @@
+name: Release
+
+# Déclenché par un tag de version (ex: 2.1.0) poussé, typiquement sur main
+# après `git flow release finish`. Le serveur Hazel (Vercel) lit ensuite
+# la dernière release GitHub pour proposer la mise à jour via Squirrel.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag à publier (doit exister)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Vérifier que le tag correspond à package.json
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Tag $TAG différent de la version package.json ($VERSION)"
+            exit 1
+          fi
+
+      - name: Build (Squirrel)
+        run: pnpm run make
+
+      - name: Créer la release et envoyer les fichiers Squirrel
+        shell: bash
+        run: |
+          DIR="out/make/squirrel.windows/x64"
+          ls "$DIR"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES --clobber
+          else
+            gh release create "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES \
+              --title "$TAG" --generate-notes --verify-tag
+          fi
