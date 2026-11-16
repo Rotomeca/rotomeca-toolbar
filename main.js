@@ -341,7 +341,8 @@ class AppMain extends BaseAppObject {
       .addEventListener(
         appEventList.settingsUpdated,
         this.event_settings_updated.bind(this),
-      );
+      )
+      .addEventListener(appEventList.getVersion, () => app.getVersion());
 
     for (const eventName of [
       'display-metrics-changed',

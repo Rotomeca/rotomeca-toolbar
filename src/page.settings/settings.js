@@ -23,6 +23,9 @@ export class PageSettings {
           console.error('error: ' + err);
         });
 
+      document.querySelector('#app-version').textContent =
+        await window.api.invoke(appEventList.getVersion);
+
       this.settings ??= {};
       this.settings.isButtonModeEnabled ??= true;
       this.settings.theme ??= 'system';

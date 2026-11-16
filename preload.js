@@ -24,6 +24,7 @@ const INVOKE_CHANNELS = new Set([
   'refreshApp',
   'minimiseWindow',
   'setting.updated',
+  'getVersion',
   'rotomeca-context-menu',
 ]);
 
