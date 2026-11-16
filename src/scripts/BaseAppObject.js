@@ -70,7 +70,7 @@ class BaseAppObject {
     if (!this.#_css_root) {
       if (this.settings.theme === 'system') {
         const base_color = `#${(
-          systemPreferences?.getAccentColor?.() ?? 'ffffffff'
+          systemPreferences?.getAccentColor?.() || 'ffffffff'
         ).substring(0, 6)}cc`;
         const primary_color = BaseAppObject.ColorLuminance(base_color, 1.3);
         const hover_color = BaseAppObject.ColorLuminance(base_color, 2);
@@ -204,17 +204,22 @@ class BaseAppObject {
       win.loadFile(file);
     }
 
-    win.webContents.insertCSS(this.rootCSS);
+    // Injecté à chaque chargement de page : la fenêtre peut ne pas avoir de
+    // page au moment de sa création (ex: chargée plus tard via loadFile).
+    win.webContents.on('dom-ready', () => {
+      win.webContents.insertCSS(this.rootCSS).catch(console.error);
 
-    if (this.baseCSS !== '') win.webContents.insertCSS(this.baseCSS);
+      if (this.baseCSS !== '')
+        win.webContents.insertCSS(this.baseCSS).catch(console.error);
 
-    win.webContents.executeJavaScript(
-      `document.querySelector('html').classList.add('dark-mode-${
-        nativeTheme.shouldUseDarkColors
-          ? 'enabled'
-          : 'disabled'
-      }')`,
-    );
+      win.webContents
+        .executeJavaScript(
+          `document.querySelector('html').classList.add('dark-mode-${
+            nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
+          }')`,
+        )
+        .catch(console.error);
+    });
 
     this.addWindow(index, win);
 

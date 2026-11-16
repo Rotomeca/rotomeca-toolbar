@@ -1075,6 +1075,7 @@ app.on('ready', async () => {
     keepLoginsAlive(session.defaultSession);
     AppMain.InitAutoUpdater().Run();
   } catch (error) {
+    console.error(error);
     const dialogOpts = {
       type: 'error',
       buttons: ['Ok'],
