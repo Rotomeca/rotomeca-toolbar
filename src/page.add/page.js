@@ -18,6 +18,32 @@ export class Page {
       iframe.setAttribute('src', iframe.getAttribute('data-src'));
     });
 
+    //Demandes d'ajout venant de l'iframe de recherche (sandboxée, sans accès à l'IPC)
+    window.addEventListener('message', (event) => {
+      const iframe = document.querySelector('iframe');
+      if (!iframe || event.source !== iframe.contentWindow) return;
+
+      const { type, name, url } = event.data ?? {};
+      if (
+        ![appEventList.requestAddData, appEventList.requestAddDataEdit].includes(
+          type,
+        )
+      )
+        return;
+
+      try {
+        if (!['http:', 'https:'].includes(new URL(url).protocol)) return;
+      } catch (error) {
+        return;
+      }
+
+      window.api.invoke(type, {
+        name: typeof name === 'string' ? name : String(url),
+        url,
+        picture: null,
+      });
+    });
+
     //Récupérer la config avec la liste des applications par défaut
     await fetch('../../configs/config.json')
       .then(function (response) {

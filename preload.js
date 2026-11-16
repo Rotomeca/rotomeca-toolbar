@@ -1,60 +1,67 @@
-// boilerplate code for electron...
 const { contextBridge, ipcRenderer } = require('electron');
 
-// All of the Node.js APIs are available in the preload process.
-// It has the same sandbox as a Chrome extension.
-window.addEventListener('DOMContentLoaded', () => {
-  const replaceText = (selector, text) => {
-    const element = document.getElementById(selector);
-    if (element) element.innerText = text;
-  };
+// Un preload sandboxé ne peut pas `require` de fichier local : les listes
+// ci-dessous doivent rester synchronisées avec
+// `src/scripts/events/AppEventList.js` et `PageEventList.js`.
 
-  for (const type of ['chrome', 'node', 'electron']) {
-    replaceText(`${type}-version`, process.versions[type]);
-  }
-});
+/** Canaux `ipcMain.handle` autorisés pour le renderer */
+const INVOKE_CHANNELS = new Set([
+  'toggleToolbar',
+  'requestAdd',
+  'requestAddData',
+  'requestAddSeparator',
+  'requestAddDataEdit',
+  'requestUpdatedData',
+  'closeFrame',
+  'openFrame',
+  'closeApps',
+  'appDelete',
+  'appEdit',
+  'timeoutStopTop',
+  'toggleStopTop',
+  'requestMovement',
+  'killApp',
+  'refreshApp',
+  'minimiseWindow',
+  'setting.updated',
+  'rotomeca-context-menu',
+]);
 
-// end boilerplate code, on to your stuff..
+/** Canaux envoyés par le process principal vers le renderer */
+const ON_CHANNELS = new Set([
+  'toolbarClosed',
+  'mode_edit',
+  'frameOpen',
+  'toolbarAppSeparatorDelete',
+  'toolbarAppDeleted',
+  'windowAppMovement',
+  'appEdited',
+  'appAdded',
+  'appUpdated',
+  'init',
+  'appInserted',
+  'windowAppsClosed',
+  'settingsStart',
+]);
 
-/**
- * HERE YOU WILL EXPOSE YOUR 'myfunc' FROM main.js
- * TO THE FRONTEND.
- * (remember in main.js, you're putting preload.js
- * in the electron window? your frontend js will be able
- * to access this stuff as a result.
- */
 contextBridge.exposeInMainWorld('api', {
   invoke: (channel, ...data) => {
-    let validChannels = [
-      'toggleToolbar',
-      'requestAdd',
-      'requestAddData',
-      'openFrame',
-      'closeFrame',
-      'closeApps',
-      'appDelete',
-      'appEdit',
-      'requestUpdatedData',
-      'timeoutStopTop',
-      'toggleStopTop',
-      'killApp',
-      'refreshApp',
-      'closeWindow',
-      'minimiseWindow',
-      'requestAddDataEdit',
-      'setting.updated',
-      'rotomeca-context-menu',
-      'requestAddSeparator',
-      'requestMovement',
-    ]; // list of ipcMain.handle channels you want access in frontend to
-    if (validChannels.includes(channel)) {
-      // ipcRenderer.invoke accesses ipcMain.handle channels like 'myfunc'
-      // make sure to include this return statement or you won't get your Promise back
+    if (INVOKE_CHANNELS.has(channel)) {
       return ipcRenderer.invoke(channel, ...data);
     }
   },
+  /**
+   * Écoute un canal autorisé. Le premier argument du callback (l'évènement IPC)
+   * n'est jamais transmis à la page.
+   * @returns {() => void} Fonction de désabonnement
+   */
   on: (channel, callback) => {
-    return ipcRenderer.on(channel, callback);
+    if (!ON_CHANNELS.has(channel) || typeof callback !== 'function')
+      return () => {};
+
+    const listener = (_event, ...args) => callback(null, ...args);
+    ipcRenderer.on(channel, listener);
+
+    return () => ipcRenderer.removeListener(channel, listener);
   },
-  getGlobal: (variable) => global[variable],
 });

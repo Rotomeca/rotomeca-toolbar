@@ -12,4 +12,5 @@ const pageEventList = Object.freeze({
   init: 'init',
   appInserted: 'appInserted',
   windowAppsClosed: 'windowAppsClosed',
+  settingsStart: 'settingsStart',
 });

@@ -1,4 +1,5 @@
 import { appEventList } from '../scripts/events/AppEventListModule.js';
+import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
 export class PageSettings {
   constructor() {
@@ -7,7 +8,7 @@ export class PageSettings {
   }
 
   async main() {
-    window.api.on('settingsStart', async (_, path) => {
+    window.api.on(pageEventList.settingsStart, async (_, path) => {
       console.log('path', path);
       await fetch(path)
         .then(function (response) {

@@ -1,6 +1,13 @@
+// Doit être exécuté en premier : évènements d'installation/mise à jour Squirrel
+if (require('electron-squirrel-startup')) {
+  require('electron').app.quit();
+  return;
+}
+
 const {
   app,
   BrowserWindow,
+  session,
   WebContentsView,
   Tray,
   Menu,
@@ -17,7 +24,15 @@ const { BaseWindow } = require('electron/main');
 const {
   JsEvent,
 } = require('./lib/RotomecaWebComponents/libs/events_electron.js');
-const { appEventList } = require('./src/scripts/events/AppEventList.js');
+const {
+  pinUserData,
+  migrateLegacyData,
+  backupUserData,
+  restoreFromBackup,
+  flushSession,
+  keepLoginsAlive,
+} = require('./src/scripts/Persistence.js');
+const { appEventList } =require('./src/scripts/events/AppEventList.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 
 /**
@@ -86,8 +101,8 @@ class AppMain extends BaseAppObject {
       this.createBrowserWindow('main', {
         width: 64,
         height: 32,
-        x: 10,
-        y: this.primaryScreenSize.height - 32,
+        x: this.workArea.x + 10,
+        y: this.workArea.y + this.workArea.height - 32,
         alwaysOnTop: true,
         frame: false,
         useContentSize: true,
@@ -112,10 +127,9 @@ class AppMain extends BaseAppObject {
       this.getWindow('toolbar') ??
       this.createBrowserWindow('toolbar', {
         width: 64,
-        height:
-          this.primaryScreenSize.height - (this.settingIsButton ? 52 : 20),
-        x: 10,
-        y: 10,
+        height: this.workArea.height - (this.settingIsButton ? 52 : 20),
+        x: this.workArea.x + 10,
+        y: this.workArea.y + 10,
         alwaysOnTop: true,
         frame: false,
         transparent: true,
@@ -142,7 +156,7 @@ class AppMain extends BaseAppObject {
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
       const win = this.createBrowserWindow('add_dialog', {
         title: 'Ajouter une application',
-        width: this.primaryScreenSize.width / 4,
+        width: this.workArea.width / 4,
         height: this.toolbarWindow.getBounds().height / 2,
         y: this.toolbarWindow.getBounds().y,
         x:
@@ -189,10 +203,10 @@ class AppMain extends BaseAppObject {
 
     if (!win) {
       win = new BaseWindow({
-        width: this.primaryScreenSize.width / 4,
+        width: this.workArea.width / 4,
         height: this.toolbarWindow.getBounds().height,
-        x: 64 + 20,
-        y: 10,
+        x: this.workArea.x + 64 + 20,
+        y: this.workArea.y + 10,
         alwaysOnTop: true,
         frame: false,
         skipTaskbar: true,
@@ -329,19 +343,62 @@ class AppMain extends BaseAppObject {
         this.event_settings_updated.bind(this),
       );
 
+    for (const eventName of [
+      'display-metrics-changed',
+      'display-added',
+      'display-removed',
+    ])
+      screen.on(eventName, () => this.repositionWindows());
+
     if (!this.settingIsButton) this.startDetectMousePosition();
   }
 
   startDetectMousePosition() {
     if (!this.mouseInterval) {
       this.mouseInterval = setInterval(() => {
-        if (screen.getCursorScreenPoint().x <= 10) {
+        // Bord gauche de l'écran principal uniquement (pas d'un écran voisin)
+        const { bounds } = this.primaryScreen;
+        const cursor = screen.getCursorScreenPoint();
+        if (
+          cursor.x >= bounds.x &&
+          cursor.x <= bounds.x + 10 &&
+          cursor.y >= bounds.y &&
+          cursor.y < bounds.y + bounds.height
+        ) {
           clearInterval(this.mouseInterval);
           this.mouseInterval = null;
           this.event_main_click();
         }
       }, 100);
     }
+  }
+
+  /**
+   * Replace les fenêtres existantes quand la configuration des écrans change.
+   */
+  repositionWindows() {
+    const wa = this.workArea;
+    const main = this.getWindow('main');
+    const toolbar = this.getWindow('toolbar');
+    const apps = this.getWindow('apps');
+
+    if (toolbar && !toolbar.isDestroyed())
+      toolbar.setBounds({
+        x: wa.x + 10,
+        y: wa.y + 10,
+        width: 64,
+        height: wa.height - (this.settingIsButton ? 52 : 20),
+      });
+
+    if (main && !main.isDestroyed())
+      main.setBounds({
+        x: wa.x + 10,
+        y: wa.y + wa.height - 32,
+        width: 64,
+        height: 32,
+      });
+
+    if (apps && !apps.isDestroyed()) apps.setPosition(wa.x + 64 + 20, wa.y + 10);
   }
 
   initContextMenu() {
@@ -401,7 +458,11 @@ class AppMain extends BaseAppObject {
     try {
       this.userFileData.save(this.saves);
     } catch (e) {
-      alert('Failed to save the file !');
+      console.error('Failed to save the file', e);
+      dialog.showErrorBox(
+        'Erreur',
+        "Impossible de sauvegarder la liste des applications : " + e.message,
+      );
     }
   }
 
@@ -414,6 +475,13 @@ class AppMain extends BaseAppObject {
   }
 
   event_tray_on_click() {
+    const existing = this.getWindow('settings');
+    if (existing && !existing.isDestroyed()) {
+      if (existing.isMinimized()) existing.restore();
+      existing.focus();
+      return;
+    }
+
     let win = this.createBrowserWindow('settings', {
       title: 'Paramètres',
       icon: this.appIcon,
@@ -442,7 +510,10 @@ class AppMain extends BaseAppObject {
             `);
 
     win.webContents.on('dom-ready', () => {
-      win.webContents.postMessage('settingsStart', this.settings.filePath);
+      win.webContents.postMessage(
+        pageEventList.settingsStart,
+        this.settings.filePath,
+      );
     });
 
     win.show();
@@ -460,7 +531,9 @@ class AppMain extends BaseAppObject {
 
       this.toolbarWindow.show();
 
-      this.toolbarWindow.webContents.addListener('dom-ready', async () => {
+      if (!this.toolbarDomReadyBound) {
+        this.toolbarDomReadyBound = true;
+        this.toolbarWindow.webContents.addListener('dom-ready', async () => {
         if (!this.started) {
           this.started = true;
           if (await this.load()) {
@@ -479,7 +552,8 @@ class AppMain extends BaseAppObject {
             });
           }
         }
-      });
+        });
+      }
     } else {
       this.appsWindow.hide();
       this.toolbarWindow.hide();
@@ -503,7 +577,7 @@ class AppMain extends BaseAppObject {
     // this.mainWindow.hide();
 
     this.addDialogWindow.setMenuBarVisibility(false);
-    this.addDialogWindow.on('closed', () => {
+    this.addDialogWindow.once('closed', () => {
       // app.quit();
       this.toolbarWindow.show();
       this.toolbarWindow.webContents.postMessage(
@@ -548,7 +622,7 @@ class AppMain extends BaseAppObject {
 
     const index = this.saves.findIndex((x) => x.url === url);
 
-    if (index !== null && index !== false) {
+    if (index >= 0) {
       if (index + 1 >= this.saves.length) {
         this.toolbarWindow.webContents.postMessage(
           pageEventList.appAdded,
@@ -603,14 +677,8 @@ class AppMain extends BaseAppObject {
   }
 
   event_close_frame(_, url) {
-    if (
-      !!this.views?.[url]?.index &&
-      !!this.appsWindow.contentView.children[this.views[url].index]
-    ) {
-      this.appsWindow.contentView.children[this.views[url].index].setVisible(
-        false,
-      );
-
+    if (this.views?.[url]?.view) {
+      this.views[url].view.setVisible(false);
       this.views[url].visible = false;
     }
 
@@ -629,25 +697,27 @@ class AppMain extends BaseAppObject {
   }
 
   event_open_frame(_, url) {
+    if (!AppMain.IsSafeUrl(url)) return;
+
     this.url = url;
 
     if (!this.views[url]) {
+      // Session par défaut (persistante) : on ne vide jamais son stockage
       const view = new WebContentsView();
+      const bounds = this.appsWindow.getBounds();
       view.setBounds({
         x: 0,
         y: 20,
-        width: this.appsWindow.getBounds().width,
-        height: this.appsWindow.getBounds().height,
+        width: bounds.width,
+        height: Math.max(0, bounds.height - 20),
       });
 
-      this.views[url] = { view, index: Object.keys(this.views).length + 1 };
-      this.appsWindow.contentView.addChildView(view, this.views[url].index);
+      this.views[url] = { view };
+      this.appsWindow.contentView.addChildView(view);
 
       view.webContents.loadURL(url);
     } else {
-      this.appsWindow.contentView.children[this.views[url].index].setVisible(
-        true,
-      );
+      this.views[url].view.setVisible(true);
     }
 
     this.views[url].visible = true;
@@ -732,6 +802,7 @@ class AppMain extends BaseAppObject {
     const { url, type } = args;
 
     const index = this.saves.findIndex((x) => x.url === url);
+    if (index < 0) return;
     const element = this.saves.splice(index, 1)[0];
 
     let modifier = 0;
@@ -820,16 +891,16 @@ class AppMain extends BaseAppObject {
         );
       else this.toolbarWindow.hide();
 
-      shell.openExternal(url);
+      if (AppMain.IsSafeUrl(url)) shell.openExternal(url);
     }
   }
 
   event_refresh_app(_, url) {
     /**
-     * @type {WebContentsView}
+     * @type {WebContentsView | undefined}
      */
-    const view = this.views[url].view;
-    view.webContents.reload();
+    const view = this.views[url]?.view;
+    view?.webContents.reload();
   }
 
   event_minimise_windows(_, win) {
@@ -875,7 +946,17 @@ class AppMain extends BaseAppObject {
   }
 
   static InitAutoUpdater() {
-    if (AppMain.IsDev) return this;
+    // Squirrel n'existe que sur Windows/macOS et uniquement en version packagée
+    if (
+      AppMain.IsDev ||
+      !app.isPackaged ||
+      !['win32', 'darwin'].includes(process.platform)
+    )
+      return this;
+
+    autoUpdater.on('error', (error) => {
+      console.error('Auto update error', error);
+    });
 
     const server = require('./configs/appConfig.js').feedUrl;
 
@@ -908,7 +989,18 @@ class AppMain extends BaseAppObject {
             };
 
             dialog.showMessageBox(dialogOpts).then((returnValue) => {
-              if (returnValue.response === 0) autoUpdater.quitAndInstall();
+              if (returnValue.response === 0) {
+                // Copie de sécurité des données avant l'installation
+                try {
+                  const { FileData } = require('./src/scripts/FileData.js');
+                  backupUserData(app, FileData.BasePath);
+                } catch (e) {
+                  console.error(e);
+                }
+                // Sauvegarde des sessions (logins) avant que l'app soit tuée
+                flushSession(session.defaultSession);
+                autoUpdater.quitAndInstall();
+              }
             });
           };
 
@@ -950,6 +1042,14 @@ class AppMain extends BaseAppObject {
    * @type {boolean}
    * @readonly
    */
+  static IsSafeUrl(url) {
+    try {
+      return ['http:', 'https:'].includes(new URL(url).protocol);
+    } catch (error) {
+      return false;
+    }
+  }
+
   static get hasAutoUpdater() {
     return !!this.InitAutoUpdater.hasAutoUpdater;
   }
@@ -967,10 +1067,25 @@ class AppMain extends BaseAppObject {
   }
 }
 
+// Le dossier userData ne doit jamais changer (sessions, cookies, localStorage)
+pinUserData(app);
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
+
+app.on('before-quit', () => flushSession(session.defaultSession));
+app.on('will-quit', () => flushSession(session.defaultSession));
+
 app.on('ready', async () => {
+  if (!hasSingleInstanceLock) return;
   try {
+    const { FileData } = require('./src/scripts/FileData.js');
+    migrateLegacyData(app, FileData.BasePath);
+    restoreFromBackup(FileData.BasePath);
+    keepLoginsAlive(session.defaultSession);
     AppMain.InitAutoUpdater().Run();
   } catch (error) {
+    console.error(error);
     const dialogOpts = {
       type: 'error',
       buttons: ['Ok'],
