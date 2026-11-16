@@ -37,6 +37,15 @@ class BaseAppObject {
     return screen.getPrimaryDisplay();
   }
 
+  /**
+   * Zone utilisable (hors barre des tâches) de l'écran principal, avec son origine.
+   * @type {Electron.Rectangle}
+   * @readonly
+   */
+  get workArea() {
+    return this.primaryScreen.workArea;
+  }
+
   get primaryScreenSize() {
     return this.primaryScreen.workAreaSize;
   }
@@ -61,7 +70,7 @@ class BaseAppObject {
     if (!this.#_css_root) {
       if (this.settings.theme === 'system') {
         const base_color = `#${(
-          systemPreferences?.getAccentColor?.() ?? 'ffffffff'
+          systemPreferences?.getAccentColor?.() || 'ffffffff'
         ).substring(0, 6)}cc`;
         const primary_color = BaseAppObject.ColorLuminance(base_color, 1.3);
         const hover_color = BaseAppObject.ColorLuminance(base_color, 2);
@@ -195,17 +204,22 @@ class BaseAppObject {
       win.loadFile(file);
     }
 
-    win.webContents.insertCSS(this.rootCSS);
+    // Injecté à chaque chargement de page : la fenêtre peut ne pas avoir de
+    // page au moment de sa création (ex: chargée plus tard via loadFile).
+    win.webContents.on('dom-ready', () => {
+      win.webContents.insertCSS(this.rootCSS).catch(console.error);
 
-    if (this.baseCSS !== '') win.webContents.insertCSS(this.baseCSS);
+      if (this.baseCSS !== '')
+        win.webContents.insertCSS(this.baseCSS).catch(console.error);
 
-    win.webContents.executeJavaScript(
-      `document.querySelector('html').classList.add('dark-mode-${
-        nativeTheme.shouldUseDarkColors
-          ? 'enabled'
-          : 'disabled'
-      }')`,
-    );
+      win.webContents
+        .executeJavaScript(
+          `document.querySelector('html').classList.add('dark-mode-${
+            nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
+          }')`,
+        )
+        .catch(console.error);
+    });
 
     this.addWindow(index, win);
 
@@ -240,7 +254,21 @@ class BaseAppObject {
    * @returns
    */
   addEventListener(name, callback) {
-    ipcMain.handle(name, callback);
+    ipcMain.handle(name, (event, ...args) => {
+      // Seule la page principale d'une de nos fenêtres locales peut appeler l'IPC :
+      // ni un sous-cadre (iframe), ni un site distant.
+      const frame = event.senderFrame;
+      if (
+        !frame ||
+        frame !== event.sender.mainFrame ||
+        !frame.url.startsWith('file://')
+      ) {
+        console.warn(`IPC '${name}' refusé depuis`, frame?.url);
+        return;
+      }
+
+      return callback(event, ...args);
+    });
     return this;
   }
 
