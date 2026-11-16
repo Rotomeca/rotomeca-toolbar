@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+// NE JAMAIS MODIFIER : changer ce nom ferait perdre les sessions/cookies/localStorage
 const USER_DATA_NAME = 'rotomecatoolbar';
 const DATA_FILES = ['data.rsft', 'settings.rcft'];
 // Un an : les cookies de session deviennent persistants pour garder les logins
@@ -62,6 +63,69 @@ function migrateLegacyData(app, dataDir) {
   }
 }
 
+const BACKUP_DIR_NAME = 'backups';
+const MAX_BACKUPS = 5;
+
+/**
+ * Copie les fichiers de données dans `<dataDir>/backups/<version>-<timestamp>/`
+ * avant l'installation d'une mise à jour. Ne supprime jamais les données
+ * actives ; seules les sauvegardes les plus anciennes sont purgées.
+ * @param {Electron.App} app
+ * @param {string} dataDir Dossier de données actuel
+ */
+function backupUserData(app, dataDir) {
+  try {
+    const files = DATA_FILES.filter((f) =>
+      fs.existsSync(path.join(dataDir, f)),
+    );
+    if (!files.length) return;
+
+    const root = path.join(dataDir, BACKUP_DIR_NAME);
+    const target = path.join(root, `${app.getVersion()}-${Date.now()}`);
+    fs.mkdirSync(target, { recursive: true });
+    for (const f of files)
+      fs.copyFileSync(path.join(dataDir, f), path.join(target, f));
+
+    const old = fs
+      .readdirSync(root)
+      .map((name) => ({ name, mtime: fs.statSync(path.join(root, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(MAX_BACKUPS);
+    for (const { name } of old)
+      fs.rmSync(path.join(root, name), { recursive: true, force: true });
+  } catch (error) {
+    console.error('Sauvegarde des données impossible', error);
+  }
+}
+
+/**
+ * Restaure depuis la sauvegarde la plus récente les fichiers de données
+ * absents du dossier de données.
+ * @param {string} dataDir Dossier de données actuel
+ */
+function restoreFromBackup(dataDir) {
+  try {
+    const root = path.join(dataDir, BACKUP_DIR_NAME);
+    if (!fs.existsSync(root)) return;
+
+    const backups = fs
+      .readdirSync(root)
+      .map((name) => ({ name, mtime: fs.statSync(path.join(root, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    for (const file of DATA_FILES) {
+      const target = path.join(dataDir, file);
+      if (fs.existsSync(target)) continue;
+      const found = backups.find((b) =>
+        fs.existsSync(path.join(root, b.name, file)),
+      );
+      if (found) fs.copyFileSync(path.join(root, found.name, file), target);
+    }
+  } catch (error) {
+    console.error('Restauration des données impossible', error);
+  }
+}
+
 /**
  * Force l'écriture des cookies sur le disque.
  * @param {Electron.Session} session
@@ -108,6 +172,8 @@ function keepLoginsAlive(session) {
 module.exports = {
   pinUserData,
   migrateLegacyData,
+  backupUserData,
+  restoreFromBackup,
   flushSession,
   keepLoginsAlive,
 };

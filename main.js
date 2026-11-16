@@ -27,6 +27,8 @@ const {
 const {
   pinUserData,
   migrateLegacyData,
+  backupUserData,
+  restoreFromBackup,
   flushSession,
   keepLoginsAlive,
 } = require('./src/scripts/Persistence.js');
@@ -988,6 +990,13 @@ class AppMain extends BaseAppObject {
 
             dialog.showMessageBox(dialogOpts).then((returnValue) => {
               if (returnValue.response === 0) {
+                // Copie de sécurité des données avant l'installation
+                try {
+                  const { FileData } = require('./src/scripts/FileData.js');
+                  backupUserData(app, FileData.BasePath);
+                } catch (e) {
+                  console.error(e);
+                }
                 // Sauvegarde des sessions (logins) avant que l'app soit tuée
                 flushSession(session.defaultSession);
                 autoUpdater.quitAndInstall();
@@ -1072,6 +1081,7 @@ app.on('ready', async () => {
   try {
     const { FileData } = require('./src/scripts/FileData.js');
     migrateLegacyData(app, FileData.BasePath);
+    restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession);
     AppMain.InitAutoUpdater().Run();
   } catch (error) {
