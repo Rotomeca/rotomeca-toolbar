@@ -14,5 +14,6 @@ const pageEventList = Object.freeze({
   windowAppsClosed: 'windowAppsClosed',
   settingsStart: 'settingsStart',
   appIndicators: 'appIndicators',
+  mediaState: 'mediaState',
 });
  module.exports = { pageEventList };

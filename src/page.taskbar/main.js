@@ -58,6 +58,23 @@ export class Main {
       this.event_button_unpressed.bind(this),
     );
 
+    button.addEventListener('mouseenter', () => {
+      if (!button.hasMedia) return;
+
+      const rect = button.getBoundingClientRect();
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: true,
+        y: rect.top + rect.height / 2,
+      });
+    });
+    button.addEventListener('mouseleave', () => {
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: false,
+      });
+    });
+
     if (request === true) return button;
 
     if (document.querySelectorAll(HTMLToolbarButton.TAG).length === 0)
@@ -191,8 +208,8 @@ export class Main {
       }
     });
 
-    window.api.on(pageEventList.appIndicators, (_, { url, badge, audible }) => {
-      HTMLToolbarButton.Select(url)?.setIndicators({ badge, audible });
+    window.api.on(pageEventList.appIndicators, (_, { url, ...indicators }) => {
+      HTMLToolbarButton.Select(url)?.setIndicators(indicators);
     });
 
     window.api.on(pageEventList.windowAppsClosed, () => {

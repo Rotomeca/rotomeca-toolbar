@@ -10,6 +10,10 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_itemData = null;
   #_badge = 0;
   #_audible = false;
+  #_muted = false;
+  #_cover = null;
+  #_hasMedia = false;
+  #_coverNode = null;
   #_badgeNode = null;
   #_audioNode = null;
   constructor() {
@@ -84,7 +88,13 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#_audioNode.classList.add('audio');
     this.#_audioNode.setAttribute('aria-hidden', 'true');
     this.#_audioNode.appendChild(this.createText('🔊'));
-    this.root.append(this.#_badgeNode, this.#_audioNode);
+    this.#_coverNode = document.createElement('img');
+    this.#_coverNode.classList.add('cover');
+    this.#_coverNode.alt = '';
+    this.#_coverNode.onerror = () => {
+      this.#_coverNode.hidden = true;
+    };
+    this.root.append(this.#_coverNode, this.#_badgeNode, this.#_audioNode);
     this.#_renderIndicators();
 
     childNode = null;
@@ -185,26 +195,58 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
    * @param {Object} [indicators]
    * @param {number} [indicators.badge=0] Nombre de non-lus (0 = aucun badge)
    * @param {boolean} [indicators.audible=false] Le site émet du son
+   * @param {boolean} [indicators.muted=false] Le son du site est coupé
+   * @param {?string} [indicators.cover=null] Pochette du morceau en cours
+   * @param {boolean} [indicators.hasMedia=false] Un morceau est exposé par le site
    * @returns {this}
    */
-  setIndicators({ badge = 0, audible = false } = {}) {
+  setIndicators({
+    badge = 0,
+    audible = false,
+    muted = false,
+    cover = null,
+    hasMedia = false,
+  } = {}) {
     this.#_badge = badge;
     this.#_audible = audible;
+    this.#_muted = muted;
+    this.#_hasMedia = hasMedia;
+    this.#_cover = cover;
     this.#_renderIndicators();
 
     return this;
   }
 
+  /**
+   * Un morceau est en cours (le lecteur peut s'afficher au survol).
+   * @type {boolean}
+   * @readonly
+   */
+  get hasMedia() {
+    return this.#_hasMedia;
+  }
+
   #_renderIndicators() {
     if (!this.#_badgeNode) return;
 
+    if (this.#_cover) {
+      if (this.#_coverNode.getAttribute('src') !== this.#_cover)
+        this.#_coverNode.src = this.#_cover;
+      this.#_coverNode.hidden = false;
+    } else {
+      this.#_coverNode.hidden = true;
+      this.#_coverNode.removeAttribute('src');
+    }
+
     this.#_badgeNode.hidden = this.#_badge <= 0;
     this.#_badgeNode.textContent = this.#_badge > 99 ? '99+' : this.#_badge;
-    this.#_audioNode.hidden = !this.#_audible;
+    this.#_audioNode.hidden = !this.#_audible && !this.#_muted;
+    this.#_audioNode.textContent = this.#_muted ? '🔇' : '🔊';
 
     const states = [];
     if (this.#_badge > 0) states.push(`${this.#_badge} non lu(s)`);
-    if (this.#_audible) states.push('son en cours');
+    if (this.#_muted) states.push('son coupé');
+    else if (this.#_audible) states.push('son en cours');
 
     this.setAttribute(
       'title',
@@ -241,6 +283,16 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
       },
       p: {
         margin: '0px',
+      },
+      '.cover': {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        'object-fit': 'cover',
+        'border-radius': '15px',
+        'pointer-events': 'none',
       },
       '.badge': {
         position: 'absolute',

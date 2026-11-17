@@ -26,6 +26,9 @@ const INVOKE_CHANNELS = new Set([
   'setting.updated',
   'getVersion',
   'getDisplays',
+  'toggleMute',
+  'mediaControl',
+  'mediaHover',
   'rotomeca-context-menu',
 ]);
 
@@ -45,6 +48,7 @@ const ON_CHANNELS = new Set([
   'windowAppsClosed',
   'settingsStart',
   'appIndicators',
+  'mediaState',
 ]);
 
 contextBridge.exposeInMainWorld('api', {

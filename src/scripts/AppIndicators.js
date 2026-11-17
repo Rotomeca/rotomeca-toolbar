@@ -6,9 +6,57 @@
  * @returns {number} Nombre de non-lus (0 si aucun)
  */
 function parseUnreadCount(title) {
-  const match = /^\s*[([](\d{1,4})\+?[)\]]/.exec(title ?? '');
+	const match = /^\s*[([](\d{1,4})\+?[)\]]/.exec(title ?? '');
 
-  return match ? parseInt(match[1], 10) : 0;
+	return match ? parseInt(match[1], 10) : 0;
 }
 
-module.exports = { parseUnreadCount };
+const MEDIA_ACTIONS = Object.freeze([
+	'play',
+	'pause',
+	'previoustrack',
+	'nexttrack',
+]);
+const MAX_TEXT_LENGTH = 200;
+const MAX_DATA_URL_LENGTH = 500000;
+
+/**
+ * Valide l'état média envoyé par une page (donnée non fiable).
+ * @param {*} raw JSON (chaîne) issu du script injecté dans le site
+ * @returns {?{title: string, artist: string, artwork: ?string, playing: boolean, actions: string[]}}
+ *          `null` si la page n'expose aucun morceau
+ */
+function sanitizeMediaState(raw) {
+	let data;
+	try {
+		data = typeof raw === 'string' ? JSON.parse(raw) : null;
+	} catch (e) {
+		return null;
+	}
+
+	if (!data || typeof data !== 'object' || typeof data.title !== 'string')
+		return null;
+
+	const text = value =>
+		typeof value === 'string' ? value.slice(0, MAX_TEXT_LENGTH) : '';
+
+	const artwork =
+		typeof data.artwork === 'string' &&
+		(/^https:\/\//.test(data.artwork) ||
+			(/^data:image\//.test(data.artwork) &&
+				data.artwork.length <= MAX_DATA_URL_LENGTH))
+			? data.artwork
+			: null;
+
+	return {
+		title: text(data.title),
+		artist: text(data.artist),
+		artwork,
+		playing: data.playing === true,
+		actions: Array.isArray(data.actions)
+			? data.actions.filter(x => MEDIA_ACTIONS.includes(x))
+			: [],
+	};
+}
+
+module.exports = { parseUnreadCount, sanitizeMediaState, MEDIA_ACTIONS };

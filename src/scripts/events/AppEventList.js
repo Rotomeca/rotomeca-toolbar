@@ -22,6 +22,9 @@ const appEventList = Object.freeze({
   settingsUpdated: 'setting.updated',
   getVersion: 'getVersion',
   getDisplays: 'getDisplays',
+  toggleMute: 'toggleMute',
+  mediaControl: 'mediaControl',
+  mediaHover: 'mediaHover',
   rotomecaContextMenu: 'rotomeca-context-menu',
 });
  module.exports = { appEventList };
