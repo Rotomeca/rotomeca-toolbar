@@ -175,7 +175,17 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
 
       let style = document.createElement('style');
       style.appendChild(
-        document.createTextNode(`@keyframes tremble {
+        document.createTextNode(`@keyframes rainbow {
+          to {
+            filter: hue-rotate(360deg);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .progress {
+            animation: none;
+          }
+        }
+        @keyframes tremble {
           0% {
             transform: rotate(0);
           }
@@ -284,6 +294,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
         'aspect-ratio': '1 / 1',
         'border-radius': '15px',
         'border-color': 'transparent !important',
+        // La bordure est invisible : sans largeur, la boîte (et l'anneau de
+        // progression) fait toujours 40px quel que soit l'état du bouton
+        'border-width': '0 !important',
       },
       ':host(.edit) img, :host(.edit) p, :host(.edit) i': {
         animation: 'tremble 0.5s infinite',
@@ -313,22 +326,24 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
         'border-radius': '15px',
         'pointer-events': 'none',
       },
-      // Anneau d'avancée : un conic-gradient évidé par un masque
+      // Anneau d'avancée fin, aux dimensions du contour : un arc-en-ciel évidé
+      // par un masque : l'arc parcouru porte tout le spectre, le reste est grisé
       '.progress': {
         position: 'absolute',
-        top: '-3px',
-        left: '-3px',
-        right: '-3px',
-        bottom: '-3px',
-        padding: '3px',
+        top: '0',
+        left: '0',
+        right: '0',
+        bottom: '0',
+        padding: '2px',
         'box-sizing': 'border-box',
-        'border-radius': '18px',
+        'border-radius': '15px',
         background:
-          'conic-gradient(var(--color-scheme-text-active, #e1c58f) var(--progress, 0%), rgba(255, 255, 255, 0.15) 0)',
+          'conic-gradient(#ff3b30 calc(var(--progress, 0%) * 0.0), #ffcc00 calc(var(--progress, 0%) * 0.1667), #34c759 calc(var(--progress, 0%) * 0.3333), #00c7be calc(var(--progress, 0%) * 0.5), #0a84ff calc(var(--progress, 0%) * 0.6667), #bf5af2 calc(var(--progress, 0%) * 0.8333), #ff3b30 calc(var(--progress, 0%) * 1.0), transparent 0), rgba(255, 255, 255, 0.18)',
         '-webkit-mask':
           'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
         '-webkit-mask-composite': 'xor',
         'mask-composite': 'exclude',
+        animation: 'rainbow 3s linear infinite',
         'pointer-events': 'none',
       },
       '.badge': {
