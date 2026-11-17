@@ -3,6 +3,7 @@ name: Release
 # Déclenché par un tag de version (ex: 2.1.0) poussé, typiquement sur main
 # après `git flow release finish`. Le serveur Hazel (Vercel) lit ensuite
 # la dernière release GitHub pour proposer la mise à jour via Squirrel.
+# La release contient Windows (Squirrel) et Linux (deb + rpm).
 on:
   push:
     tags:
@@ -17,16 +18,18 @@ permissions:
   contents: write
 
 jobs:
-  release-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
-          fetch-depth: 0 # git-cliff a besoin de l'historique et des tags
 
       - uses: pnpm/action-setup@v4
 
@@ -46,8 +49,45 @@ jobs:
             exit 1
           fi
 
-      - name: Build (Squirrel)
+      - name: Installer les outils de packaging Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg
+
+      - name: Build
         run: pnpm run make
+
+      - name: Envoyer les fichiers Windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: make-windows
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/squirrel.windows/x64/*.nupkg
+            out/make/squirrel.windows/x64/RELEASES
+          if-no-files-found: error
+
+      - name: Envoyer les fichiers Linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: make-linux
+          path: |
+            out/make/deb/x64/*.deb
+            out/make/rpm/x64/*.rpm
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0 # git-cliff a besoin de l'historique et des tags
 
       - name: Générer les notes de release (git-cliff)
         uses: orhun/git-cliff-action@v4
@@ -57,15 +97,18 @@ jobs:
         env:
           OUTPUT: RELEASE_NOTES.md
 
-      - name: Créer la release et envoyer les fichiers Squirrel
-        shell: bash
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Créer la release et envoyer les fichiers
         run: |
-          DIR="out/make/squirrel.windows/x64"
-          ls "$DIR"
+          ls dist
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES --clobber
+            gh release upload "$TAG" dist/* --clobber
             gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
-            gh release create "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES \
+            gh release create "$TAG" dist/* \
               --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
           fi

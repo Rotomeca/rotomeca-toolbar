@@ -10,6 +10,7 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
+      platforms: ['win32'],
       config: {},
     },
     {
@@ -18,15 +19,24 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {         
+      config: {
         options: {
-        icon: './src/pictures/icon.png'
-      }
-    },
+          icon: './src/pictures/icon.png',
+          maintainer: 'Rotomeca',
+          homepage: 'https://github.com/Rotomeca/rotomeca-toolbar',
+          categories: ['Utility'],
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: './src/pictures/icon.png',
+          homepage: 'https://github.com/Rotomeca/rotomeca-toolbar',
+          categories: ['Utility'],
+        },
+      },
     },
   ],
   plugins: [
