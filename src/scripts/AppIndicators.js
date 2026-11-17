@@ -23,7 +23,7 @@ const MAX_DATA_URL_LENGTH = 500000;
 /**
  * Valide l'état média envoyé par une page (donnée non fiable).
  * @param {*} raw JSON (chaîne) issu du script injecté dans le site
- * @returns {?{title: string, artist: string, artwork: ?string, playing: boolean, actions: string[]}}
+ * @returns {?{duration: ?number, position: ?number, title: string, artist: string, artwork: ?string, playing: boolean, actions: string[]}}
  *          `null` si la page n'expose aucun morceau
  */
 function sanitizeMediaState(raw) {
@@ -48,7 +48,12 @@ function sanitizeMediaState(raw) {
 			? data.artwork
 			: null;
 
+	const duration = Number.isFinite(data.duration) ? data.duration : 0;
+	const position = Number.isFinite(data.position) ? data.position : 0;
+
 	return {
+		duration: duration > 0 ? duration : null,
+		position: duration > 0 ? Math.min(Math.max(position, 0), duration) : null,
 		title: text(data.title),
 		artist: text(data.artist),
 		artwork,

@@ -63,6 +63,21 @@
         margin-bottom: 6px;
       }
 
+      #bar {
+        height: 3px;
+        margin-bottom: 6px;
+        border-radius: 2px;
+        background-color: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      #bar > div {
+        height: 100%;
+        width: var(--progress, 0%);
+        background-color: var(--color-scheme-text-active, #e1c58f);
+        transition: width 1s linear;
+      }
+
       #controls {
         display: flex;
         gap: 4px;
@@ -97,6 +112,7 @@
       <div id="info">
         <div id="title"></div>
         <div id="artist"></div>
+        <div id="bar" hidden><div></div></div>
         <div id="controls">
           <button id="prev" type="button" title="Précédent">⏮</button>
           <button id="toggle" type="button" title="Lecture / pause">⏯</button>

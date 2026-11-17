@@ -792,6 +792,7 @@ class AppMain extends BaseAppObject {
         audible: entry?.audible ?? false,
         muted: this.mutedUrls.has(url),
         cover: entry?.media?.artwork ?? null,
+        progress: this.getMediaProgress(entry?.media),
         hasMedia: !!entry?.media,
       });
 
@@ -799,6 +800,14 @@ class AppMain extends BaseAppObject {
   }
 
   // #region Media
+  /**
+   * @param {?{duration: ?number, position: ?number}} media
+   * @returns {?number} Avancée du morceau entre 0 et 1, `null` si inconnue
+   */
+  getMediaProgress(media) {
+    return media?.duration ? media.position / media.duration : null;
+  }
+
   /**
    * @param {string} url
    * @returns {?Object} État affiché par la fenêtre de contrôle du morceau

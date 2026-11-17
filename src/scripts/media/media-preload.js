@@ -16,6 +16,22 @@ const PAGE_SCRIPT = `(() => {
     return original(action, handler);
   };
 
+  // setPositionState n'a pas de getter : on capture ce que la page déclare
+  let declared = null;
+  const originalPosition = ms.setPositionState.bind(ms);
+  ms.setPositionState = (state) => {
+    declared =
+      state && state.duration
+        ? {
+            duration: state.duration,
+            position: state.position || 0,
+            rate: state.playbackRate || 1,
+            at: performance.now(),
+          }
+        : null;
+    return originalPosition(state);
+  };
+
   const mediaElements = () => [...document.querySelectorAll('audio, video')];
 
   const bestArtwork = (list) => {
@@ -35,19 +51,49 @@ const PAGE_SCRIPT = `(() => {
     }
   };
 
+  const progress = (playing) => {
+    let duration = 0;
+    let position = 0;
+
+    if (declared) {
+      duration = declared.duration;
+      position =
+        declared.position +
+        (playing ? ((performance.now() - declared.at) / 1000) * declared.rate : 0);
+    } else {
+      const el = mediaElements().find(
+        (x) => Number.isFinite(x.duration) && x.duration > 0 && !x.paused,
+      );
+      if (el) {
+        duration = el.duration;
+        position = el.currentTime;
+      }
+    }
+
+    if (!(duration > 0)) return { duration: null, position: null };
+
+    return {
+      duration: Math.round(duration),
+      position: Math.round(Math.min(Math.max(position, 0), duration)),
+    };
+  };
+
   let last = '';
   const publish = () => {
     const meta = ms.metadata;
     let state = null;
 
     if (meta && meta.title) {
+      const playing =
+        ms.playbackState === 'playing' ||
+        (ms.playbackState === 'none' && mediaElements().some((x) => !x.paused));
+
       state = {
+        ...progress(playing),
         title: meta.title,
         artist: meta.artist || meta.album || '',
         artwork: bestArtwork(meta.artwork),
-        playing:
-          ms.playbackState === 'playing' ||
-          (ms.playbackState === 'none' && mediaElements().some((x) => !x.paused)),
+        playing,
         actions: Object.keys(handlers),
       };
     }

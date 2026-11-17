@@ -68,6 +68,14 @@ class Main {
 		title.title = state.title;
 		document.getElementById('artist').textContent = state.artist;
 
+		const bar = document.getElementById('bar');
+		bar.hidden = !state.duration;
+		if (state.duration)
+			bar.style.setProperty(
+				'--progress',
+				`${(state.position / state.duration) * 100}%`,
+			);
+
 		const has = action => state.actions.includes(action);
 		document.getElementById('prev').disabled = !has('previoustrack');
 		document.getElementById('next').disabled = !has('nexttrack');

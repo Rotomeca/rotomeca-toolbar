@@ -13,6 +13,8 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_muted = false;
   #_cover = null;
   #_hasMedia = false;
+  #_progress = null;
+  #_progressNode = null;
   #_coverNode = null;
   #_badgeNode = null;
   #_audioNode = null;
@@ -94,7 +96,15 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#_coverNode.onerror = () => {
       this.#_coverNode.hidden = true;
     };
-    this.root.append(this.#_coverNode, this.#_badgeNode, this.#_audioNode);
+    this.#_progressNode = document.createElement('span');
+    this.#_progressNode.classList.add('progress');
+    this.#_progressNode.setAttribute('aria-hidden', 'true');
+    this.root.append(
+      this.#_coverNode,
+      this.#_progressNode,
+      this.#_badgeNode,
+      this.#_audioNode,
+    );
     this.#_renderIndicators();
 
     childNode = null;
@@ -198,6 +208,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
    * @param {boolean} [indicators.muted=false] Le son du site est coupé
    * @param {?string} [indicators.cover=null] Pochette du morceau en cours
    * @param {boolean} [indicators.hasMedia=false] Un morceau est exposé par le site
+   * @param {?number} [indicators.progress=null] Avancée du morceau (0 à 1)
    * @returns {this}
    */
   setIndicators({
@@ -206,7 +217,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     muted = false,
     cover = null,
     hasMedia = false,
+    progress = null,
   } = {}) {
+    this.#_progress = progress;
     this.#_badge = badge;
     this.#_audible = audible;
     this.#_muted = muted;
@@ -237,6 +250,12 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
       this.#_coverNode.hidden = true;
       this.#_coverNode.removeAttribute('src');
     }
+
+    this.#_progressNode.hidden = this.#_progress === null;
+    this.#_progressNode.style.setProperty(
+      '--progress',
+      `${Math.round((this.#_progress ?? 0) * 100)}%`,
+    );
 
     this.#_badgeNode.hidden = this.#_badge <= 0;
     this.#_badgeNode.textContent = this.#_badge > 99 ? '99+' : this.#_badge;
@@ -292,6 +311,24 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
         height: '100%',
         'object-fit': 'cover',
         'border-radius': '15px',
+        'pointer-events': 'none',
+      },
+      // Anneau d'avancée : un conic-gradient évidé par un masque
+      '.progress': {
+        position: 'absolute',
+        top: '-3px',
+        left: '-3px',
+        right: '-3px',
+        bottom: '-3px',
+        padding: '3px',
+        'box-sizing': 'border-box',
+        'border-radius': '18px',
+        background:
+          'conic-gradient(var(--color-scheme-text-active, #e1c58f) var(--progress, 0%), rgba(255, 255, 255, 0.15) 0)',
+        '-webkit-mask':
+          'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+        '-webkit-mask-composite': 'xor',
+        'mask-composite': 'exclude',
         'pointer-events': 'none',
       },
       '.badge': {
