@@ -191,6 +191,10 @@ export class Main {
       }
     });
 
+    window.api.on(pageEventList.appIndicators, (_, { url, badge, audible }) => {
+      HTMLToolbarButton.Select(url)?.setIndicators({ badge, audible });
+    });
+
     window.api.on(pageEventList.windowAppsClosed, () => {
       document.querySelector('[aria-pressed="true"]')?.unpress?.();
     });

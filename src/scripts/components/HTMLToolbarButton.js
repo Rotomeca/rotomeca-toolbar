@@ -8,6 +8,10 @@ import { HTMLGrouppedButton } from './HTMLGrouppedButton.js';
 
 export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_itemData = null;
+  #_badge = 0;
+  #_audible = false;
+  #_badgeNode = null;
+  #_audioNode = null;
   constructor() {
     super();
   }
@@ -73,6 +77,15 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     mainDiv.appendChild(childNode);
 
     this.root.appendChild(mainDiv);
+
+    this.#_badgeNode = document.createElement('span');
+    this.#_badgeNode.classList.add('badge');
+    this.#_audioNode = document.createElement('span');
+    this.#_audioNode.classList.add('audio');
+    this.#_audioNode.setAttribute('aria-hidden', 'true');
+    this.#_audioNode.appendChild(this.createText('🔊'));
+    this.root.append(this.#_badgeNode, this.#_audioNode);
+    this.#_renderIndicators();
 
     childNode = null;
     mainDiv = null;
@@ -167,6 +180,40 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     }
   }
 
+  /**
+   * Met à jour les indicateurs affichés sur le bouton.
+   * @param {Object} [indicators]
+   * @param {number} [indicators.badge=0] Nombre de non-lus (0 = aucun badge)
+   * @param {boolean} [indicators.audible=false] Le site émet du son
+   * @returns {this}
+   */
+  setIndicators({ badge = 0, audible = false } = {}) {
+    this.#_badge = badge;
+    this.#_audible = audible;
+    this.#_renderIndicators();
+
+    return this;
+  }
+
+  #_renderIndicators() {
+    if (!this.#_badgeNode) return;
+
+    this.#_badgeNode.hidden = this.#_badge <= 0;
+    this.#_badgeNode.textContent = this.#_badge > 99 ? '99+' : this.#_badge;
+    this.#_audioNode.hidden = !this.#_audible;
+
+    const states = [];
+    if (this.#_badge > 0) states.push(`${this.#_badge} non lu(s)`);
+    if (this.#_audible) states.push('son en cours');
+
+    this.setAttribute(
+      'title',
+      states.length
+        ? `${this.itemData.title} (${states.join(', ')})`
+        : this.itemData.title,
+    );
+  }
+
   static get CssRules() {
     return StyleComponent.RuleClass.Write({
       ':host': {
@@ -194,6 +241,34 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
       },
       p: {
         margin: '0px',
+      },
+      '.badge': {
+        position: 'absolute',
+        top: '-4px',
+        right: '-4px',
+        'min-width': '16px',
+        height: '16px',
+        padding: '0 4px',
+        'box-sizing': 'border-box',
+        'border-radius': '8px',
+        background: '#e53935',
+        color: '#fff',
+        'font-size': '10px',
+        'font-weight': 'bold',
+        'line-height': '16px',
+        'text-align': 'center',
+        'pointer-events': 'none',
+      },
+      '.audio': {
+        position: 'absolute',
+        bottom: '-2px',
+        right: '-2px',
+        'font-size': '11px',
+        'line-height': '1',
+        'pointer-events': 'none',
+      },
+      '[hidden]': {
+        display: 'none',
       },
     });
   }

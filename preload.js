@@ -44,6 +44,7 @@ const ON_CHANNELS = new Set([
   'appInserted',
   'windowAppsClosed',
   'settingsStart',
+  'appIndicators',
 ]);
 
 contextBridge.exposeInMainWorld('api', {

@@ -34,6 +34,7 @@ const {
 } = require('./src/scripts/Persistence.js');
 const { appEventList } =require('./src/scripts/events/AppEventList.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
+const { parseUnreadCount } = require('./src/scripts/AppIndicators.js');
 
 /**
  * @callback SavesUpdatedCallback
@@ -553,6 +554,9 @@ class AppMain extends BaseAppObject {
               },
             });
           }
+
+          // La toolbar peut avoir été recréée alors que des sites tournent déjà
+          for (const url in this.views) this.sendIndicators(url);
         }
         });
       }
@@ -698,6 +702,46 @@ class AppMain extends BaseAppObject {
     if (!loaded) this.appsWindow.hide();
   }
 
+  /**
+   * Suit le titre (non-lus) et l'état audio d'une vue pour les afficher sur son bouton.
+   * @param {string} url
+   * @param {WebContentsView} view
+   */
+  bindIndicators(url, view) {
+    const { webContents } = view;
+
+    webContents.on('page-title-updated', (_, title) => {
+      this.updateIndicators(url, { badge: parseUnreadCount(title) });
+    });
+    webContents.on('audio-state-changed', (event) => {
+      this.updateIndicators(url, { audible: event.audible });
+    });
+  }
+
+  /**
+   * @param {string} url
+   * @param {{badge?: number, audible?: boolean}} changes
+   */
+  updateIndicators(url, changes) {
+    const entry = this.views[url];
+    if (!entry) return;
+
+    Object.assign(entry, changes);
+    this.sendIndicators(url);
+  }
+
+  sendIndicators(url) {
+    const entry = this.views[url];
+    const toolbar = this.getWindow('toolbar');
+    if (!toolbar || toolbar.isDestroyed()) return;
+
+    toolbar.webContents.postMessage(pageEventList.appIndicators, {
+      url,
+      badge: entry?.badge ?? 0,
+      audible: entry?.audible ?? false,
+    });
+  }
+
   event_open_frame(_, url) {
     if (!AppMain.IsSafeUrl(url)) return;
 
@@ -714,8 +758,9 @@ class AppMain extends BaseAppObject {
         height: Math.max(0, bounds.height - 20),
       });
 
-      this.views[url] = { view };
+      this.views[url] = { view, badge: 0, audible: false };
       this.appsWindow.contentView.addChildView(view);
+      this.bindIndicators(url, view);
 
       view.webContents.loadURL(url);
     } else {
@@ -878,6 +923,7 @@ class AppMain extends BaseAppObject {
       view.webContents.close();
       view.webContents?.destroy?.();
       delete this.views[url];
+      this.sendIndicators(url);
     }
 
     this.toolbarWindow.webContents.postMessage(
