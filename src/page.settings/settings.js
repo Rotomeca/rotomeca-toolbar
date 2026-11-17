@@ -7,6 +7,40 @@ export class PageSettings {
     this.main();
   }
 
+  async #initDisplays() {
+    const displays = (await window.api.invoke(appEventList.getDisplays)) ?? [];
+    if (displays.length < 2) return;
+
+    // Écran enregistré absent : on affiche le principal sans toucher au réglage
+    const selected =
+      displays.find((d) => d.id === this.settings.displayId) ??
+      displays.find((d) => d.isPrimary) ??
+      displays[0];
+    const container = document.querySelector('#displays');
+
+    for (const display of displays) {
+      const button = document.createElement('rotomeca-primary-pressed-button');
+      button.dataset.form = 'secondary';
+      button.classList.add('setting', 'setting-display');
+      button.textContent = display.label;
+      container.appendChild(button);
+
+      if (display.id === selected.id) button.press({ enableEvent: false });
+
+      button.addEventListener('event:custom:state.pressed', (event) => {
+        document
+          .querySelectorAll('.setting-display')
+          .forEach((element) => element.unpress());
+        event.currentTarget.press({ enableEvent: false });
+
+        this.settings.displayId = display.id;
+        window.api.invoke(appEventList.settingsUpdated, this.settings);
+      });
+    }
+
+    document.querySelector('#display-setting').hidden = false;
+  }
+
   async main() {
     window.api.on(pageEventList.settingsStart, async (_, path) => {
       console.log('path', path);
@@ -29,6 +63,8 @@ export class PageSettings {
       this.settings ??= {};
       this.settings.isButtonModeEnabled ??= true;
       this.settings.theme ??= 'system';
+
+      await this.#initDisplays();
 
       document.querySelectorAll('.setting-mode').forEach((button) => {
         if (this.settings.isButtonModeEnabled && button.id === 'button')

@@ -21,6 +21,7 @@ const appEventList = Object.freeze({
   minimiseWindow: 'minimiseWindow',
   settingsUpdated: 'setting.updated',
   getVersion: 'getVersion',
+  getDisplays: 'getDisplays',
   rotomecaContextMenu: 'rotomeca-context-menu',
 });
  module.exports = { appEventList };

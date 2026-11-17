@@ -34,6 +34,19 @@ class Settings {
   }
 
   /**
+   * Identifiant de l'écran choisi (`null` = écran principal).
+   * @type {number|null}
+   */
+  get displayId() {
+    return this.#_config.displayId ?? null;
+  }
+
+  set displayId(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.displayId = value;
+  }
+
+  /**
    * @type {readonly}
    */
   get filePath() {
@@ -44,6 +57,7 @@ class Settings {
     this.fileData.save({
       isButtonModeEnabled: this.isButtonModeEnabled,
       theme: this.theme,
+      displayId: this.displayId,
     });
   }
 

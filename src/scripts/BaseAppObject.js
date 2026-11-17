@@ -33,8 +33,33 @@ class BaseAppObject {
     return this.#_params.Instance;
   }
 
+  /**
+   * Écran choisi dans les paramètres, ou l'écran principal s'il n'existe plus.
+   * L'identifiant enregistré n'est jamais modifié : l'écran est repris dès son retour.
+   * @type {Electron.Display}
+   * @readonly
+   */
   get primaryScreen() {
-    return screen.getPrimaryDisplay();
+    const id = this.settings.displayId;
+    return (
+      (id !== null && screen.getAllDisplays().find((d) => d.id === id)) ||
+      screen.getPrimaryDisplay()
+    );
+  }
+
+  /**
+   * Écrans disponibles, pour la page des paramètres.
+   * @returns {{id:number, label:string, isPrimary:boolean}[]}
+   */
+  getDisplaysInfo() {
+    const primaryId = screen.getPrimaryDisplay().id;
+    return screen.getAllDisplays().map((d, i) => ({
+      id: d.id,
+      label:
+        `${d.label || `Écran ${i + 1}`} (${d.bounds.width}x${d.bounds.height})` +
+        (d.id === primaryId ? ' - principal' : ''),
+      isPrimary: d.id === primaryId,
+    }));
   }
 
   /**

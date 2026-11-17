@@ -342,7 +342,8 @@ class AppMain extends BaseAppObject {
         appEventList.settingsUpdated,
         this.event_settings_updated.bind(this),
       )
-      .addEventListener(appEventList.getVersion, () => app.getVersion());
+      .addEventListener(appEventList.getVersion, () => app.getVersion())
+      .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo());
 
     for (const eventName of [
       'display-metrics-changed',
@@ -924,7 +925,12 @@ class AppMain extends BaseAppObject {
     this.settings.theme = settings.theme;
     this.settings.isButtonModeEnabled = settings.isButtonModeEnabled;
 
+    const displayUpdated = this.settings.displayId !== (settings.displayId ?? null);
+    this.settings.displayId = settings.displayId ?? null;
+
     this.settings.save();
+
+    if (displayUpdated) this.repositionWindows();
 
     const css = this.update_root_css();
     this.mainWindow.webContents.insertCSS(css);
