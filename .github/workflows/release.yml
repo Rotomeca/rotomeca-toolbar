@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
+          fetch-depth: 0 # git-cliff a besoin de l'historique et des tags
 
       - uses: pnpm/action-setup@v4
 
@@ -48,6 +49,14 @@ jobs:
       - name: Build (Squirrel)
         run: pnpm run make
 
+      - name: Générer les notes de release (git-cliff)
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
       - name: Créer la release et envoyer les fichiers Squirrel
         shell: bash
         run: |
@@ -55,7 +64,8 @@ jobs:
           ls "$DIR"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES --clobber
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
             gh release create "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES \
-              --title "$TAG" --generate-notes --verify-tag
+              --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
           fi
