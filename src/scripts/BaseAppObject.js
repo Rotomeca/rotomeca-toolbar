@@ -122,12 +122,15 @@ class BaseAppObject {
    * @returns {string}
    */
   get themeScript() {
-    const { resolveTheme } = require('../../settings.js');
+    const { resolveTheme, SEASON_THEMES } = require('../../settings.js');
     const attrs = resolveTheme(
       this.settings.theme,
       nativeTheme.shouldUseDarkColors,
     );
-    return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; }`;
+    // Effets de saison : seulement sur un thème de saison, interrupteur actif
+    const fx =
+      this.settings.effetsSaison && SEASON_THEMES.includes(attrs.palette);
+    return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; h.dataset.fx = ${JSON.stringify(fx ? 'on' : 'off')}; h.dataset.fxDensity = ${JSON.stringify(this.settings.densiteEffets)}; }`;
   }
 
   /**

@@ -126,3 +126,65 @@
   --p-accent: #d6a23d; --p-on-accent: #000000; --p-accent-soft: #2e2510; --p-on-accent-soft: #e9c27a;
   --p-brand-soft: #1f1f1f; --p-on-brand-soft: #f2f2f2;
 }
+
+/* ===== Saisons — d'après les éditions prestige de « Mémoires de la forêt » ===== */
+
+/* Hiver — bleu de nuit, branches givrées, or */
+[data-palette="hiver"] {
+  --p-bg: #171c4a; --p-variant: #20275e; --p-strong: #2c3578; --p-overlay: #20275e;
+  --p-text: #eef1ff; --p-muted: #b8c2ec; --p-border-subtle: #2c3578; --p-border-strong: #6f7fc8;
+  --p-primary: #d9b968; --p-primary-hover: #e6cb86; --p-primary-active: #bf9f4f; --p-on-primary: #171c4a;
+  --p-action-text: #a9c8ff; --p-hover: #252d6a; --p-press: #2c3578;
+  --p-accent: #7fb0f5; --p-on-accent: #171c4a; --p-accent-soft: #243a6e; --p-on-accent-soft: #a9c8ff;
+  --p-brand-soft: #2a2f63; --p-on-brand-soft: #e6cb86;
+}
+
+/* Automne — bordeaux profond, dorure, feuille orangée */
+[data-palette="automne"] {
+  --p-bg: #3b1016; --p-variant: #4e1820; --p-strong: #66232c; --p-overlay: #4e1820;
+  --p-text: #f7e8d6; --p-muted: #dcc0a6; --p-border-subtle: #66232c; --p-border-strong: #b07a64;
+  --p-primary: #d4a95a; --p-primary-hover: #e2bd76; --p-primary-active: #b98e45; --p-on-primary: #3b1016;
+  --p-action-text: #e2bd76; --p-hover: #571c24; --p-press: #66232c;
+  --p-accent: #e07a3a; --p-on-accent: #3b1016; --p-accent-soft: #5c2a14; --p-on-accent-soft: #f0a878;
+  --p-brand-soft: #5a1f27; --p-on-brand-soft: #e2bd76;
+}
+
+/* Printemps — vert émeraude, menthe, or */
+[data-palette="printemps"] {
+  --p-bg: #12352a; --p-variant: #184235; --p-strong: #215443; --p-overlay: #184235;
+  --p-text: #eef7ee; --p-muted: #b7d6c2; --p-border-subtle: #215443; --p-border-strong: #6fa58a;
+  --p-primary: #9fd4b2; --p-primary-hover: #b6e0c4; --p-primary-active: #84c09b; --p-on-primary: #12352a;
+  --p-action-text: #b6e0c4; --p-hover: #1c4a3b; --p-press: #215443;
+  --p-accent: #d4b062; --p-on-accent: #12352a; --p-accent-soft: #3a3a1a; --p-on-accent-soft: #e2c886;
+  --p-brand-soft: #1d4a3a; --p-on-brand-soft: #b6e0c4;
+}
+
+/* Printemps, variante cerisier — même forêt, action rose fleur */
+[data-palette="cerisier"] {
+  --p-bg: #12352a; --p-variant: #184235; --p-strong: #215443; --p-overlay: #184235;
+  --p-text: #eef7ee; --p-muted: #b7d6c2; --p-border-subtle: #215443; --p-border-strong: #6fa58a;
+  --p-primary: #f2a7bd; --p-primary-hover: #f7bfd0; --p-primary-active: #e48aa5; --p-on-primary: #12352a;
+  --p-action-text: #f7bfd0; --p-hover: #1c4a3b; --p-press: #215443;
+  --p-accent: #d4b062; --p-on-accent: #12352a; --p-accent-soft: #3a3a1a; --p-on-accent-soft: #e2c886;
+  --p-brand-soft: #3d2f3a; --p-on-brand-soft: #f7bfd0;
+}
+
+/* Été — clair, lumière dorée, orange solaire, jaune tournesol */
+[data-palette="ete"] {
+  --p-bg: #fff8ea; --p-variant: #fdeccb; --p-strong: #f7da9a; --p-overlay: #fffdf6;
+  --p-text: #3b2410; --p-muted: #6b4a28; --p-border-subtle: #f1d9a8; --p-border-strong: #a8763e;
+  --p-primary: #b4531a; --p-primary-hover: #c86a2c; --p-primary-active: #8f3f12; --p-on-primary: #ffffff;
+  --p-action-text: #9a4614; --p-hover: #fdeccb; --p-press: #f7da9a;
+  --p-accent: #e8b923; --p-on-accent: #3b2410; --p-accent-soft: #fbe7a6; --p-on-accent-soft: #6e4f00;
+  --p-brand-soft: #fbe0c8; --p-on-brand-soft: #8f3f12;
+}
+
+/* Noël — kitsch traditionnel : sapin, rouge vif, or, neige */
+[data-palette="noel"] {
+  --p-bg: #0f3b22; --p-variant: #164d2d; --p-strong: #1f6338; --p-overlay: #164d2d;
+  --p-text: #fff8ec; --p-muted: #d6e8cf; --p-border-subtle: #1f6338; --p-border-strong: #e3b341;
+  --p-primary: #d62839; --p-primary-hover: #e4434f; --p-primary-active: #b01e2d; --p-on-primary: #ffffff;
+  --p-action-text: #ffd166; --p-hover: #1a5833; --p-press: #1f6338;
+  --p-accent: #f2c14e; --p-on-accent: #0f3b22; --p-accent-soft: #5a1219; --p-on-accent-soft: #ffb3ba;
+  --p-brand-soft: #5a1219; --p-on-brand-soft: #ffb3ba;
+}

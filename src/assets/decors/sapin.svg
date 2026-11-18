@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" preserveAspectRatio="xMidYMax meet">
+<rect x="44" y="112" width="12" height="16" rx="2" fill="#6b4226"></rect>
+<path d="M50 58L94 116L6 116Z" fill="#1e6b34"></path>
+<path d="M50 34L86 88L14 88Z" fill="#267a40"></path>
+<path d="M50 14L78 60L22 60Z" fill="#2e8b4a"></path>
+<path d="M27 56Q50 66 73 52M20 84Q50 98 80 80M14 110Q50 124 88 106" stroke="#f2c14e" stroke-width="2.2" fill="none"></path>
+<circle class="fx-twinkle" cx="36" cy="72" r="4" fill="#d62839"></circle>
+<circle class="fx-twinkle" style="animation-delay: -0.5s;" cx="62" cy="68" r="4" fill="#f2c14e"></circle>
+<circle class="fx-twinkle" style="animation-delay: -1s;" cx="54" cy="46" r="3.5" fill="#ffffff"></circle>
+<circle class="fx-twinkle" style="animation-delay: -0.3s;" cx="42" cy="98" r="4.5" fill="#f2c14e"></circle>
+<circle class="fx-twinkle" style="animation-delay: -1.2s;" cx="70" cy="100" r="4.5" fill="#d62839"></circle>
+<circle class="fx-twinkle" style="animation-delay: -0.8s;" cx="26" cy="104" r="4" fill="#ffffff"></circle>
+<circle class="fx-twinkle" style="animation-delay: -1.4s;" cx="56" cy="84" r="3.5" fill="#d62839"></circle>
+<path d="M50 1L53.5 9H62L55 14L58 22L50 17L42 22L45 14L38 9H46.5Z" fill="#f2c14e"></path>
+</svg>

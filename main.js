@@ -1711,6 +1711,8 @@ class AppMain extends BaseAppObject {
 
     // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
+    this.settings.effetsSaison = settings.effetsSaison;
+    this.settings.densiteEffets = settings.densiteEffets;
     this.settings.isButtonModeEnabled = isButtonModeEnabled;
     this.settings.appBarEnabled = appBarEnabled;
     this.settings.appBarAutoHide = appBarAutoHide;

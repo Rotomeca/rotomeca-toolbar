@@ -13,9 +13,30 @@ const THEME_ATTRS = Object.freeze({
   sapin: { theme: 'dark', palette: 'sapin' },
   blanc: { theme: 'light', palette: 'blanc' },
   noir: { theme: 'dark', palette: 'noir' },
+  hiver: { theme: 'dark', palette: 'hiver' },
+  automne: { theme: 'dark', palette: 'automne' },
+  printemps: { theme: 'dark', palette: 'printemps' },
+  cerisier: { theme: 'dark', palette: 'cerisier' },
+  ete: { theme: 'light', palette: 'ete' },
+  noel: { theme: 'dark', palette: 'noel' },
 });
 const THEMES = Object.freeze(Object.keys(THEME_ATTRS));
 const DEFAULT_THEME = 'system';
+
+/** Thèmes de saison : les seuls à porter des effets animés. */
+const SEASON_THEMES = Object.freeze(['hiver', 'automne', 'printemps', 'cerisier', 'ete', 'noel']);
+
+/** Densités des effets de saison. */
+const EFFECT_DENSITIES = Object.freeze(['discrete', 'normale', 'abondante']);
+const DEFAULT_DENSITY = 'normale';
+
+/**
+ * @param {unknown} value
+ * @returns {string} Une densité valide, ou la densité par défaut
+ */
+function sanitizeDensity(value) {
+  return EFFECT_DENSITIES.includes(value) ? value : DEFAULT_DENSITY;
+}
 
 /** Anciennes valeurs enregistrées (avant 3.x) → thème équivalent. */
 const LEGACY_THEMES = Object.freeze({
@@ -122,6 +143,32 @@ class Settings {
   }
 
   /**
+   * Effets de saison activés (par défaut oui).
+   * @type {boolean}
+   */
+  get effetsSaison() {
+    return this.#_config.effetsSaison !== false;
+  }
+
+  set effetsSaison(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.effetsSaison = value !== false;
+  }
+
+  /**
+   * Densité des effets de saison.
+   * @type {'discrete'|'normale'|'abondante'}
+   */
+  get densiteEffets() {
+    return sanitizeDensity(this.#_config.densiteEffets);
+  }
+
+  set densiteEffets(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.densiteEffets = sanitizeDensity(value);
+  }
+
+  /**
    * Identifiant de l'écran choisi (`null` = écran principal).
    * @type {number|null}
    */
@@ -147,6 +194,8 @@ class Settings {
       appBarEnabled: this.appBarEnabled,
       appBarAutoHide: this.appBarAutoHide,
       theme: this.theme,
+      effetsSaison: this.effetsSaison,
+      densiteEffets: this.densiteEffets,
       displayId: this.displayId,
     });
   }
@@ -183,6 +232,8 @@ module.exports = {
   Params,
   THEMES,
   sanitizeTheme,
+  sanitizeDensity,
   resolveTheme,
+  SEASON_THEMES,
   sanitizeDisplayId,
 };
