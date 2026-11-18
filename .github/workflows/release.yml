@@ -129,11 +129,14 @@ jobs:
 
       - name: Créer la release et envoyer les fichiers
         run: |
-          ls dist
+          # Les artefacts Linux gardent leurs sous-dossiers (deb/x64, rpm/x64) :
+          # on liste uniquement les fichiers, pas les dossiers.
+          mapfile -t FILES < <(find dist -type f)
+          printf '%s\n' "${FILES[@]}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+            gh release upload "$TAG" "${FILES[@]}" --clobber
             gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
-            gh release create "$TAG" dist/* \
+            gh release create "$TAG" "${FILES[@]}" \
               --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
           fi
