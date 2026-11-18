@@ -5,6 +5,8 @@ const {
   screen,
   systemPreferences,
   nativeTheme,
+  webContents,
+  app,
 } = require('electron');
 const path = require('path');
 const { t } = require('./i18n');
@@ -15,7 +17,6 @@ class BaseAppObject {
    */
   #_windows = {};
   #_base_css = null;
-  #_css_root = null;
   #_params = null;
   constructor() {
     this.init();
@@ -108,24 +109,6 @@ class BaseAppObject {
     return this.#_base_css;
   }
 
-  /**
-   * @type {string}
-   * @readonly
-   */
-  get rootCSS() {
-    if (!this.#_css_root) {
-      const fs = require('fs');
-      this.#_css_root =
-        fs
-          .readFileSync(
-            path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
-          )
-          ?.toString?.() ?? '';
-    }
-
-    return this.#_css_root;
-  }
-
   get windows() {
     return this.#_windows;
   }
@@ -135,12 +118,45 @@ class BaseAppObject {
   main() {}
 
   /**
-   *
+   * Script qui applique le thème courant (data-theme / data-palette) sur <html>.
    * @returns {string}
    */
-  update_root_css() {
-    this.#_css_root = null;
-    return this.rootCSS;
+  get themeScript() {
+    const { resolveTheme, SEASON_THEMES } = require('../../settings.js');
+    const attrs = resolveTheme(
+      this.settings.effectiveTheme,
+      nativeTheme.shouldUseDarkColors,
+    );
+    // Effets de saison : seulement sur un thème de saison, interrupteur actif
+    const fx =
+      this.settings.effetsSaison && SEASON_THEMES.includes(attrs.palette);
+    return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; h.dataset.fx = ${JSON.stringify(fx ? 'on' : 'off')}; h.dataset.fxDensity = ${JSON.stringify(this.settings.densiteEffets)}; }`;
+  }
+
+  /**
+   * Applique le thème courant à toutes les fenêtres ouvertes.
+   */
+  broadcastTheme() {
+    this.lastEffectiveTheme = this.settings.effectiveTheme;
+    const script = this.themeScript;
+    for (const contents of webContents.getAllWebContents()) {
+      if (contents.isDestroyed() || !contents.getURL().startsWith('file://'))
+        continue;
+      contents.executeJavaScript(script).catch(console.error);
+    }
+  }
+
+  /**
+   * Applique le thème à chaque page locale de l'interface dès son chargement
+   * (fenêtres, mais aussi vues intégrées comme celle de la fenêtre des applications).
+   */
+  applyThemeOnLoad() {
+    app.on('web-contents-created', (_, contents) => {
+      contents.on('dom-ready', () => {
+        if (!contents.getURL().startsWith('file://')) return;
+        contents.executeJavaScript(this.themeScript).catch(console.error);
+      });
+    });
   }
 
   /**
@@ -226,20 +242,8 @@ class BaseAppObject {
     // Injecté à chaque chargement de page : la fenêtre peut ne pas avoir de
     // page au moment de sa création (ex: chargée plus tard via loadFile).
     win.webContents.on('dom-ready', () => {
-      win.webContents.insertCSS(this.rootCSS).catch(console.error);
-
       if (this.baseCSS !== '')
         win.webContents.insertCSS(this.baseCSS).catch(console.error);
-
-      win.webContents
-        .executeJavaScript(
-          `document.querySelector('html').classList.add('dark-mode-${
-            nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
-          }'); document.documentElement.dataset.appTheme = ${JSON.stringify(
-            this.settings.theme,
-          )}`,
-        )
-        .catch(console.error);
     });
 
     this.addWindow(index, win);

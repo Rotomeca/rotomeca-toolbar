@@ -2,20 +2,22 @@ import '../scripts/ds.js';
 import { HTMLToolbarButton } from '../scripts/components/HTMLToolbarButton.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
+import { initSeasonFx } from '../scripts/seasonFx.js';
 
 /**
- * Balise du séparateur entre les applications
+ * Sélecteur des séparateurs de groupe entre les applications
  * @type {string}
  */
-const SEPARATOR_TAG = 'rds-divider';
+const SEPARATOR_SELECTOR = '#apps .separator';
 
 /**
- * Crée un séparateur
+ * Crée un séparateur de groupe (trait court, couleur d'accent)
  * @returns {HTMLElement}
  */
 function createSeparator() {
-  const separator = document.createElement(SEPARATOR_TAG);
-  separator.setAttribute('spacing', 'none');
+  const separator = document.createElement('div');
+  separator.classList.add('separator', 'group');
+  separator.setAttribute('aria-hidden', 'true');
   return separator;
 }
 
@@ -100,6 +102,17 @@ export class Main {
         hovering: false,
       });
     });
+    // Un clic sur la tuile ouvre aussi le lecteur (utile s'il vient de se fermer)
+    button.addEventListener('click', () => {
+      if (!button.hasMedia) return;
+
+      const rect = button.getBoundingClientRect();
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: true,
+        y: rect.top + rect.height / 2,
+      });
+    });
 
     if (request === true) return button;
 
@@ -110,6 +123,64 @@ export class Main {
   }
 
   main() {
+    // Effets de saison sur la barre (calque décoratif, ne capte aucun clic)
+    initSeasonFx(document.querySelector('#main'), { narrow: true });
+
+    // Réduite au rail, la barre se déplie au survol (masquage automatique,
+    // filtré côté principal) ou au clic
+    const isRail = () => document.documentElement.classList.contains('rail');
+    document.documentElement.addEventListener('mouseenter', () => {
+      if (isRail()) window.api.invoke(appEventList.edgeEnter);
+    });
+    document.querySelector('#rail-button').addEventListener('click', () => {
+      window.api.invoke(appEventList.toggleToolbar);
+    });
+
+    // Infobulle : au survol (après 400 ms) et au focus clavier (immédiat)
+    let tooltipTimer = null;
+    let tooltipTarget = null;
+    const tooltipHost = (target) =>
+      target?.closest?.('rotomeca-toolbar-button, rds-icon-button') ?? null;
+    const showTooltip = (element) => {
+      // Un bouton qui joue un morceau affiche déjà le lecteur
+      if (element.hasMedia) return;
+
+      const text = element.dataset.tooltip ?? element.getAttribute('label');
+      if (!text) return;
+
+      const rect = element.getBoundingClientRect();
+      window.api.invoke(appEventList.tooltipShow, {
+        text,
+        badge: element.dataset.tooltipBadge || null,
+        y: rect.top + rect.height / 2,
+      });
+    };
+    const hideTooltip = () => {
+      clearTimeout(tooltipTimer);
+      tooltipTarget = null;
+      window.api.invoke(appEventList.tooltipHide);
+    };
+    document.addEventListener('mouseover', (event) => {
+      const element = tooltipHost(event.target);
+      if (element === tooltipTarget) return;
+
+      hideTooltip();
+      if (!element) return;
+      tooltipTarget = element;
+      tooltipTimer = setTimeout(() => showTooltip(element), 400);
+    });
+    document.addEventListener('mouseleave', hideTooltip);
+    document.addEventListener('focusin', (event) => {
+      const element = tooltipHost(event.target);
+      if (!element) return;
+
+      clearTimeout(tooltipTimer);
+      tooltipTarget = element;
+      showTooltip(element);
+    });
+    document.addEventListener('focusout', hideTooltip);
+    document.addEventListener('click', hideTooltip);
+
     // Échap cache la barre (ouverte au clavier ou à la souris)
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape')
@@ -119,11 +190,10 @@ export class Main {
     window.api.on(pageEventList.toolbarAppSeparatorDelete, (_, url) => {
       let element =
         url === 0
-          ? document.querySelector(SEPARATOR_TAG)
+          ? document.querySelector(SEPARATOR_SELECTOR)
           : findButtonByUrl(url)?.nextElementSibling;
 
-      if (element?.nodeName === SEPARATOR_TAG.toUpperCase())
-        element.remove();
+      if (element?.classList.contains('separator')) element.remove();
     });
 
     window.api.on(pageEventList.toolbarAppDeleted, (_, url) => {
@@ -209,17 +279,20 @@ export class Main {
       if (!settings?.isButton) {
         let node = document.createElement('rds-icon-button');
         node.setAttribute('icon', 'chevron-left');
-        node.setAttribute('variant', 'primary');
         node.setAttribute('square', '');
-        node.setAttribute('label', 'Cacher la barre');
-        node.setAttribute('title', 'Cacher la barre');
+        node.setAttribute('size', 'sm');
+        node.setAttribute('label', window.api.t('toolbar.hide'));
         node.id = 'hide-button';
 
         node.onclick = () => {
           window.api.invoke(appEventList.toggleToolbar);
         };
 
-        document.querySelector('#main').prepend(node);
+        // Bouton réduire en tête de barre, suivi d'un séparateur simple
+        const separator = document.createElement('div');
+        separator.classList.add('separator');
+        separator.setAttribute('aria-hidden', 'true');
+        document.querySelector('#head').append(node, separator);
         node = null;
       }
     });
@@ -243,6 +316,12 @@ export class Main {
     window.api.on(pageEventList.windowAppsClosed, () => {
       document.querySelector('[aria-pressed="true"]')?.unpress?.();
     });
+
+    document
+      .querySelector('#settings-button')
+      .addEventListener('click', () => {
+        window.api.invoke(appEventList.openSettings);
+      });
 
     this.addButton.addEventListener('click', () => {
       window.api.invoke(appEventList.requestAdd);

@@ -21,6 +21,7 @@ const appEventList = Object.freeze({
   minimiseWindow: 'minimiseWindow',
   settingsUpdated: 'setting.updated',
   getVersion: 'getVersion',
+  isAppBarSupported: 'isAppBarSupported',
   getDisplays: 'getDisplays',
   toggleMute: 'toggleMute',
   mediaControl: 'mediaControl',
@@ -28,5 +29,10 @@ const appEventList = Object.freeze({
   rotomecaContextMenu: 'rotomeca-context-menu',
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
+  openSettings: 'openSettings',
+  tooltipShow: 'tooltipShow',
+  tooltipHide: 'tooltipHide',
+  getSavedUrls: 'getSavedUrls',
+  getSeasonInfo: 'getSeasonInfo',
 });
  module.exports = { appEventList };

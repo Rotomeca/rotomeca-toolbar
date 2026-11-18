@@ -1,0 +1,190 @@
+/* Palettes de la toolbar — surcouche des tokens sémantiques --ds-* du Rotomeca Design System.
+   Usage : data-theme="light|dark" (base du système) + data-palette="<nom>" (couleurs). */
+
+[data-palette]:not([data-palette=""]) {
+  --ds-body-background-color: var(--p-bg);
+  --ds-body-text-color: var(--p-text);
+  --ds-background-surface: var(--p-bg);
+  --ds-background-surface-variant: var(--p-variant);
+  --ds-background-surface-strong: var(--p-strong);
+  --ds-background-overlay: var(--p-overlay);
+  --ds-text-default: var(--p-text);
+  --ds-text-muted: var(--p-muted);
+  --ds-border-subtle: var(--p-border-subtle);
+  --ds-border-strong: var(--p-border-strong);
+  --ds-focus-ring-color: var(--p-text);
+  --ds-background-action-primary: var(--p-primary);
+  --ds-background-action-primary-hover: var(--p-primary-hover);
+  --ds-background-action-primary-active: var(--p-primary-active);
+  --ds-text-action-primary: var(--p-on-primary);
+  --ds-background-action-secondary: var(--p-bg);
+  --ds-background-action-secondary-hover: var(--p-hover);
+  --ds-background-action-secondary-active: var(--p-press);
+  --ds-text-action-secondary: var(--p-action-text);
+  --ds-text-action-secondary-button: var(--p-action-text);
+  --ds-text-action-tertiary: var(--p-action-text);
+  --ds-background-action-tertiary-hover: var(--p-hover);
+  --ds-background-action-tertiary-active: var(--p-press);
+  --ds-input-background: var(--p-variant);
+  --ds-input-text: var(--p-text);
+  --ds-input-hint: var(--p-muted);
+  --ds-input-border: var(--p-border-strong);
+  --ds-input-ring-1: var(--p-primary);
+  --ds-input-ring-2: var(--p-accent);
+  --ds-input-ring-3: var(--p-action-text);
+  --ds-input-ring-4: var(--p-primary-hover);
+  --ds-control-border: var(--p-border-strong);
+  --ds-control-checked: var(--p-primary);
+  --ds-control-checked-hover: var(--p-primary-hover);
+  --ds-control-state-layer: var(--p-action-text);
+  --ds-switch-track: var(--p-variant);
+  --ds-switch-thumb: var(--p-border-strong);
+  --ds-switch-thumb-checked: var(--p-on-primary);
+  --ds-switch-icon-checked: var(--p-primary);
+  --ds-background-option-hover: var(--p-hover);
+  --ds-background-option-selected: var(--p-strong);
+  --ds-background-tone-neutral: var(--p-strong);
+  --ds-text-tone-neutral: var(--p-text);
+  --ds-background-tone-neutral-bold: var(--p-text);
+  --ds-text-tone-neutral-bold: var(--p-bg);
+  --ds-background-tone-brand: var(--p-brand-soft);
+  --ds-text-tone-brand: var(--p-on-brand-soft);
+  --ds-background-tone-brand-bold: var(--p-primary);
+  --ds-text-tone-brand-bold: var(--p-on-primary);
+  --ds-background-tone-accent: var(--p-accent-soft);
+  --ds-text-tone-accent: var(--p-on-accent-soft);
+  --ds-background-tone-accent-bold: var(--p-accent);
+  --ds-text-tone-accent-bold: var(--p-on-accent);
+}
+
+/* Marron — chocolat et caramel */
+[data-palette="marron"] {
+  --p-bg: #2a1a12; --p-variant: #3b2518; --p-strong: #523424; --p-overlay: #3b2518;
+  --p-text: #f7ead9; --p-muted: #d4b89c; --p-border-subtle: #523424; --p-border-strong: #a37a58;
+  --p-primary: #e0a36b; --p-primary-hover: #ebb886; --p-primary-active: #c88a52; --p-on-primary: #2a1a12;
+  --p-action-text: #ebb886; --p-hover: #46301f; --p-press: #523424;
+  --p-accent: #d6a23d; --p-on-accent: #2a1a12; --p-accent-soft: #4a3514; --p-on-accent-soft: #e9c27a;
+  --p-brand-soft: #4a2c1c; --p-on-brand-soft: #ebb886;
+}
+
+/* Rouge — lie-de-vin et corail */
+[data-palette="rouge"] {
+  --p-bg: #1f1114; --p-variant: #2e181d; --p-strong: #45242b; --p-overlay: #2e181d;
+  --p-text: #f8e6e8; --p-muted: #d9aeb5; --p-border-subtle: #45242b; --p-border-strong: #a0606c;
+  --p-primary: #e06c75; --p-primary-hover: #ea8a91; --p-primary-active: #d05e67; --p-on-primary: #1f1114;
+  --p-action-text: #f09aa0; --p-hover: #3a1f25; --p-press: #45242b;
+  --p-accent: #e8a54b; --p-on-accent: #1f1114; --p-accent-soft: #4a3014; --p-on-accent-soft: #f0c27e;
+  --p-brand-soft: #4d1f27; --p-on-brand-soft: #f09aa0;
+}
+
+/* Bleu — ardoise nuit, filets ocre */
+[data-palette="bleu"] {
+  --p-bg: #121a24; --p-variant: #1b2633; --p-strong: #283849; --p-overlay: #1b2633;
+  --p-text: #e6eef7; --p-muted: #a9bbcf; --p-border-subtle: #283849; --p-border-strong: #6b85a3;
+  --p-primary: #6ea8fe; --p-primary-hover: #8dbbff; --p-primary-active: #4f8fe8; --p-on-primary: #0d1520;
+  --p-action-text: #8dbbff; --p-hover: #223042; --p-press: #283849;
+  --p-accent: #d6a23d; --p-on-accent: #121a24; --p-accent-soft: #3d3114; --p-on-accent-soft: #e9c27a;
+  --p-brand-soft: #1d3350; --p-on-brand-soft: #8dbbff;
+}
+
+/* Vert — prairie */
+[data-palette="vert"] {
+  --p-bg: #111b15; --p-variant: #19281f; --p-strong: #25392c; --p-overlay: #19281f;
+  --p-text: #e4f2e8; --p-muted: #a8c9b2; --p-border-subtle: #25392c; --p-border-strong: #6a9a7a;
+  --p-primary: #5fbf7f; --p-primary-hover: #7fd099; --p-primary-active: #47a466; --p-on-primary: #0d1610;
+  --p-action-text: #7fd099; --p-hover: #1f3026; --p-press: #25392c;
+  --p-accent: #d6a23d; --p-on-accent: #111b15; --p-accent-soft: #3a3214; --p-on-accent-soft: #e9c27a;
+  --p-brand-soft: #1c3a26; --p-on-brand-soft: #7fd099;
+}
+
+/* Vert sapin — forêt profonde, laiton */
+[data-palette="sapin"] {
+  --p-bg: #0e1a17; --p-variant: #15261f; --p-strong: #20372e; --p-overlay: #15261f;
+  --p-text: #e3efe9; --p-muted: #a3c2b5; --p-border-subtle: #20372e; --p-border-strong: #5f8f7d;
+  --p-primary: #7cc4a6; --p-primary-hover: #98d3ba; --p-primary-active: #5fae8e; --p-on-primary: #0e1a17;
+  --p-action-text: #98d3ba; --p-hover: #1b2f27; --p-press: #20372e;
+  --p-accent: #c9a15a; --p-on-accent: #0e1a17; --p-accent-soft: #3a3018; --p-on-accent-soft: #dcbc80;
+  --p-brand-soft: #183a30; --p-on-brand-soft: #98d3ba;
+}
+
+/* Blanc — neutre lumineux, action marron */
+[data-palette="blanc"] {
+  --p-bg: #ffffff; --p-variant: #f4f4f2; --p-strong: #e7e6e2; --p-overlay: #ffffff;
+  --p-text: #1f1f1d; --p-muted: #55524d; --p-border-subtle: #e2e0db; --p-border-strong: #8a867e;
+  --p-primary: #6b4226; --p-primary-hover: #8b5e3c; --p-primary-active: #3e2723; --p-on-primary: #ffffff;
+  --p-action-text: #6b4226; --p-hover: #f4f4f2; --p-press: #e7e6e2;
+  --p-accent: #d6a23d; --p-on-accent: #2d211b; --p-accent-soft: #f6e7c4; --p-on-accent-soft: #7a5410;
+  --p-brand-soft: #f3ece6; --p-on-brand-soft: #6b4226;
+}
+
+/* Noir — OLED, contraste maximal */
+[data-palette="noir"] {
+  --p-bg: #000000; --p-variant: #121212; --p-strong: #1f1f1f; --p-overlay: #161616;
+  --p-text: #f2f2f2; --p-muted: #b0b0b0; --p-border-subtle: #262626; --p-border-strong: #6e6e6e;
+  --p-primary: #f2f2f2; --p-primary-hover: #ffffff; --p-primary-active: #cfcfcf; --p-on-primary: #000000;
+  --p-action-text: #e6e6e6; --p-hover: #1a1a1a; --p-press: #262626;
+  --p-accent: #d6a23d; --p-on-accent: #000000; --p-accent-soft: #2e2510; --p-on-accent-soft: #e9c27a;
+  --p-brand-soft: #1f1f1f; --p-on-brand-soft: #f2f2f2;
+}
+
+/* ===== Saisons — d'après les éditions prestige de « Mémoires de la forêt » ===== */
+
+/* Hiver — bleu de nuit, branches givrées, or */
+[data-palette="hiver"] {
+  --p-bg: #171c4a; --p-variant: #20275e; --p-strong: #2c3578; --p-overlay: #20275e;
+  --p-text: #eef1ff; --p-muted: #b8c2ec; --p-border-subtle: #2c3578; --p-border-strong: #6f7fc8;
+  --p-primary: #d9b968; --p-primary-hover: #e6cb86; --p-primary-active: #bf9f4f; --p-on-primary: #171c4a;
+  --p-action-text: #a9c8ff; --p-hover: #252d6a; --p-press: #2c3578;
+  --p-accent: #7fb0f5; --p-on-accent: #171c4a; --p-accent-soft: #243a6e; --p-on-accent-soft: #a9c8ff;
+  --p-brand-soft: #2a2f63; --p-on-brand-soft: #e6cb86;
+}
+
+/* Automne — bordeaux profond, dorure, feuille orangée */
+[data-palette="automne"] {
+  --p-bg: #3b1016; --p-variant: #4e1820; --p-strong: #66232c; --p-overlay: #4e1820;
+  --p-text: #f7e8d6; --p-muted: #dcc0a6; --p-border-subtle: #66232c; --p-border-strong: #b07a64;
+  --p-primary: #d4a95a; --p-primary-hover: #e2bd76; --p-primary-active: #b98e45; --p-on-primary: #3b1016;
+  --p-action-text: #e2bd76; --p-hover: #571c24; --p-press: #66232c;
+  --p-accent: #e07a3a; --p-on-accent: #3b1016; --p-accent-soft: #5c2a14; --p-on-accent-soft: #f0a878;
+  --p-brand-soft: #5a1f27; --p-on-brand-soft: #e2bd76;
+}
+
+/* Printemps — vert émeraude, menthe, or */
+[data-palette="printemps"] {
+  --p-bg: #12352a; --p-variant: #184235; --p-strong: #215443; --p-overlay: #184235;
+  --p-text: #eef7ee; --p-muted: #b7d6c2; --p-border-subtle: #215443; --p-border-strong: #6fa58a;
+  --p-primary: #9fd4b2; --p-primary-hover: #b6e0c4; --p-primary-active: #84c09b; --p-on-primary: #12352a;
+  --p-action-text: #b6e0c4; --p-hover: #1c4a3b; --p-press: #215443;
+  --p-accent: #d4b062; --p-on-accent: #12352a; --p-accent-soft: #3a3a1a; --p-on-accent-soft: #e2c886;
+  --p-brand-soft: #1d4a3a; --p-on-brand-soft: #b6e0c4;
+}
+
+/* Printemps, variante cerisier — même forêt, action rose fleur */
+[data-palette="cerisier"] {
+  --p-bg: #12352a; --p-variant: #184235; --p-strong: #215443; --p-overlay: #184235;
+  --p-text: #eef7ee; --p-muted: #b7d6c2; --p-border-subtle: #215443; --p-border-strong: #6fa58a;
+  --p-primary: #f2a7bd; --p-primary-hover: #f7bfd0; --p-primary-active: #e48aa5; --p-on-primary: #12352a;
+  --p-action-text: #f7bfd0; --p-hover: #1c4a3b; --p-press: #215443;
+  --p-accent: #d4b062; --p-on-accent: #12352a; --p-accent-soft: #3a3a1a; --p-on-accent-soft: #e2c886;
+  --p-brand-soft: #3d2f3a; --p-on-brand-soft: #f7bfd0;
+}
+
+/* Été — clair, lumière dorée, orange solaire, jaune tournesol */
+[data-palette="ete"] {
+  --p-bg: #fff8ea; --p-variant: #fdeccb; --p-strong: #f7da9a; --p-overlay: #fffdf6;
+  --p-text: #3b2410; --p-muted: #6b4a28; --p-border-subtle: #f1d9a8; --p-border-strong: #a8763e;
+  --p-primary: #b4531a; --p-primary-hover: #c86a2c; --p-primary-active: #8f3f12; --p-on-primary: #ffffff;
+  --p-action-text: #9a4614; --p-hover: #fdeccb; --p-press: #f7da9a;
+  --p-accent: #e8b923; --p-on-accent: #3b2410; --p-accent-soft: #fbe7a6; --p-on-accent-soft: #6e4f00;
+  --p-brand-soft: #fbe0c8; --p-on-brand-soft: #8f3f12;
+}
+
+/* Noël — kitsch traditionnel : sapin, rouge vif, or, neige */
+[data-palette="noel"] {
+  --p-bg: #0f3b22; --p-variant: #164d2d; --p-strong: #1f6338; --p-overlay: #164d2d;
+  --p-text: #fff8ec; --p-muted: #d6e8cf; --p-border-subtle: #1f6338; --p-border-strong: #e3b341;
+  --p-primary: #d62839; --p-primary-hover: #e4434f; --p-primary-active: #b01e2d; --p-on-primary: #ffffff;
+  --p-action-text: #ffd166; --p-hover: #1a5833; --p-press: #1f6338;
+  --p-accent: #f2c14e; --p-on-accent: #0f3b22; --p-accent-soft: #5a1219; --p-on-accent-soft: #ffb3ba;
+  --p-brand-soft: #5a1219; --p-on-brand-soft: #ffb3ba;
+}

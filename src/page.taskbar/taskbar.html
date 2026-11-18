@@ -14,36 +14,52 @@
     <title>RotomecaToolbar</title>
     <link rel="stylesheet" href="./taskbar.css" />
     <link rel="stylesheet" href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css" />
-    <link rel="stylesheet" href="../../src/css/ds-bridge.css" />
+    <link rel="stylesheet" href="../css/ds-compat.css" />
+    <link rel="stylesheet" href="../css/themes.css" />
+    <link rel="stylesheet" href="../css/saisons.css" />
     <script type="module" src="../../src/scripts/ds.js"></script>
     <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
     <script type="module" src="./main.js"></script>
   </head>
   <body>
     <div id="main">
+      <div id="head"></div>
       <rds-icon-button
         id="add-button"
         icon="plus"
         square
         variant="primary"
         label="Ajouter une application"
-        title="Ajouter une application"
         data-i18n-label="toolbar.add"
-        data-i18n-title="toolbar.add"
       ></rds-icon-button>
       <div id="apps"></div>
-      <div id="edit" style="text-align: center">
+      <div id="edit">
+        <div class="separator" aria-hidden="true"></div>
         <rds-icon-button
           id="edit-button"
           toggle
           square
           icon="pencil"
           label="Modifier les applications"
-          title="Modifier les applications"
           data-i18n-label="toolbar.edit"
-          data-i18n-title="toolbar.edit"
+        ></rds-icon-button>
+        <rds-icon-button
+          id="settings-button"
+          square
+          icon="settings"
+          label="Paramètres"
+          data-i18n-label="toolbar.settings"
         ></rds-icon-button>
       </div>
+      <button
+        type="button"
+        id="rail-button"
+        aria-label="Afficher la barre"
+        data-i18n-label="toolbar.show"
+        hidden
+      >
+        <rds-icon name="chevron-right"></rds-icon>
+      </button>
     </div>
   </body>
   <footer></footer>

@@ -10,7 +10,7 @@
       name="viewport"
       content="width=device-width, height=device-height, initial-scale=1.0"
     />
-    <title data-i18n="window.settings">Applications</title>
+    <title data-i18n="window.settings">Paramètres</title>
     <style>
       html,
       body {
@@ -19,151 +19,417 @@
         width: 100%;
         height: 100%;
         overflow: auto;
-        background-image: url('../pictures/background.png');
-        background-size: cover;
+        background: var(--ds-body-background-color);
+        color: var(--ds-text-default);
+        font-family: var(--ds-font-sans);
       }
-      body {
+
+      #page {
+        box-sizing: border-box;
+        min-height: 100%;
+        padding: 32px 40px;
         display: flex;
+        flex-direction: column;
+        gap: 24px;
       }
 
-      #toolbar {
-        border-radius: 10px;
-        margin-top: 10px;
-        margin-left: 10px;
-        width: 42px;
-        height: calc(100% - 50px);
-        color: var(--color-scheme-text, black);
-        background-color: var(--color-scheme, white);
-        margin-bottom: 10px;
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
       }
 
-      #add {
-        margin-top: 10px;
-        margin-left: 5px;
-        margin-bottom: 10px;
-        pointer-events: none;
+      #badge {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ds-background-tone-brand);
+        color: var(--ds-text-tone-brand);
+        font-size: 24px;
       }
 
-      rds-divider {
-        margin: 0 15px;
+      #heading {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
       }
 
-      rotomeca-toolbar-button {
-        pointer-events: none;
-        padding: 0;
-        margin: 5px;
-        width: 30px;
+      h1 {
+        margin: 0;
+        font: var(--text-headline);
+        letter-spacing: -0.01em;
       }
 
-      rotomeca-toolbar-button {
-        margin-top: 10px;
+      .helper {
+        margin: 0;
+        font: var(--text-helper);
+        color: var(--ds-text-muted);
       }
 
-      html.without-button #up {
-        display: none;
+      #version {
+        padding: 4px 10px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-neutral);
+        color: var(--ds-text-tone-neutral);
+        font: var(--text-caption);
       }
 
-      html.without-button #toolbar {
-        height: calc(100% - 20px);
+      section {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 24px;
+        border-radius: var(--ds-radius-lg);
+        /* légèrement transparent : laisse voir les effets de saison */
+        background: color-mix(in srgb, var(--ds-background-surface-variant) 82%, transparent);
+        border: 1px solid var(--ds-border-subtle);
       }
 
-      #up {
-        margin-left: 10px;
-        pointer-events: none;
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
       }
 
-      #up::part(button) {
-        width: 42px;
-        height: 28px;
-        border-radius: 8px 8px 0 0;
+      /* Vignettes de thème */
+      #themes {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
       }
 
-      .setting-group {
-        margin-top: 15px;
+      .tile {
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-radius: var(--ds-input-radius);
+        border: 2px solid var(--ds-border-subtle);
+        background: var(--ds-background-surface);
+        color: var(--ds-text-default);
+        font-family: inherit;
+        cursor: pointer;
       }
 
-      #settings {
-        width: 100%;
-        height: calc(100% - 40px);
-        background-color: var(--color-scheme);
-        color: var(--color-scheme-text);
-        border-radius: 10px;
-        margin: 10px;
-        padding: 10px;
+      .tile[aria-pressed='true'] {
+        border-color: var(--ds-background-action-primary);
+      }
+
+      .tile:focus-visible {
+        outline: 2px solid var(--ds-focus-ring-color);
+        outline-offset: 2px;
+      }
+
+      .tile-name {
+        min-height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font: var(--text-caption);
+        text-align: center;
+      }
+
+      /* Aperçu : porte son propre data-theme / data-palette, les jetons s'y résolvent */
+      .preview {
+        height: 54px;
+        border-radius: 6px;
+        overflow: hidden;
+        display: flex;
+        background: var(--ds-body-background-color);
+        border: 1px solid var(--ds-border-subtle);
+      }
+
+      .preview-bar {
+        width: 14px;
+        flex-shrink: 0;
+        padding-top: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: var(--ds-background-surface-variant);
+      }
+
+      .preview-bar > span {
+        display: block;
+        width: 7px;
+        height: 7px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-surface-strong);
+      }
+
+      .preview-bar > .pv-plus {
+        border-radius: 2px;
+        background: var(--ds-background-action-primary);
+      }
+
+      .preview-bar > .pv-sep {
+        width: 6px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--ds-background-tone-accent-bold);
+      }
+
+      .preview-body {
+        flex-grow: 1;
+        padding: 7px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .preview-body > .pv-l1 {
+        height: 5px;
+        width: 70%;
+        border-radius: 3px;
+        background: var(--ds-text-default);
+      }
+
+      .preview-body > .pv-l2 {
+        height: 4px;
+        width: 45%;
+        border-radius: 3px;
+        background: var(--ds-text-muted);
+      }
+
+      .preview-body > .pv-btn {
+        margin-top: auto;
+        align-self: flex-end;
+        width: 18px;
+        height: 8px;
+        border-radius: 3px;
+        background: var(--ds-background-action-primary);
+      }
+
+      /* Vignette « Système » : moitié claire, moitié sombre */
+      .preview.split > .half {
+        flex: 1;
+        display: flex;
+        background: var(--ds-body-background-color);
+      }
+
+      .preview.split > .half.dark {
+        justify-content: flex-end;
+        padding: 6px;
+      }
+
+      .preview.split .pv-btn {
+        align-self: flex-end;
+        width: 14px;
+        height: 8px;
+        border-radius: 3px;
+        background: var(--ds-background-action-primary);
+      }
+
+      /* Pastille « +N » : le parent a des variantes */
+      .tile-name .plus {
+        padding: 0 6px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-neutral);
+        color: var(--ds-text-tone-neutral);
+        font: var(--text-caption);
+      }
+
+      /* Ligne « Variante de … » */
+      #variants {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      #variant-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        height: 36px;
+        padding: 0 14px 0 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: var(--ds-radius-full, 999px);
+        border: 2px solid var(--ds-border-subtle);
+        background: var(--ds-background-surface);
+        color: var(--ds-text-default);
+        font: var(--text-label);
+        cursor: pointer;
+      }
+
+      .pill[aria-pressed='true'] {
+        border-color: var(--ds-background-action-primary);
+      }
+
+      .pill:focus-visible {
+        outline: 2px solid var(--ds-focus-ring-color);
+        outline-offset: 2px;
+      }
+
+      .pill-dot {
+        width: 22px;
+        height: 22px;
+        border-radius: var(--ds-radius-full, 999px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ds-body-background-color);
+        border: 1px solid var(--ds-border-strong);
+        box-sizing: border-box;
+      }
+
+      .pill-dot > span {
+        width: 9px;
+        height: 9px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-action-primary);
+      }
+
+      /* Pastille de la saison en cours (thème automatique) */
+      #auto-badge {
+        padding: 4px 10px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-brand);
+        color: var(--ds-text-tone-brand);
+        font: var(--text-caption);
+      }
+
+      .auto-block {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--ds-border-subtle);
+      }
+
+      #season-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-top: 16px;
+        border-top: 1px solid var(--ds-border-subtle);
+      }
+
+      .season-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .density {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-grow: 1;
+      }
+
+      h2 {
+        margin: 0;
+        font: var(--text-title);
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .label {
+        font: var(--text-label);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        align-items: center;
+      }
+
+      [hidden] {
+        display: none !important;
       }
     </style>
-    <script
-      src="../scripts/components/HTMLToolbarButton.js"
-      type="module"
-    ></script>
     <link
       rel="stylesheet"
       href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css"
     />
-    <link rel="stylesheet" href="../css/ds-bridge.css" />
+    <link rel="stylesheet" href="../css/ds-compat.css" />
+    <link rel="stylesheet" href="../css/themes.css" />
+    <link rel="stylesheet" href="../css/saisons.css" />
     <script src="../scripts/ds.js" type="module"></script>
     <script src="./settings.js" type="module"></script>
-    <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
   </head>
   <body>
-    <div style="display: flex; flex-direction: column; height: 100%">
-      <div id="toolbar">
-        <rds-icon-button
-          id="add"
-          variant="primary"
-          size="sm"
-          square
-          icon="plus"
-          label="Ajouter une application"
-          data-i18n-label="toolbar.add"
-        ></rds-icon-button>
-        <rds-divider spacing="sm"></rds-divider>
-        <rotomeca-toolbar-button
-          data-title="Reddit"
-          data-picture="font:reddit"
-          data-url="nop"
-        ></rotomeca-toolbar-button>
-        <rotomeca-toolbar-button
-          data-title="Reddit"
-          data-picture="font:reddit"
-          data-url="nop"
-          data-pressed="true"
-        ></rotomeca-toolbar-button>
-      </div>
-      <rds-icon-button
-        id="up"
-        variant="primary"
-        square
-        icon="chevron-up"
-        label="Cacher la barre"
-        data-i18n-label="toolbar.hide"
-      ></rds-icon-button>
-    </div>
-    <div id="settings">
-      <label data-i18n="settings.mode">Mode d'activation</label>
-      <br />
-      <rds-segmented-control id="mode" label="Mode d'activation" data-i18n-label="settings.mode">
-        <option value="button" data-i18n="settings.modeButton">Bouton</option>
-        <option value="mouse" data-i18n="settings.modeMouse">Souris à gauche</option>
-      </rds-segmented-control>
-      <div class="setting-group">
-        <rds-select id="theme" label="Thème" data-i18n-label="settings.theme">
-          <option value="system" data-i18n="settings.themeSystem">Système</option>
-          <option value="dark" data-i18n="settings.themeDark">Sombre</option>
-          <option value="red" data-i18n="settings.themeRed">Rouge</option>
-          <option value="blue" data-i18n="settings.themeBlue">Bleu</option>
-          <option value="green" data-i18n="settings.themeGreen">Vert</option>
-          <option value="white" data-i18n="settings.themeWhite">Blanc</option>
-          <option value="black" data-i18n="settings.themeBlack">Noir</option>
-        </rds-select>
-      </div>
-      <div id="display-setting" class="setting-group" hidden>
-        <rds-select id="displays" label="Écran" data-i18n-label="settings.display"></rds-select>
-      </div>
-      <div class="setting-group">
-        <label><span data-i18n="settings.version">Version :</span> <span id="app-version"></span></label>
-      </div>
+    <div id="page" class="fx-host">
+      <header>
+        <div id="badge" aria-hidden="true"><rds-icon name="settings"></rds-icon></div>
+        <div id="heading">
+          <h1 data-i18n="settings.title">Paramètres</h1>
+          <p class="helper" data-i18n="settings.subtitle">Comportement et apparence de la barre d'outils</p>
+        </div>
+        <span id="version"></span>
+      </header>
+
+      <section aria-labelledby="sec-behavior">
+        <h2 id="sec-behavior" data-i18n="settings.sectionBehavior">Comportement</h2>
+        <div class="field">
+          <span class="label" data-i18n="settings.mode">Mode d'activation</span>
+          <rds-segmented-control id="mode" label="Mode d'activation" data-i18n-label="settings.mode" full>
+            <option value="button" data-i18n="settings.modeButton">Bouton</option>
+            <option value="mouse" data-i18n="settings.modeMouse">Souris à gauche</option>
+          </rds-segmented-control>
+          <span id="mode-help" class="helper"></span>
+        </div>
+        <div class="grid">
+          <div id="display-setting" hidden>
+            <rds-select id="displays" label="Écran" data-i18n-label="settings.display"></rds-select>
+          </div>
+          <div id="appbar-settings" hidden>
+            <rds-switch id="autohide" icons data-i18n="settings.appBarAutoHide">Masquer automatiquement</rds-switch>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="sec-appearance">
+        <div class="card-head">
+          <h2 id="sec-appearance" data-i18n="settings.sectionAppearance">Apparence</h2>
+          <rds-segmented-control id="family" label="Famille de thèmes" data-i18n-label="settings.family"></rds-segmented-control>
+        </div>
+        <div id="themes" role="group" aria-label="Thème" data-i18n-aria-label="settings.themeGroup"></div>
+        <div id="variants" hidden>
+          <span class="label" id="variants-label"></span>
+          <div id="variant-pills" role="group"></div>
+        </div>
+        <div id="season-options" hidden>
+          <div class="auto-block">
+            <div class="season-row">
+              <rds-switch id="auto" icons data-i18n="settings.auto">Thème automatique</rds-switch>
+              <span id="auto-badge" hidden></span>
+            </div>
+            <span class="helper" data-i18n="settings.autoHelp">Suit les dates officielles des saisons (équinoxes et solstices), avec Noël les 24 et 25 décembre. Au printemps : Cerisier jusqu’au 31 mars, puis Printemps. Choisir un thème à la main désactive ce mode.</span>
+          </div>
+          <div class="season-row">
+            <rds-switch id="fx" icons data-i18n="settings.effects">Effets de saison</rds-switch>
+            <div class="density">
+              <span class="label" data-i18n="settings.density">Densité</span>
+              <rds-segmented-control id="density" label="Densité des effets" data-i18n-label="settings.density" full>
+                <option value="discrete" data-i18n="settings.densityDiscrete">Discrète</option>
+                <option value="normale" data-i18n="settings.densityNormal">Normale</option>
+                <option value="abondante" data-i18n="settings.densityAbundant">Abondante</option>
+              </rds-segmented-control>
+            </div>
+          </div>
+          <span class="helper" data-i18n="settings.effectsHelp">Neige, feuilles, pétales, tournesols ou traîneau selon la saison. Coupés si Windows réduit les animations.</span>
+        </div>
+      </section>
     </div>
   </body>
-  <footer></footer>
 </html>

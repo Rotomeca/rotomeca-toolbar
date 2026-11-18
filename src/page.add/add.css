@@ -1,3 +1,6 @@
 :root {
   --ce-html-tab-element-tablist-text-align: center;
+  --ce-html-custom-tab-text-color: var(--ds-text-default);
+  --ce-html-custom-tag-border-bottom-hover: 2px solid var(--ds-border-strong);
+  --ce-html-custom-tag-border-bottom-selected: 2px solid var(--ds-background-action-primary);
 }

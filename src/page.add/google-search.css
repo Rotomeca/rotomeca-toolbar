@@ -1,0 +1,323 @@
+/*
+ * Habillage du widget Google Programmable Search avec les jetons du design system.
+ *
+ * Cette feuille est lue par la page d'ajout puis injectée dans l'iframe de recherche
+ * (search.html), qui ne peut charger aucun fichier local (iframe sandboxée) : elle
+ * y reçoit aussi les jetons --ds-* résolus, au thème courant.
+ * Tous les noms de classes Google sont réunis ici : ils peuvent changer sans préavis.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent !important;
+  color: var(--ds-text-default);
+  font-family: var(--ds-font-sans);
+}
+
+html {
+  scrollbar-color: var(--ds-border-strong) transparent;
+}
+
+body {
+  overflow-y: auto;
+  padding: 16px 16px 8px;
+  box-sizing: border-box;
+}
+
+/* Conteneur : transparent, sans bordure ni marge */
+body .gsc-control-cse,
+body .gsc-control-cse-fr,
+body .gsc-control-wrapper-cse,
+body .gsc-wrapper,
+body .gsc-results-wrapper-nooverlay,
+body .gsc-resultsbox-visible,
+body .gsc-resultsRoot {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit;
+}
+
+/* ---- Champ de recherche -------------------------------------------------- */
+body table.gsc-search-box,
+body table.gsc-search-box td {
+  border: none;
+}
+
+body .gsc-input-box {
+  box-sizing: border-box;
+  height: 48px;
+  padding: 0 4px 0 12px;
+  background: var(--ds-input-background) !important;
+  border: 1px solid var(--ds-input-border) !important;
+  border-radius: var(--ds-input-radius) !important;
+  display: flex;
+  align-items: center;
+}
+
+body .gsc-input-box:focus-within {
+  border-color: var(--ds-focus-ring-color) !important;
+  outline: 1px solid var(--ds-focus-ring-color);
+}
+
+/* Loupe (le bouton de recherche de Google est masqué : on valide avec Entrée) */
+body .gsc-input-box::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: var(--ds-text-muted);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m21 21-4.34-4.34'/><circle cx='11' cy='11' r='8'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m21 21-4.34-4.34'/><circle cx='11' cy='11' r='8'/></svg>") center / contain no-repeat;
+}
+
+body table.gsc-input,
+body table.gsc-input td {
+  width: 100%;
+  background: transparent !important;
+}
+
+body input.gsc-input {
+  /* background-color seulement : le filigrane « optimisé par Google » reste */
+  background-color: transparent !important;
+  color: var(--ds-input-text) !important;
+  font: inherit !important;
+  font-size: 1rem !important;
+  padding: 0 8px !important;
+  height: 100% !important;
+}
+
+body input.gsc-input::placeholder {
+  color: var(--ds-input-hint);
+}
+
+body .gsc-search-button-v2,
+body button.gsc-search-button {
+  background: transparent !important;
+  border: none !important;
+  padding: 8px !important;
+  margin: 0 !important;
+  cursor: pointer;
+}
+
+body .gsc-search-button-v2 svg {
+  fill: var(--ds-text-default) !important;
+}
+
+body .gsst_a .gscb_a,
+body .gsst_a {
+  color: var(--ds-text-muted) !important;
+}
+
+/* ---- Résultats ------------------------------------------------------------ */
+body .gsc-result-info {
+  color: var(--ds-text-muted) !important;
+  font-size: 0.75rem !important;
+  padding: 12px 0 4px !important;
+}
+
+/* Tri masqué */
+body .gsc-orderby-container,
+body .gsc-orderby {
+  display: none !important;
+}
+
+body .gsc-webResult.gsc-result {
+  position: relative;
+  box-sizing: border-box;
+  padding: 16px 104px 16px 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ds-border-subtle) !important;
+}
+
+body .gsc-webResult.gsc-result:hover {
+  background: transparent !important;
+}
+
+body .gsc-webResult .gsc-table-result,
+body .gsc-webResult .gsc-table-cell-snippet-close {
+  width: 100%;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* Vignette masquée */
+body .gsc-table-cell-thumbnail,
+body .gsc-thumbnail-left,
+body .gs-web-image-box {
+  display: none !important;
+}
+
+/* Titre : une ligne, ellipse, sans soulignement */
+body .gsc-webResult .gs-title,
+body .gsc-webResult a.gs-title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: none !important;
+  color: var(--ds-text-default) !important;
+  font-size: 1rem !important;
+  font-weight: 500;
+  line-height: 1.4;
+  height: auto !important;
+}
+
+body .gsc-webResult .gs-title *,
+body .gsc-webResult a.gs-title b {
+  color: inherit !important;
+  font-size: inherit !important;
+  text-decoration: none !important;
+}
+
+body .gsc-webResult a.gs-title b {
+  font-weight: 700;
+}
+
+/* Adresse */
+body .gsc-url-top,
+body .gs-visibleUrl,
+body .gs-visibleUrl-long {
+  color: var(--ds-text-action-tertiary) !important;
+  font-size: 0.75rem !important;
+  line-height: 1.3;
+}
+
+/* Résumé : deux lignes au plus */
+body .gs-snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ds-text-muted) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.4;
+}
+
+body .gs-snippet b {
+  color: var(--ds-text-default) !important;
+}
+
+body .gs-richsnippet-box,
+body .gs-per-result-labels {
+  color: var(--ds-text-muted) !important;
+}
+
+/* ---- Pagination ------------------------------------------------------------ */
+body .gsc-cursor-box {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin: 16px 0 !important;
+  padding: 0 !important;
+}
+
+body .gsc-cursor-box .gsc-cursor-page {
+  min-width: 32px;
+  box-sizing: border-box;
+  padding: 6px 10px !important;
+  border-radius: var(--ds-input-radius);
+  background: transparent !important;
+  color: var(--ds-text-default) !important;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none !important;
+}
+
+body .gsc-cursor-box .gsc-cursor-page:hover {
+  background: var(--ds-background-surface-strong) !important;
+}
+
+body .gsc-cursor-box .gsc-cursor-current-page {
+  background: var(--ds-background-action-primary) !important;
+  color: var(--ds-text-action-primary) !important;
+  font-weight: 700;
+}
+
+/* ---- Mentions Google (obligatoires) ----------------------------------------- */
+body .gcsc-find-more-on-google,
+body .gcsc-find-more-on-google-text,
+body .gcsc-branding,
+body .gcsc-branding-text {
+  color: var(--ds-text-muted) !important;
+}
+
+/* ---- Boutons d'action par résultat (injectés par search.html) --------------- */
+.rotomeca-actions {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rotomeca-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-input-radius);
+  background: var(--ds-background-surface-variant);
+  color: var(--ds-text-default);
+  cursor: pointer;
+}
+
+.rotomeca-btn:hover {
+  background: var(--ds-background-surface-strong);
+  border-color: var(--ds-border-strong);
+}
+
+.rotomeca-btn:focus-visible {
+  outline: 2px solid var(--ds-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.rotomeca-btn.primary {
+  border-color: transparent;
+  background: var(--ds-background-action-primary);
+  color: var(--ds-text-action-primary);
+}
+
+.rotomeca-btn.primary:hover {
+  background: var(--ds-background-action-primary-hover);
+}
+
+.rotomeca-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rotomeca-added {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--ds-background-tone-success);
+  color: var(--ds-text-tone-success);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.rotomeca-added svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Champ : l'icône de loupe est dessinée par ::before, on resserre le texte */
+body td.gsib_a {
+  padding: 0 4px !important;
+}
