@@ -110,6 +110,16 @@ export class Main {
   }
 
   main() {
+    // Réduite au rail, la barre se déplie au survol (masquage automatique,
+    // filtré côté principal) ou au clic
+    const isRail = () => document.documentElement.classList.contains('rail');
+    document.documentElement.addEventListener('mouseenter', () => {
+      if (isRail()) window.api.invoke(appEventList.edgeEnter);
+    });
+    document.documentElement.addEventListener('click', () => {
+      if (isRail()) window.api.invoke(appEventList.toggleToolbar);
+    });
+
     // Échap cache la barre (ouverte au clavier ou à la souris)
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape')
@@ -219,7 +229,8 @@ export class Main {
           window.api.invoke(appEventList.toggleToolbar);
         };
 
-        document.querySelector('#main').prepend(node);
+        // Même gabarit que le bouton d'ajout (centré), suivi d'un séparateur
+        document.querySelector('#main').prepend(node, createSeparator());
         node = null;
       }
     });

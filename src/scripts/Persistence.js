@@ -15,7 +15,11 @@ const COOKIE_LIFETIME_SECONDS = 60 * 60 * 24 * 365;
  * @param {Electron.App} app
  */
 function pinUserData(app) {
-  app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_NAME));
+  // En dev, le fuse EnableCookieEncryption n'est pas appliqué : partager le
+  // dossier avec la version installée rendrait les cookies illisibles (logins
+  // perdus). On isole donc le stockage de développement.
+  const name = app.isPackaged ? USER_DATA_NAME : `${USER_DATA_NAME}-dev`;
+  app.setPath('userData', path.join(app.getPath('appData'), name));
 }
 
 /**

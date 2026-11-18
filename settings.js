@@ -56,6 +56,33 @@ class Settings {
     this.#_settings.isButtonModeEnabled = value;
   }
 
+  /**
+   * Barre ancrée au bord de l'écran (AppBar Windows). Prioritaire sur les modes
+   * bouton et souris quand elle est disponible.
+   * @type {boolean}
+   */
+  get appBarEnabled() {
+    return this.#_config.appBarEnabled === true;
+  }
+
+  set appBarEnabled(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.appBarEnabled = value === true;
+  }
+
+  /**
+   * Barre ancrée qui se replie quand la souris la quitte.
+   * @type {boolean}
+   */
+  get appBarAutoHide() {
+    return this.#_config.appBarAutoHide === true;
+  }
+
+  set appBarAutoHide(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.appBarAutoHide = value === true;
+  }
+
   get theme() {
     return sanitizeTheme(this.#_config.theme);
   }
@@ -88,6 +115,8 @@ class Settings {
   save() {
     this.fileData.save({
       isButtonModeEnabled: this.isButtonModeEnabled,
+      appBarEnabled: this.appBarEnabled,
+      appBarAutoHide: this.appBarAutoHide,
       theme: this.theme,
       displayId: this.displayId,
     });

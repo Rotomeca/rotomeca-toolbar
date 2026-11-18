@@ -85,6 +85,8 @@
   "settings.mode": "Activation mode",
   "settings.modeButton": "Button",
   "settings.modeMouse": "Mouse on the left",
+  "settings.modeAppBar": "Docked bar",
+  "settings.appBarAutoHide": "Hide automatically",
   "settings.theme": "Theme",
   "settings.themeSystem": "System",
   "settings.themeDark": "Dark",

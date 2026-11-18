@@ -38,11 +38,25 @@ const {
 const { appEventList } = require('./src/scripts/events/AppEventList.js');
 const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
+const { AppBar } = require('./src/scripts/AppBar.js');
 const {
   parseUnreadCount,
   sanitizeMediaState,
   MEDIA_ACTIONS,
 } = require('./src/scripts/AppIndicators.js');
+
+// Largeur (px) de la bande réservée à la barre ancrée (AppBar)
+const APPBAR_WIDTH = 64;
+
+// Largeur (px) du rail qui reste visible quand la barre est repliée. Windows
+// impose 32 px au minimum à une fenêtre : en dessous, elle dépasserait la place
+// réservée.
+const RAIL_WIDTH = 32;
+
+// Barre ancrée en masquage automatique : délai (ms) avant de se replier une
+// fois la souris sortie, et période (ms) de la surveillance du curseur
+const AUTOHIDE_DELAY = 700;
+const AUTOHIDE_POLL = 150;
 
 // Hauteur (px) du bandeau d'actions au-dessus des applications
 const APPS_HEADER_HEIGHT = 32;
@@ -86,8 +100,47 @@ class AppMain extends BaseAppObject {
     this.taskbarIgnored = new Set();
   }
 
+  /**
+   * Mode bouton (chevron flottant). Exclu quand la barre est ancrée.
+   */
   get settingIsButton() {
-    return this.settings.isButtonModeEnabled;
+    return !this.settingIsAppBar && this.settings.isButtonModeEnabled;
+  }
+
+  /**
+   * Barre ancrée au bord gauche (AppBar Windows), si disponible.
+   */
+  get settingIsAppBar() {
+    return this.settings.appBarEnabled && AppBar.isSupported;
+  }
+
+  /**
+   * Barre ancrée qui se replie seule quand la souris la quitte.
+   */
+  get settingIsAutoHide() {
+    return this.settingIsAppBar && this.settings.appBarAutoHide;
+  }
+
+  /**
+   * Largeur actuelle de la barre ancrée : pleine largeur dépliée, rail fin
+   * repliée (le rail est la barre elle-même, un clic dessus la déplie).
+   */
+  get dockedWidth() {
+    return this.state ? APPBAR_WIDTH : RAIL_WIDTH;
+  }
+
+  /**
+   * Mode souris (zone sensible au bord gauche).
+   */
+  get settingIsMouse() {
+    return !this.settingIsAppBar && !this.settings.isButtonModeEnabled;
+  }
+
+  /**
+   * La barre se déplie quand la souris touche le bord gauche de l'écran.
+   */
+  get settingUsesEdge() {
+    return this.settingIsMouse;
   }
 
   get theme() {
@@ -423,12 +476,14 @@ class AppMain extends BaseAppObject {
       )
       .addEventListener(appEventList.edgeEnter, () => {
         // Seule la zone du bord gauche (mode souris) peut ouvrir la barre ainsi
-        if (!this.settingIsButton && !this.state) this.event_main_click();
+        if ((this.settingUsesEdge || this.settingIsAutoHide) && !this.state)
+          this.event_main_click();
       })
       .addEventListener(appEventList.requestToggle, () =>
         this.toggleFromOutside(),
       )
       .addEventListener(appEventList.getVersion, () => app.getVersion())
+      .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
       .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
       .addEventListener(
@@ -456,7 +511,178 @@ class AppMain extends BaseAppObject {
     ])
       screen.on(eventName, () => this.repositionWindows());
 
-    if (!this.settingIsButton) this.startDetectMousePosition();
+    if (this.settingUsesEdge) this.startDetectMousePosition();
+    // Barre ancrée fixe : dépliée dès le démarrage
+    if (this.settingIsAppBar) {
+      if (!this.settingIsAutoHide) this.event_main_click();
+      else this.updateDock();
+    }
+  }
+
+  /**
+   * Met à jour la barre ancrée : rail replié ou barre dépliée.
+   */
+  updateDock() {
+    if (this.settingIsAppBar) this.updateRail();
+  }
+
+  /**
+   * Replie la barre en rail fin (ou la restaure) : le rail est la barre réduite
+   * à une bande, qui garde sa place si elle n'est pas en masquage automatique.
+   */
+  updateRail() {
+    this.bindToolbarInit();
+
+    const rail = !this.state;
+
+    // Réserve (ou met à jour) l'espace avant de replacer les fenêtres : le rail
+    // ne doit jamais recouvrir les autres fenêtres
+    if (rail) this.attachAppBar();
+    this.repositionWindows();
+
+    const toolbar = this.toolbarWindow;
+    if (rail && !toolbar.isVisible()) toolbar.showInactive();
+
+    this.syncToolbarClasses();
+  }
+
+  /**
+   * Indique à la page de la barre si elle est réduite au rail.
+   */
+  syncToolbarClasses() {
+    const rail = this.settingIsAppBar && !this.state;
+
+    this.toolbarWindow.webContents
+      .executeJavaScript(
+        `document.documentElement.classList.toggle('rail', ${rail})`,
+      )
+      .catch(() => {});
+  }
+
+  /**
+   * Charge les applications dans la barre dès que sa page est prête (une
+   * seule fois par fenêtre).
+   */
+  bindToolbarInit() {
+    if (this.toolbarDomReadyBound) return;
+    this.toolbarDomReadyBound = true;
+
+    this.toolbarWindow.webContents.addListener('dom-ready', async () => {
+      this.syncToolbarClasses();
+
+      if (this.started) return;
+      this.started = true;
+
+      const loaded = await this.load();
+      this.toolbarWindow.webContents.postMessage(
+        loaded ? pageEventList.init : 'init',
+        {
+          saves: loaded ? this.saves : [],
+          settings: {
+            isButton: this.settingIsButton,
+          },
+        },
+      );
+
+      // La toolbar peut avoir été recréée alors que des sites tournent déjà
+      for (const url of new Set([...Object.keys(this.views), ...this.mutedUrls]))
+        this.sendIndicators(url);
+    });
+  }
+
+  /**
+   * En masquage automatique, replie la barre une fois la souris sortie de
+   * toutes les fenêtres de l'interface.
+   */
+  startAutoHideWatch() {
+    this.stopAutoHideWatch();
+    if (!this.settingIsAutoHide) return;
+
+    let outsideSince = null;
+
+    this.autoHideTimer = setInterval(() => {
+      const point = screen.getCursorScreenPoint();
+      const inside = ['toolbar', 'apps', 'add_dialog'].some((name) => {
+        const win = this.getWindow(name);
+        if (!win || win.isDestroyed() || !win.isVisible()) return false;
+
+        const b = win.getBounds();
+        return (
+          point.x >= b.x &&
+          point.x < b.x + b.width &&
+          point.y >= b.y &&
+          point.y < b.y + b.height
+        );
+      });
+
+      if (inside) {
+        outsideSince = null;
+      } else if (outsideSince === null) {
+        outsideSince = Date.now();
+      } else if (Date.now() - outsideSince >= AUTOHIDE_DELAY) {
+        outsideSince = null;
+        if (this.state) this.event_main_click();
+      }
+    }, AUTOHIDE_POLL);
+  }
+
+  stopAutoHideWatch() {
+    clearInterval(this.autoHideTimer);
+    this.autoHideTimer = null;
+  }
+
+  /**
+   * Réserve (ou met à jour) la bande du bord gauche auprès du système.
+   * @param {boolean} [force=false] Redemander même si la zone n'a pas changé
+   */
+  dockToolbar(force = false) {
+    if (!this.appBar?.registered) return;
+
+    const { bounds } = this.primaryScreen;
+    const wanted = {
+      x: bounds.x,
+      y: bounds.y,
+      // En masquage automatique, seul le rail réserve de la place : la barre
+      // dépliée flotte par-dessus les fenêtres sans les déplacer
+      width: this.settingIsAutoHide ? RAIL_WIDTH : this.dockedWidth,
+      height: bounds.height,
+    };
+    const key = JSON.stringify(wanted);
+
+    // Évite de boucler : réserver l'espace modifie la zone de travail, ce qui
+    // redéclenche repositionWindows
+    if (!force && key === this.appBarKey) return;
+    this.appBarKey = key;
+
+    this.appBarRect = this.appBar.setPos(wanted) ?? this.appBarRect;
+  }
+
+  /**
+   * Enregistre la barre comme AppBar et la place.
+   */
+  attachAppBar() {
+    this.appBar ??= new AppBar({
+      onFullscreen: (isFullscreen) =>
+        this.getWindow('toolbar')?.setAlwaysOnTop(!isFullscreen),
+      onPosChanged: () => {
+        this.dockToolbar(true);
+        this.repositionWindows();
+      },
+    });
+
+    if (!this.appBar.register(this.toolbarWindow)) return;
+
+    this.dockToolbar(true);
+    this.repositionWindows();
+  }
+
+  /**
+   * Libère l'espace réservé par la barre ancrée.
+   */
+  detachAppBar() {
+    this.appBar?.unregister();
+    this.appBarKey = null;
+    this.appBarRect = null;
   }
 
   /**
@@ -483,12 +709,18 @@ class AppMain extends BaseAppObject {
   get layout() {
     const wa = this.workArea;
     const { bounds } = this.primaryScreen;
-    const toolbar = {
-      x: wa.x + 10,
-      y: wa.y + 10,
-      width: 64,
-      height: wa.height - (this.settingIsButton ? 52 : 20),
-    };
+    const docked = this.settingIsAppBar;
+    const toolbar = docked
+      ? {
+          ...(this.appBarRect ?? { x: bounds.x, y: wa.y, height: wa.height }),
+          width: this.dockedWidth,
+        }
+      : {
+          x: wa.x + 10,
+          y: wa.y + 10,
+          width: 64,
+          height: wa.height - (this.settingIsButton ? 52 : 20),
+        };
 
     return {
       main: {
@@ -499,10 +731,12 @@ class AppMain extends BaseAppObject {
       },
       toolbar,
       apps: {
-        x: wa.x + 64 + 20,
-        y: wa.y + 10,
+        x: docked
+          ? toolbar.x + toolbar.width + 10
+          : wa.x + 64 + 20,
+        y: docked ? toolbar.y + 10 : wa.y + 10,
         width: Math.round(wa.width / 4),
-        height: toolbar.height,
+        height: docked ? toolbar.height - 20 : toolbar.height,
       },
       addDialog: {
         x: toolbar.x + toolbar.width + 10,
@@ -523,7 +757,7 @@ class AppMain extends BaseAppObject {
    * Affiche la zone sensible du bord gauche (mode souris).
    */
   startDetectMousePosition() {
-    if (this.settingIsButton) return;
+    if (!this.settingUsesEdge) return;
 
     const edge = this.edgeWindow;
     this.moveWindow(edge, this.layout.edge);
@@ -560,6 +794,7 @@ class AppMain extends BaseAppObject {
    * Replace les fenêtres existantes quand la configuration des écrans change.
    */
   repositionWindows() {
+    this.dockToolbar();
     const layout = this.layout;
 
     for (const name of ['main', 'toolbar', 'apps', 'edge'])
@@ -718,47 +953,31 @@ class AppMain extends BaseAppObject {
       else this.stopDetectMousePosition();
 
       this.toolbarWindow.show();
+      // En masquage automatique la barre flotte au-dessus des fenêtres, sans
+      // réserver d'espace
+      if (this.settingIsAppBar && !this.settingIsAutoHide) this.attachAppBar();
+      this.startAutoHideWatch();
 
-      if (!this.toolbarDomReadyBound) {
-        this.toolbarDomReadyBound = true;
-        this.toolbarWindow.webContents.addListener('dom-ready', async () => {
-        if (!this.started) {
-          this.started = true;
-          if (await this.load()) {
-            this.toolbarWindow.webContents.postMessage(pageEventList.init, {
-              saves: this.saves,
-              settings: {
-                isButton: this.settingIsButton,
-              },
-            });
-          } else {
-            this.toolbarWindow.webContents.postMessage('init', {
-              saves: [],
-              settings: {
-                isButton: this.settingIsButton,
-              },
-            });
-          }
-
-          // La toolbar peut avoir été recréée alors que des sites tournent déjà
-          for (const url of new Set([...Object.keys(this.views), ...this.mutedUrls]))
-            this.sendIndicators(url);
-        }
-        });
-      }
+      this.bindToolbarInit();
     } else {
       this.appsWindow.hide();
-      this.toolbarWindow.hide();
+      // Ancrée, la barre reste affichée mais réduite à un rail fin
+      if (!this.settingIsAppBar) this.toolbarWindow.hide();
       this.hideMediaPopup();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
       );
 
-      if (!this.settingIsButton) {
+      this.stopAutoHideWatch();
+      if (!this.settingIsAppBar) this.detachAppBar();
+
+      if (this.settingUsesEdge) {
         this.startDetectMousePosition();
       }
     }
+
+    this.updateDock();
   }
 
   async event_toolbar_add_button_click(data = null) {
@@ -1366,14 +1585,18 @@ class AppMain extends BaseAppObject {
     if (!settings || typeof settings !== 'object') return;
 
     const isButtonModeEnabled = settings.isButtonModeEnabled === true;
-    let buttonModeUpdated = false;
-    if (this.settingIsButton !== isButtonModeEnabled) {
-      buttonModeUpdated = true;
-    }
+    const appBarEnabled = settings.appBarEnabled === true;
+    const appBarAutoHide = settings.appBarAutoHide === true;
+    const buttonModeUpdated =
+      this.settings.isButtonModeEnabled !== isButtonModeEnabled ||
+      this.settings.appBarEnabled !== appBarEnabled ||
+      this.settings.appBarAutoHide !== appBarAutoHide;
 
     // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
     this.settings.isButtonModeEnabled = isButtonModeEnabled;
+    this.settings.appBarEnabled = appBarEnabled;
+    this.settings.appBarAutoHide = appBarAutoHide;
 
     const previousDisplayId = this.settings.displayId;
     this.settings.displayId = settings.displayId;
@@ -1384,7 +1607,10 @@ class AppMain extends BaseAppObject {
     if (displayUpdated) this.repositionWindows();
 
     const css = this.update_root_css();
-    for (const win of [this.mainWindow, this.toolbarWindow]) {
+    for (const win of [
+      this.settingIsButton && this.mainWindow,
+      this.toolbarWindow,
+    ].filter(Boolean)) {
       win.webContents.insertCSS(css);
       win.webContents
         .executeJavaScript(
@@ -1394,8 +1620,12 @@ class AppMain extends BaseAppObject {
     }
 
     if (buttonModeUpdated) {
+      // Libère l'espace réservé avant de détruire la fenêtre qui le porte
+      this.stopAutoHideWatch();
+      this.detachAppBar();
       this.removeWindow('toolbar');
       this.removeWindow('main');
+      this.toolbarDomReadyBound = false;
       this.started = false;
       this.state = false;
 
@@ -1403,9 +1633,16 @@ class AppMain extends BaseAppObject {
         this.mainWindow.show();
         this.stopDetectMousePosition();
       } else {
-        this.mainWindow.hide();
-        this.startDetectMousePosition();
+        this.getWindow('main')?.hide();
+
+        if (this.settingIsAppBar && !this.settingIsAutoHide) {
+          this.stopDetectMousePosition();
+          this.event_main_click();
+        } else if (this.settingUsesEdge) this.startDetectMousePosition();
+        else this.stopDetectMousePosition();
       }
+
+      this.updateDock();
     }
   }
 
@@ -1748,8 +1985,16 @@ pinUserData(app);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
-app.on('before-quit', () => flushSession(session.defaultSession));
+/** @type {?AppMain} */
+let runningInstance = null;
+
+// Sans cela, l'espace réservé par la barre ancrée resterait occupé
+app.on('before-quit', () => {
+  runningInstance?.detachAppBar();
+  flushSession(session.defaultSession);
+});
 app.on('will-quit', () => {
+  runningInstance?.detachAppBar();
   globalShortcut.unregisterAll();
   flushSession(session.defaultSession);
 });
@@ -1763,6 +2008,7 @@ app.on('ready', async () => {
     keepLoginsAlive(session.defaultSession);
     AppMain.InstallPermissionHandlers(session.defaultSession);
     const instance = AppMain.InitAutoUpdater().Run();
+    runningInstance = instance;
     AppMain.StartManualUpdateCheck();
 
     // Raccourci clavier global : afficher ou cacher la barre

@@ -34,7 +34,8 @@
 	},
 	"dependencies": {
 		"@rotomeca/design-system": "^1.1.0",
-		"electron-squirrel-startup": "^1.0.1"
+		"electron-squirrel-startup": "^1.0.1",
+		"koffi": "^3.3.8"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [

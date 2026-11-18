@@ -48,17 +48,48 @@ export class PageSettings {
     document.querySelector('#display-setting').hidden = false;
   }
 
-  #initMode() {
+  async #initMode() {
     const control = document.querySelector('#mode');
-    control.value = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
+
+    // L'option « barre ancrée » n'existe que si l'API native est disponible
+    const appBarSupported = await window.api.invoke(
+      appEventList.isAppBarSupported,
+    );
+
+    if (appBarSupported) {
+      const option = document.createElement('option');
+      option.value = 'appbar';
+      option.dataset.i18n = 'settings.modeAppBar';
+      option.textContent = 'Barre ancrée';
+      control.appendChild(option);
+    }
+
+    const isAppBar = appBarSupported && this.settings.appBarEnabled === true;
+
+    if (isAppBar) control.value = 'appbar';
+    else control.value = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
+
+    const autoHide = document.querySelector('#autohide');
+    const appBarSettings = document.querySelector('#appbar-settings');
+    appBarSettings.hidden = !isAppBar;
+
+    autoHide.checked = this.settings.appBarAutoHide === true;
+    autoHide.addEventListener('rds-switch:change', (event) => {
+      this.settings.appBarAutoHide = event.detail.checked;
+      this.#saveSettings();
+    });
 
     control.addEventListener('rds-segmented-control:change', (event) => {
-      const isButton = event.detail.value === 'button';
+      const mode = event.detail.value;
+      appBarSettings.hidden = mode !== 'appbar';
 
-      this.settings.isButtonModeEnabled = isButton;
+      this.settings.appBarEnabled = mode === 'appbar';
+      // En mode ancré, on conserve le dernier choix bouton/souris
+      if (mode !== 'appbar')
+        this.settings.isButtonModeEnabled = mode === 'button';
       this.#saveSettings();
 
-      document.documentElement.classList.toggle('without-button', !isButton);
+      document.documentElement.classList.toggle('without-button', mode !== 'button');
     });
   }
 
@@ -110,7 +141,7 @@ export class PageSettings {
       this.settings.theme ??= 'system';
 
       await this.#initDisplays();
-      this.#initMode();
+      await this.#initMode();
       this.#initTheme();
     });
   }
