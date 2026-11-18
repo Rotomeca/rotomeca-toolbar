@@ -2,6 +2,7 @@ const {
   JsEvent,
 } = require('../../lib/RotomecaWebComponents/libs/events_electron.js');
 const { BaseAppObject } = require('./BaseAppObject');
+const { t } = require('./i18n');
 
 /**
  * @callback OnShowCallback
@@ -112,16 +113,18 @@ class ContextMenu extends BaseAppObject {
 
       return [
         {
-          text: 'Supprimer',
-          title: `Supprimer l'application "${event.target.attribs.title}"`,
+          text: t('contextMenu.delete'),
+          title: t('contextMenu.deleteTitle', {
+            name: event.target.attribs.title,
+          }),
           action: 'delete',
           data: {
             url: event.target.attribs.href,
           },
         },
         {
-          text: 'Ajouter un séparateur en bas',
-          title: 'Ajoute un séparateur en bas',
+          text: t('contextMenu.addSeparator'),
+          title: t('contextMenu.addSeparatorTitle'),
           action: 'addseparator',
           data: {
             url: event.target.attribs.href,
@@ -131,8 +134,8 @@ class ContextMenu extends BaseAppObject {
             this.saves[index + 1] === 'separator',
         },
         {
-          text: 'Déplacer en haut',
-          title: "Déplace l'application vers le haut",
+          text: t('contextMenu.moveUp'),
+          title: t('contextMenu.moveUpTitle'),
           action: 'goUp',
           data: {
             url: event.target.attribs.href,
@@ -142,8 +145,8 @@ class ContextMenu extends BaseAppObject {
             index - 1 < 0,
         },
         {
-          text: 'Déplacer en bas',
-          title: "Déplace l'application vers le bas",
+          text: t('contextMenu.moveDown'),
+          title: t('contextMenu.moveDownTitle'),
           action: 'goDown',
           data: {
             url: event.target.attribs.href,
@@ -157,8 +160,10 @@ class ContextMenu extends BaseAppObject {
     } else {
       return [
         {
-          text: 'Supprimer',
-          title: `Supprimer l'application "${event.target.attribs.title}"`,
+          text: t('contextMenu.delete'),
+          title: t('contextMenu.deleteTitle', {
+            name: event.target.attribs.title,
+          }),
           action: 'delete',
           data: {
             url: event.target.attribs.href,
@@ -166,17 +171,19 @@ class ContextMenu extends BaseAppObject {
         },
         {
           text: this.isMuted(event.target.attribs.href)
-            ? 'Réactiver le son'
-            : 'Couper le son',
-          title: "Coupe ou réactive le son de l'application",
+            ? t('contextMenu.unmute')
+            : t('contextMenu.mute'),
+          title: t('contextMenu.muteTitle'),
           action: 'toggleMute',
           data: {
             url: event.target.attribs.href,
           },
         },
         {
-          text: 'Modifier',
-          title: `Modifier l'application "${event.target.attribs.title}"`,
+          text: t('contextMenu.edit'),
+          title: t('contextMenu.editTitle', {
+            name: event.target.attribs.title,
+          }),
           action: 'edit',
           data: {
             url: event.target.attribs.href,

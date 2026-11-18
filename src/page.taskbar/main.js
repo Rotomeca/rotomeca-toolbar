@@ -110,6 +110,12 @@ export class Main {
   }
 
   main() {
+    // Échap cache la barre (ouverte au clavier ou à la souris)
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape')
+        window.api.invoke(appEventList.requestToggle);
+    });
+
     window.api.on(pageEventList.toolbarAppSeparatorDelete, (_, url) => {
       let element =
         url === 0

@@ -1,17 +1,35 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
+// Signature de code Windows (Authenticode) : active uniquement si un certificat
+// .pfx est fourni par l'environnement (WINDOWS_CERTIFICATE_FILE et
+// WINDOWS_CERTIFICATE_PASSWORD, lus par @electron/windows-sign). Sans
+// certificat, la compilation reste possible mais l'installeur n'est pas signé.
+const windowsSign = process.env.WINDOWS_CERTIFICATE_FILE
+  ? {
+      certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
+      certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
+      timestampServer:
+        process.env.WINDOWS_TIMESTAMP_SERVER ||
+        'http://timestamp.digicert.com',
+      description: 'Rotomeca Toolbar',
+    }
+  : undefined;
+
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './src/pictures/icon'
+    icon: './src/pictures/icon',
+    // Signe l'exécutable, les DLL et les modules natifs de l'application
+    ...(windowsSign && { windowsSign }),
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
-      config: {},
+      // Signe Setup.exe et Update.exe
+      config: { ...(windowsSign && { windowsSign }) },
     },
     {
       name: '@electron-forge/maker-zip',
