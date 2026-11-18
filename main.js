@@ -41,6 +41,7 @@ const {
   MEDIA_ACTIONS,
 } = require('./src/scripts/AppIndicators.js');
 
+const TRAY_DEFAULT_TOOLTIP = "Gérer la barre d'outils";
 const MEDIA_POPUP_WIDTH = 300;
 const MEDIA_POPUP_HEIGHT = 96;
 const MEDIA_POPUP_HIDE_DELAY = 250;
@@ -64,6 +65,8 @@ class AppMain extends BaseAppObject {
     this.mutedUrls = new Set();
     this.mediaHoverUrl = null;
     this.mediaHideTimer = null;
+    /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
+    this.taskbarIgnored = new Set();
   }
 
   get settingIsButton() {
@@ -500,7 +503,7 @@ class AppMain extends BaseAppObject {
     const appContextMenu = Menu.buildFromTemplate(menu);
 
     this.tray = new Tray(this.appIcon);
-    this.tray.setToolTip("Gérer la barre d'outils");
+    this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
     this.tray.setContextMenu(appContextMenu);
 
     return this;
@@ -782,6 +785,12 @@ class AppMain extends BaseAppObject {
   }
 
   sendIndicators(url) {
+    this.postIndicators(url);
+    this.pushMediaState(url);
+    this.updateTaskbar();
+  }
+
+  postIndicators(url) {
     const entry = this.views[url];
     const toolbar = this.getWindow('toolbar');
 
@@ -794,9 +803,47 @@ class AppMain extends BaseAppObject {
         cover: entry?.media?.artwork ?? null,
         progress: this.getMediaProgress(entry?.media),
         hasMedia: !!entry?.media,
+        ignored: this.taskbarIgnored.has(url),
       });
+  }
 
-    this.pushMediaState(url);
+  /**
+   * Reflète le premier morceau en cours dans l'infobulle de l'icône de la zone
+   * de notification (un seul morceau affiché : les autres lecteurs sont ignorés).
+   */
+  updateTaskbar() {
+    const playing = Object.keys(this.views).filter(
+      (key) => this.views[key].media,
+    );
+    const [first, ...others] = playing;
+
+    const previous = this.taskbarIgnored;
+    this.taskbarIgnored = new Set(others);
+    for (const key of new Set([...previous, ...this.taskbarIgnored]))
+      if (previous.has(key) !== this.taskbarIgnored.has(key))
+        this.postIndicators(key);
+
+    if (!this.tray || this.tray.isDestroyed()) return;
+
+    if (!first) {
+      this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
+      return;
+    }
+
+    const media = this.views[first].media;
+    const progress = this.getMediaProgress(media);
+    const lines = [
+      `${media.playing ? '▶' : '⏸'} ${[media.title, media.artist]
+        .filter(Boolean)
+        .join(' – ')}`,
+    ];
+    if (progress !== null) lines.push(`${Math.round(progress * 100)} %`);
+    if (others.length)
+      lines.push(
+        `Seul le premier lecteur est pris en compte (+${others.length} ignoré(s))`,
+      );
+
+    this.tray.setToolTip(lines.join('\n'));
   }
 
   // #region Media

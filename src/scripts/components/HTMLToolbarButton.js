@@ -14,6 +14,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_cover = null;
   #_hasMedia = false;
   #_progress = null;
+  #_ignored = false;
   #_progressNode = null;
   #_coverNode = null;
   #_badgeNode = null;
@@ -219,6 +220,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
    * @param {?string} [indicators.cover=null] Pochette du morceau en cours
    * @param {boolean} [indicators.hasMedia=false] Un morceau est exposé par le site
    * @param {?number} [indicators.progress=null] Avancée du morceau (0 à 1)
+   * @param {boolean} [indicators.ignored=false] Lecture non reflétée dans la barre des tâches
    * @returns {this}
    */
   setIndicators({
@@ -228,7 +230,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     cover = null,
     hasMedia = false,
     progress = null,
+    ignored = false,
   } = {}) {
+    this.#_ignored = ignored;
     this.#_progress = progress;
     this.#_badge = badge;
     this.#_audible = audible;
@@ -276,6 +280,8 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     if (this.#_badge > 0) states.push(`${this.#_badge} non lu(s)`);
     if (this.#_muted) states.push('son coupé');
     else if (this.#_audible) states.push('son en cours');
+    if (this.#_ignored)
+      states.push('lecture ignorée dans la barre des tâches : seul le premier lecteur est pris en compte');
 
     this.setAttribute(
       'title',
