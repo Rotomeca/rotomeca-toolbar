@@ -2,6 +2,7 @@ import '../scripts/ds.js';
 import { HTMLToolbarButton } from '../scripts/components/HTMLToolbarButton.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
+import { initSeasonFx } from '../scripts/seasonFx.js';
 
 /**
  * Sélecteur des séparateurs de groupe entre les applications
@@ -122,6 +123,9 @@ export class Main {
   }
 
   main() {
+    // Effets de saison sur la barre (calque décoratif, ne capte aucun clic)
+    initSeasonFx(document.querySelector('#main'), { narrow: true });
+
     // Réduite au rail, la barre se déplie au survol (masquage automatique,
     // filtré côté principal) ou au clic
     const isRail = () => document.documentElement.classList.contains('rail');

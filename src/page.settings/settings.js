@@ -1,6 +1,7 @@
 import '../scripts/ds.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
+import { initSeasonFx } from '../scripts/seasonFx.js';
 
 /**
  * Familles de thèmes (ordre d'affichage) : libellé du réglage → [clé de traduction du thème].
@@ -94,6 +95,7 @@ function previewBar() {
 export class PageSettings {
   constructor() {
     this.settings ??= {};
+    initSeasonFx(document.querySelector('#page'));
     this.main();
   }
 
