@@ -15,6 +15,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        background: transparent;
       }
 
       #player {
@@ -22,27 +23,54 @@
         width: 100%;
         height: 100%;
         display: flex;
-        gap: 10px;
-        padding: 10px;
-        align-items: center;
-        border-radius: 10px;
-        background-color: var(--color-scheme, #1f2933);
-        color: var(--color-scheme-text, #c7dfff);
-        font-family: sans-serif;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: var(--ds-radius-lg);
+        background: var(--ds-background-overlay);
+        border: 1px solid var(--ds-border-subtle);
+        box-shadow: var(--ds-shadow-3);
+        color: var(--ds-text-default);
+        font-family: var(--ds-font-sans);
       }
 
-      #cover {
+      #head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      #cover,
+      #cover-fallback {
         flex: none;
-        width: 76px;
-        height: 76px;
-        border-radius: 8px;
+        box-sizing: border-box;
+        width: 72px;
+        height: 72px;
+        border-radius: var(--ds-input-radius);
         object-fit: cover;
-        background-color: var(--color-scheme-primary, #323f4b);
+      }
+
+      #cover-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ds-background-tone-brand);
+        color: var(--ds-text-tone-brand);
+        font-size: 28px;
+      }
+
+      #cover[hidden],
+      #cover-fallback[hidden] {
+        display: none;
       }
 
       #info {
         flex: 1;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       #title,
@@ -53,35 +81,59 @@
       }
 
       #title {
-        font-size: 14px;
-        font-weight: bold;
+        font: var(--text-label);
+        font-size: 1rem;
       }
 
       #artist {
-        font-size: 12px;
-        opacity: 0.8;
-        margin-bottom: 6px;
+        font: var(--text-helper);
+        color: var(--ds-text-muted);
       }
 
-      #bar {
-        margin-bottom: 6px;
-      }
-
-      #bar[hidden] {
+      #progress[hidden] {
         display: none;
+      }
+
+      #progress {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      #track {
+        height: 4px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-surface-strong);
+        overflow: hidden;
+      }
+
+      #fill {
+        height: 100%;
+        width: 0;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-action-primary);
+      }
+
+      #times {
+        display: flex;
+        justify-content: space-between;
+        font: var(--text-caption);
+        color: var(--ds-text-muted);
+        font-variant-numeric: tabular-nums;
       }
 
       #controls {
         display: flex;
-        gap: 4px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
       }
 
-      #controls rds-icon-button::part(button) {
-        width: 32px;
-        min-width: 32px;
-        height: 28px;
-        min-height: 28px;
-        border-radius: 6px;
+      .divider {
+        width: 1px;
+        height: 24px;
+        margin: 0 4px;
+        background: var(--ds-border-subtle);
       }
     </style>
     <link
@@ -93,19 +145,36 @@
     <script type="module" src="./main.js"></script>
   </head>
   <body>
-    <div id="player">
-      <img id="cover" alt="" hidden />
-      <div id="info">
-        <div id="title"></div>
-        <div id="artist"></div>
-        <rds-progress id="bar" size="sm" label="Avancée du morceau" data-i18n-label="media.progress" hidden></rds-progress>
-        <div id="controls">
-          <rds-icon-button id="prev" variant="primary" icon="skip-back" label="Précédent" title="Précédent" data-i18n-label="media.previous" data-i18n-title="media.previous"></rds-icon-button>
-          <rds-icon-button id="toggle" variant="primary" icon="play" label="Lecture / pause" title="Lecture / pause" data-i18n-label="media.play" data-i18n-title="media.play"></rds-icon-button>
-          <rds-icon-button id="next" variant="primary" icon="skip-forward" label="Suivant" title="Suivant" data-i18n-label="media.next" data-i18n-title="media.next"></rds-icon-button>
-          <rds-icon-button id="mute" variant="primary" icon="volume-2" label="Couper le son" title="Couper le son" data-i18n-label="media.mute" data-i18n-title="media.mute"></rds-icon-button>
+    <section id="player" aria-label="Lecture en cours" data-i18n-aria-label="media.title">
+      <div id="head">
+        <img id="cover" alt="" hidden />
+        <div id="cover-fallback" aria-hidden="true"><rds-icon name="music"></rds-icon></div>
+        <div id="info">
+          <span id="title"></span>
+          <span id="artist"></span>
         </div>
       </div>
-    </div>
+      <div id="progress" hidden>
+        <div
+          id="track"
+          role="progressbar"
+          aria-label="Avancée du morceau"
+          data-i18n-aria-label="media.progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div id="fill"></div>
+        </div>
+        <div id="times"><span id="elapsed">0:00</span><span id="total">0:00</span></div>
+      </div>
+      <div id="controls">
+        <rds-icon-button id="prev" icon="skip-back" label="Précédent" title="Précédent" data-i18n-label="media.previous" data-i18n-title="media.previous"></rds-icon-button>
+        <rds-icon-button id="toggle" variant="primary" size="lg" icon="play" label="Lecture / pause" title="Lecture / pause" data-i18n-label="media.play" data-i18n-title="media.play"></rds-icon-button>
+        <rds-icon-button id="next" icon="skip-forward" label="Suivant" title="Suivant" data-i18n-label="media.next" data-i18n-title="media.next"></rds-icon-button>
+        <div class="divider" aria-hidden="true"></div>
+        <rds-icon-button id="mute" icon="volume-2" label="Couper le son" title="Couper le son" data-i18n-label="media.mute" data-i18n-title="media.mute"></rds-icon-button>
+      </div>
+    </section>
   </body>
 </html>

@@ -3,6 +3,15 @@ import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
 /**
+ * @param {number} seconds
+ * @returns {string} Durée au format m:ss
+ */
+function formatTime(seconds) {
+	const total = Math.max(0, Math.floor(seconds));
+	return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
  * @class
  * @classdesc Petit lecteur affiché au survol d'un bouton qui joue un morceau
  */
@@ -63,16 +72,29 @@ class Main {
 		cover.hidden = !state.artwork;
 		if (state.artwork) cover.src = state.artwork;
 		else cover.removeAttribute('src');
+		document.getElementById('cover-fallback').hidden = !!state.artwork;
 
 		const title = document.getElementById('title');
 		title.textContent = state.title;
 		title.title = state.title;
 		document.getElementById('artist').textContent = state.artist;
 
-		const bar = document.getElementById('bar');
-		bar.hidden = !state.duration;
-		if (state.duration)
-			bar.value = Math.round((state.position / state.duration) * 100);
+		// Avancement : barre et temps lisent la même valeur
+		const progress = document.getElementById('progress');
+		progress.hidden = !state.duration;
+		if (state.duration) {
+			const percent = Math.round((state.position / state.duration) * 100);
+			document.getElementById('fill').style.width = `${percent}%`;
+			document
+				.getElementById('track')
+				.setAttribute('aria-valuenow', String(percent));
+			document.getElementById('elapsed').textContent = formatTime(
+				state.position,
+			);
+			document.getElementById('total').textContent = formatTime(
+				state.duration,
+			);
+		}
 
 		const has = action => state.actions.includes(action);
 		document.getElementById('prev').disabled = !has('previoustrack');

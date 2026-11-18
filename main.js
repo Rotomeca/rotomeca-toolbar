@@ -62,8 +62,8 @@ const AUTOHIDE_POLL = 150;
 // Hauteur (px) du bandeau d'actions au-dessus des applications
 const APPS_HEADER_HEIGHT = 32;
 
-const MEDIA_POPUP_WIDTH = 300;
-const MEDIA_POPUP_HEIGHT = 96;
+const MEDIA_POPUP_WIDTH = 340;
+const MEDIA_POPUP_HEIGHT = 200;
 const MEDIA_POPUP_HIDE_DELAY = 250;
 
 // Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
