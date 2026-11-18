@@ -85,6 +85,7 @@
   "settings.mode": "Mode d'activation",
   "settings.modeButton": "Bouton",
   "settings.modeMouse": "Souris à gauche",
+  "settings.modeAppBar": "Barre ancrée",
   "settings.theme": "Thème",
   "settings.themeSystem": "Système",
   "settings.themeDark": "Sombre",

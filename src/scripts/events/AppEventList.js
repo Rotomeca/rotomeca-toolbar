@@ -21,6 +21,7 @@ const appEventList = Object.freeze({
   minimiseWindow: 'minimiseWindow',
   settingsUpdated: 'setting.updated',
   getVersion: 'getVersion',
+  isAppBarSupported: 'isAppBarSupported',
   getDisplays: 'getDisplays',
   toggleMute: 'toggleMute',
   mediaControl: 'mediaControl',
