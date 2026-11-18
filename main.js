@@ -16,6 +16,7 @@ const {
   autoUpdater,
   Notification,
   dialog,
+  ipcMain,
 } = require('electron');
 
 const path = require('path');
@@ -34,6 +35,16 @@ const {
 } = require('./src/scripts/Persistence.js');
 const { appEventList } =require('./src/scripts/events/AppEventList.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
+const {
+  parseUnreadCount,
+  sanitizeMediaState,
+  MEDIA_ACTIONS,
+} = require('./src/scripts/AppIndicators.js');
+
+const TRAY_DEFAULT_TOOLTIP = "Gérer la barre d'outils";
+const MEDIA_POPUP_WIDTH = 300;
+const MEDIA_POPUP_HEIGHT = 96;
+const MEDIA_POPUP_HIDE_DELAY = 250;
 
 /**
  * @callback SavesUpdatedCallback
@@ -50,6 +61,12 @@ class AppMain extends BaseAppObject {
     this.tray;
     this.url;
     this.contextMenu;
+    /** Apps dont le son est coupé (conservé tant que l'application tourne) */
+    this.mutedUrls = new Set();
+    this.mediaHoverUrl = null;
+    this.mediaHideTimer = null;
+    /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
+    this.taskbarIgnored = new Set();
   }
 
   get settingIsButton() {
@@ -142,6 +159,32 @@ class AppMain extends BaseAppObject {
         preload: this.preloadPath, // path to your preload.js file
         file: path.join(__dirname, '/src/page.taskbar/taskbar.html'),
         show: false,
+      })
+    );
+  }
+
+  /**
+   * Petite fenêtre affichée au survol d'un bouton qui joue un morceau.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get mediaWindow() {
+    return (
+      this.getWindow('media') ??
+      this.createBrowserWindow('media', {
+        width: MEDIA_POPUP_WIDTH,
+        height: MEDIA_POPUP_HEIGHT,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.media/media.html'),
+        show: false,
+        otherArgs: { focusable: false },
       })
     );
   }
@@ -343,7 +386,16 @@ class AppMain extends BaseAppObject {
         this.event_settings_updated.bind(this),
       )
       .addEventListener(appEventList.getVersion, () => app.getVersion())
-      .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo());
+      .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
+      .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
+      .addEventListener(
+        appEventList.mediaControl,
+        this.event_media_control.bind(this),
+      )
+      .addEventListener(appEventList.mediaHover, this.event_media_hover.bind(this));
+
+    // Envoyé par le preload des sites (pas par nos pages locales)
+    ipcMain.on('rtb-media-state', this.event_media_state.bind(this));
 
     for (const eventName of [
       'display-metrics-changed',
@@ -411,6 +463,7 @@ class AppMain extends BaseAppObject {
         caller.id === this.getWindow('toolbar')?.id &&
         event.target.nodeName === 'ROTOMECA-TOOLBAR-BUTTON',
     );
+    this.contextMenu.isMuted = (url) => this.mutedUrls.has(url);
     this.onsave.push(this.contextMenu.getOnSaveCallback());
     this.onload.push(this.contextMenu.getOnLoadCallback());
 
@@ -450,7 +503,7 @@ class AppMain extends BaseAppObject {
     const appContextMenu = Menu.buildFromTemplate(menu);
 
     this.tray = new Tray(this.appIcon);
-    this.tray.setToolTip("Gérer la barre d'outils");
+    this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
     this.tray.setContextMenu(appContextMenu);
 
     return this;
@@ -553,12 +606,17 @@ class AppMain extends BaseAppObject {
               },
             });
           }
+
+          // La toolbar peut avoir été recréée alors que des sites tournent déjà
+          for (const url of new Set([...Object.keys(this.views), ...this.mutedUrls]))
+            this.sendIndicators(url);
         }
         });
       }
     } else {
       this.appsWindow.hide();
       this.toolbarWindow.hide();
+      this.hideMediaPopup();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
@@ -698,6 +756,227 @@ class AppMain extends BaseAppObject {
     if (!loaded) this.appsWindow.hide();
   }
 
+  /**
+   * Suit le titre (non-lus) et l'état audio d'une vue pour les afficher sur son bouton.
+   * @param {string} url
+   * @param {WebContentsView} view
+   */
+  bindIndicators(url, view) {
+    const { webContents } = view;
+
+    webContents.on('page-title-updated', (_, title) => {
+      this.updateIndicators(url, { badge: parseUnreadCount(title) });
+    });
+    webContents.on('audio-state-changed', (event) => {
+      this.updateIndicators(url, { audible: event.audible });
+    });
+  }
+
+  /**
+   * @param {string} url
+   * @param {{badge?: number, audible?: boolean}} changes
+   */
+  updateIndicators(url, changes) {
+    const entry = this.views[url];
+    if (!entry) return;
+
+    Object.assign(entry, changes);
+    this.sendIndicators(url);
+  }
+
+  sendIndicators(url) {
+    this.postIndicators(url);
+    this.pushMediaState(url);
+    this.updateTaskbar();
+  }
+
+  postIndicators(url) {
+    const entry = this.views[url];
+    const toolbar = this.getWindow('toolbar');
+
+    if (toolbar && !toolbar.isDestroyed())
+      toolbar.webContents.postMessage(pageEventList.appIndicators, {
+        url,
+        badge: entry?.badge ?? 0,
+        audible: entry?.audible ?? false,
+        muted: this.mutedUrls.has(url),
+        cover: entry?.media?.artwork ?? null,
+        progress: this.getMediaProgress(entry?.media),
+        hasMedia: !!entry?.media,
+        ignored: this.taskbarIgnored.has(url),
+      });
+  }
+
+  /**
+   * Reflète le premier morceau en cours dans l'infobulle de l'icône de la zone
+   * de notification (un seul morceau affiché : les autres lecteurs sont ignorés).
+   */
+  updateTaskbar() {
+    const playing = Object.keys(this.views).filter(
+      (key) => this.views[key].media,
+    );
+    const [first, ...others] = playing;
+
+    const previous = this.taskbarIgnored;
+    this.taskbarIgnored = new Set(others);
+    for (const key of new Set([...previous, ...this.taskbarIgnored]))
+      if (previous.has(key) !== this.taskbarIgnored.has(key))
+        this.postIndicators(key);
+
+    if (!this.tray || this.tray.isDestroyed()) return;
+
+    if (!first) {
+      this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
+      return;
+    }
+
+    const media = this.views[first].media;
+    const progress = this.getMediaProgress(media);
+    const lines = [
+      `${media.playing ? '▶' : '⏸'} ${[media.title, media.artist]
+        .filter(Boolean)
+        .join(' – ')}`,
+    ];
+    if (progress !== null) lines.push(`${Math.round(progress * 100)} %`);
+    if (others.length)
+      lines.push(
+        `Seul le premier lecteur est pris en compte (+${others.length} ignoré(s))`,
+      );
+
+    this.tray.setToolTip(lines.join('\n'));
+  }
+
+  // #region Media
+  /**
+   * @param {?{duration: ?number, position: ?number}} media
+   * @returns {?number} Avancée du morceau entre 0 et 1, `null` si inconnue
+   */
+  getMediaProgress(media) {
+    return media?.duration ? media.position / media.duration : null;
+  }
+
+  /**
+   * @param {string} url
+   * @returns {?Object} État affiché par la fenêtre de contrôle du morceau
+   */
+  getMediaPayload(url) {
+    const media = this.views[url]?.media;
+
+    return media ? { url, ...media, muted: this.mutedUrls.has(url) } : null;
+  }
+
+  /**
+   * Envoie un message à la fenêtre média, une fois sa page chargée.
+   */
+  sendToMediaWindow(channel, payload) {
+    const win = this.mediaWindow;
+
+    if (win.webContents.isLoading())
+      win.webContents.once('did-finish-load', () =>
+        win.webContents.postMessage(channel, payload),
+      );
+    else win.webContents.postMessage(channel, payload);
+  }
+
+  /**
+   * Met à jour la fenêtre média si elle est affichée pour cette application.
+   */
+  pushMediaState(url) {
+    if (this.mediaHoverUrl !== url) return;
+
+    const win = this.getWindow('media');
+    if (!win || !win.isVisible()) return;
+
+    const payload = this.getMediaPayload(url);
+
+    if (payload) this.sendToMediaWindow(pageEventList.mediaState, payload);
+    else this.hideMediaPopup();
+  }
+
+  /**
+   * @param {string} url
+   * @param {number} centerY Milieu vertical du bouton dans la toolbar
+   */
+  showMediaPopup(url, centerY) {
+    const payload = this.getMediaPayload(url);
+    if (!payload) return;
+
+    const toolbar = this.toolbarWindow.getBounds();
+    const wa = this.workArea;
+    const y = Math.min(
+      Math.max(toolbar.y + centerY - MEDIA_POPUP_HEIGHT / 2, wa.y),
+      wa.y + wa.height - MEDIA_POPUP_HEIGHT,
+    );
+
+    this.mediaHoverUrl = url;
+    this.mediaWindow.setPosition(
+      Math.round(toolbar.x + toolbar.width + 10),
+      Math.round(y),
+    );
+    this.sendToMediaWindow(pageEventList.mediaState, payload);
+    this.mediaWindow.showInactive();
+  }
+
+  hideMediaPopup() {
+    clearTimeout(this.mediaHideTimer);
+    this.mediaHoverUrl = null;
+
+    const win = this.getWindow('media');
+    if (win && win.isVisible()) win.hide();
+  }
+
+  /**
+   * Reçoit le morceau en cours d'un site (depuis son preload).
+   */
+  event_media_state(event, raw) {
+    if (event.senderFrame !== event.sender.mainFrame) return;
+
+    const url = Object.keys(this.views).find((key) => {
+      const { webContents } = this.views[key].view;
+      return !webContents.isDestroyed() && webContents.id === event.sender.id;
+    });
+
+    if (url) this.updateIndicators(url, { media: sanitizeMediaState(raw) });
+  }
+
+  event_media_hover(_, { url, hovering, y } = {}) {
+    clearTimeout(this.mediaHideTimer);
+
+    if (hovering) {
+      if (typeof url === 'string' && typeof y === 'number')
+        this.showMediaPopup(url, y);
+    } else
+      this.mediaHideTimer = setTimeout(
+        () => this.hideMediaPopup(),
+        MEDIA_POPUP_HIDE_DELAY,
+      );
+  }
+
+  event_media_control(_, { url, action } = {}) {
+    const entry = this.views[url];
+    if (!entry?.media || !MEDIA_ACTIONS.includes(action)) return;
+
+    entry.view.webContents.send('rtb-media-action', action);
+
+    // Retour immédiat : la page confirmera dans la seconde qui suit
+    if (action === 'play' || action === 'pause') {
+      entry.media.playing = action === 'play';
+      this.pushMediaState(url);
+    }
+  }
+
+  event_toggle_mute(_, { url } = {}) {
+    if (!AppMain.IsSafeUrl(url)) return;
+
+    const muted = !this.mutedUrls.has(url);
+    if (muted) this.mutedUrls.add(url);
+    else this.mutedUrls.delete(url);
+
+    this.views[url]?.view.webContents.setAudioMuted(muted);
+    this.sendIndicators(url);
+  }
+  // #endregion
+
   event_open_frame(_, url) {
     if (!AppMain.IsSafeUrl(url)) return;
 
@@ -705,7 +984,12 @@ class AppMain extends BaseAppObject {
 
     if (!this.views[url]) {
       // Session par défaut (persistante) : on ne vide jamais son stockage
-      const view = new WebContentsView();
+      const view = new WebContentsView({
+        webPreferences: {
+          preload: path.join(__dirname, './src/scripts/media/media-preload.js'),
+        },
+      });
+      view.webContents.setAudioMuted(this.mutedUrls.has(url));
       const bounds = this.appsWindow.getBounds();
       view.setBounds({
         x: 0,
@@ -714,8 +998,9 @@ class AppMain extends BaseAppObject {
         height: Math.max(0, bounds.height - 20),
       });
 
-      this.views[url] = { view };
+      this.views[url] = { view, badge: 0, audible: false };
       this.appsWindow.contentView.addChildView(view);
+      this.bindIndicators(url, view);
 
       view.webContents.loadURL(url);
     } else {
@@ -878,6 +1163,7 @@ class AppMain extends BaseAppObject {
       view.webContents.close();
       view.webContents?.destroy?.();
       delete this.views[url];
+      this.sendIndicators(url);
     }
 
     this.toolbarWindow.webContents.postMessage(

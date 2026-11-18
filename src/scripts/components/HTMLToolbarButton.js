@@ -8,6 +8,17 @@ import { HTMLGrouppedButton } from './HTMLGrouppedButton.js';
 
 export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_itemData = null;
+  #_badge = 0;
+  #_audible = false;
+  #_muted = false;
+  #_cover = null;
+  #_hasMedia = false;
+  #_progress = null;
+  #_ignored = false;
+  #_progressNode = null;
+  #_coverNode = null;
+  #_badgeNode = null;
+  #_audioNode = null;
   constructor() {
     super();
   }
@@ -73,6 +84,29 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     mainDiv.appendChild(childNode);
 
     this.root.appendChild(mainDiv);
+
+    this.#_badgeNode = document.createElement('span');
+    this.#_badgeNode.classList.add('badge');
+    this.#_audioNode = document.createElement('span');
+    this.#_audioNode.classList.add('audio');
+    this.#_audioNode.setAttribute('aria-hidden', 'true');
+    this.#_audioNode.appendChild(this.createText('🔊'));
+    this.#_coverNode = document.createElement('img');
+    this.#_coverNode.classList.add('cover');
+    this.#_coverNode.alt = '';
+    this.#_coverNode.onerror = () => {
+      this.#_coverNode.hidden = true;
+    };
+    this.#_progressNode = document.createElement('span');
+    this.#_progressNode.classList.add('progress');
+    this.#_progressNode.setAttribute('aria-hidden', 'true');
+    this.root.append(
+      this.#_coverNode,
+      this.#_progressNode,
+      this.#_badgeNode,
+      this.#_audioNode,
+    );
+    this.#_renderIndicators();
 
     childNode = null;
     mainDiv = null;
@@ -142,7 +176,17 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
 
       let style = document.createElement('style');
       style.appendChild(
-        document.createTextNode(`@keyframes tremble {
+        document.createTextNode(`@keyframes rainbow {
+          to {
+            filter: hue-rotate(360deg);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .progress {
+            animation: none;
+          }
+        }
+        @keyframes tremble {
           0% {
             transform: rotate(0);
           }
@@ -167,6 +211,86 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     }
   }
 
+  /**
+   * Met à jour les indicateurs affichés sur le bouton.
+   * @param {Object} [indicators]
+   * @param {number} [indicators.badge=0] Nombre de non-lus (0 = aucun badge)
+   * @param {boolean} [indicators.audible=false] Le site émet du son
+   * @param {boolean} [indicators.muted=false] Le son du site est coupé
+   * @param {?string} [indicators.cover=null] Pochette du morceau en cours
+   * @param {boolean} [indicators.hasMedia=false] Un morceau est exposé par le site
+   * @param {?number} [indicators.progress=null] Avancée du morceau (0 à 1)
+   * @param {boolean} [indicators.ignored=false] Lecture non reflétée dans la barre des tâches
+   * @returns {this}
+   */
+  setIndicators({
+    badge = 0,
+    audible = false,
+    muted = false,
+    cover = null,
+    hasMedia = false,
+    progress = null,
+    ignored = false,
+  } = {}) {
+    this.#_ignored = ignored;
+    this.#_progress = progress;
+    this.#_badge = badge;
+    this.#_audible = audible;
+    this.#_muted = muted;
+    this.#_hasMedia = hasMedia;
+    this.#_cover = cover;
+    this.#_renderIndicators();
+
+    return this;
+  }
+
+  /**
+   * Un morceau est en cours (le lecteur peut s'afficher au survol).
+   * @type {boolean}
+   * @readonly
+   */
+  get hasMedia() {
+    return this.#_hasMedia;
+  }
+
+  #_renderIndicators() {
+    if (!this.#_badgeNode) return;
+
+    if (this.#_cover) {
+      if (this.#_coverNode.getAttribute('src') !== this.#_cover)
+        this.#_coverNode.src = this.#_cover;
+      this.#_coverNode.hidden = false;
+    } else {
+      this.#_coverNode.hidden = true;
+      this.#_coverNode.removeAttribute('src');
+    }
+
+    this.#_progressNode.hidden = this.#_progress === null;
+    this.#_progressNode.style.setProperty(
+      '--progress',
+      `${Math.round((this.#_progress ?? 0) * 100)}%`,
+    );
+
+    this.#_badgeNode.hidden = this.#_badge <= 0;
+    this.#_badgeNode.textContent = this.#_badge > 99 ? '99+' : this.#_badge;
+    this.#_audioNode.hidden = !this.#_audible && !this.#_muted;
+    this.#_audioNode.textContent = this.#_muted ? '🔇' : '🔊';
+
+    const states = [];
+    if (this.#_badge > 0) states.push(`${this.#_badge} non lu(s)`);
+    if (this.#_muted) states.push('son coupé');
+    else if (this.#_audible) states.push('son en cours');
+    if (this.#_ignored)
+      states.push('lecture ignorée dans la barre des tâches : seul le premier lecteur est pris en compte');
+
+    this.setAttribute(
+      'title',
+      states.length
+        ? `${this.itemData.title} (${states.join(', ')})`
+        : this.itemData.title,
+    );
+  }
+
   static get CssRules() {
     return StyleComponent.RuleClass.Write({
       ':host': {
@@ -176,6 +300,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
         'aspect-ratio': '1 / 1',
         'border-radius': '15px',
         'border-color': 'transparent !important',
+        // La bordure est invisible : sans largeur, la boîte (et l'anneau de
+        // progression) fait toujours 40px quel que soit l'état du bouton
+        'border-width': '0 !important',
       },
       ':host(.edit) img, :host(.edit) p, :host(.edit) i': {
         animation: 'tremble 0.5s infinite',
@@ -194,6 +321,64 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
       },
       p: {
         margin: '0px',
+      },
+      '.cover': {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        'object-fit': 'cover',
+        'border-radius': '15px',
+        'pointer-events': 'none',
+      },
+      // Anneau d'avancée fin, aux dimensions du contour : un arc-en-ciel évidé
+      // par un masque : l'arc parcouru porte tout le spectre, le reste est grisé
+      '.progress': {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        right: '0',
+        bottom: '0',
+        padding: '2px',
+        'box-sizing': 'border-box',
+        'border-radius': '15px',
+        background:
+          'conic-gradient(#ff3b30 calc(var(--progress, 0%) * 0.0), #ffcc00 calc(var(--progress, 0%) * 0.1667), #34c759 calc(var(--progress, 0%) * 0.3333), #00c7be calc(var(--progress, 0%) * 0.5), #0a84ff calc(var(--progress, 0%) * 0.6667), #bf5af2 calc(var(--progress, 0%) * 0.8333), #ff3b30 calc(var(--progress, 0%) * 1.0), transparent 0), rgba(255, 255, 255, 0.18)',
+        '-webkit-mask':
+          'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+        '-webkit-mask-composite': 'xor',
+        'mask-composite': 'exclude',
+        animation: 'rainbow 3s linear infinite',
+        'pointer-events': 'none',
+      },
+      '.badge': {
+        position: 'absolute',
+        top: '-4px',
+        right: '-4px',
+        'min-width': '16px',
+        height: '16px',
+        padding: '0 4px',
+        'box-sizing': 'border-box',
+        'border-radius': '8px',
+        background: '#e53935',
+        color: '#fff',
+        'font-size': '10px',
+        'font-weight': 'bold',
+        'line-height': '16px',
+        'text-align': 'center',
+        'pointer-events': 'none',
+      },
+      '.audio': {
+        position: 'absolute',
+        bottom: '-2px',
+        right: '-2px',
+        'font-size': '11px',
+        'line-height': '1',
+        'pointer-events': 'none',
+      },
+      '[hidden]': {
+        display: 'none',
       },
     });
   }

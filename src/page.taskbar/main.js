@@ -58,6 +58,23 @@ export class Main {
       this.event_button_unpressed.bind(this),
     );
 
+    button.addEventListener('mouseenter', () => {
+      if (!button.hasMedia) return;
+
+      const rect = button.getBoundingClientRect();
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: true,
+        y: rect.top + rect.height / 2,
+      });
+    });
+    button.addEventListener('mouseleave', () => {
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: false,
+      });
+    });
+
     if (request === true) return button;
 
     if (document.querySelectorAll(HTMLToolbarButton.TAG).length === 0)
@@ -189,6 +206,10 @@ export class Main {
           button.after(document.createElement(HTMLSeparator.TAG));
         else button.after(this.add(null, data, { request: true }));
       }
+    });
+
+    window.api.on(pageEventList.appIndicators, (_, { url, ...indicators }) => {
+      HTMLToolbarButton.Select(url)?.setIndicators(indicators);
     });
 
     window.api.on(pageEventList.windowAppsClosed, () => {

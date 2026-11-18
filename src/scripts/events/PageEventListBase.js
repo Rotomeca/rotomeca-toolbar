@@ -13,4 +13,6 @@ const pageEventList = Object.freeze({
   appInserted: 'appInserted',
   windowAppsClosed: 'windowAppsClosed',
   settingsStart: 'settingsStart',
+  appIndicators: 'appIndicators',
+  mediaState: 'mediaState',
 });

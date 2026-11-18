@@ -47,6 +47,11 @@ class ContextMenu extends BaseAppObject {
      * @event
      */
     this.onShowCondition = new JsEvent();
+    /**
+     * Indique si le son d'une application est coupé.
+     * @type {(url: string) => boolean}
+     */
+    this.isMuted = () => false;
   }
 
   /**
@@ -155,6 +160,16 @@ class ContextMenu extends BaseAppObject {
           text: 'Supprimer',
           title: `Supprimer l'application "${event.target.attribs.title}"`,
           action: 'delete',
+          data: {
+            url: event.target.attribs.href,
+          },
+        },
+        {
+          text: this.isMuted(event.target.attribs.href)
+            ? 'Réactiver le son'
+            : 'Couper le son',
+          title: "Coupe ou réactive le son de l'application",
+          action: 'toggleMute',
           data: {
             url: event.target.attribs.href,
           },
