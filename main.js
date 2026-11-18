@@ -155,6 +155,15 @@ class AppMain extends BaseAppObject {
     return this.main.icon;
   }
 
+  /**
+   * Icône de la zone de notification : le .ico (16 à 256 px) reste net sous Windows.
+   */
+  get trayIcon() {
+    return process.platform === 'win32'
+      ? path.join(__dirname, '/src/pictures/icon.ico')
+      : this.appIcon;
+  }
+
   get preloadPath() {
     if (!this.main.preload)
       this.main.preload = path.join(__dirname, './preload.js');
@@ -875,7 +884,7 @@ class AppMain extends BaseAppObject {
 
     const appContextMenu = Menu.buildFromTemplate(menu);
 
-    this.tray = new Tray(this.appIcon);
+    this.tray = new Tray(this.trayIcon);
     this.tray.setToolTip(t('tray.tooltip'));
     this.tray.setContextMenu(appContextMenu);
     this.tray.on('click', () => this.toggleFromOutside());
