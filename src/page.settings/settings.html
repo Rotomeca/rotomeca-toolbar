@@ -84,8 +84,169 @@
         gap: 20px;
         padding: 24px;
         border-radius: var(--ds-radius-lg);
-        background: var(--ds-background-surface-variant);
+        /* légèrement transparent : laisse voir les effets de saison */
+        background: color-mix(in srgb, var(--ds-background-surface-variant) 82%, transparent);
         border: 1px solid var(--ds-border-subtle);
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      /* Vignettes de thème */
+      #themes {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tile {
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-radius: var(--ds-input-radius);
+        border: 2px solid var(--ds-border-subtle);
+        background: var(--ds-background-surface);
+        color: var(--ds-text-default);
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      .tile[aria-pressed='true'] {
+        border-color: var(--ds-background-action-primary);
+      }
+
+      .tile:focus-visible {
+        outline: 2px solid var(--ds-focus-ring-color);
+        outline-offset: 2px;
+      }
+
+      .tile-name {
+        min-height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font: var(--text-caption);
+        text-align: center;
+      }
+
+      /* Aperçu : porte son propre data-theme / data-palette, les jetons s'y résolvent */
+      .preview {
+        height: 54px;
+        border-radius: 6px;
+        overflow: hidden;
+        display: flex;
+        background: var(--ds-body-background-color);
+        border: 1px solid var(--ds-border-subtle);
+      }
+
+      .preview-bar {
+        width: 14px;
+        flex-shrink: 0;
+        padding-top: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: var(--ds-background-surface-variant);
+      }
+
+      .preview-bar > span {
+        display: block;
+        width: 7px;
+        height: 7px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-surface-strong);
+      }
+
+      .preview-bar > .pv-plus {
+        border-radius: 2px;
+        background: var(--ds-background-action-primary);
+      }
+
+      .preview-bar > .pv-sep {
+        width: 6px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--ds-background-tone-accent-bold);
+      }
+
+      .preview-body {
+        flex-grow: 1;
+        padding: 7px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .preview-body > .pv-l1 {
+        height: 5px;
+        width: 70%;
+        border-radius: 3px;
+        background: var(--ds-text-default);
+      }
+
+      .preview-body > .pv-l2 {
+        height: 4px;
+        width: 45%;
+        border-radius: 3px;
+        background: var(--ds-text-muted);
+      }
+
+      .preview-body > .pv-btn {
+        margin-top: auto;
+        align-self: flex-end;
+        width: 18px;
+        height: 8px;
+        border-radius: 3px;
+        background: var(--ds-background-action-primary);
+      }
+
+      /* Vignette « Système » : moitié claire, moitié sombre */
+      .preview.split > .half {
+        flex: 1;
+        display: flex;
+        background: var(--ds-body-background-color);
+      }
+
+      .preview.split > .half.dark {
+        justify-content: flex-end;
+        padding: 6px;
+      }
+
+      .preview.split .pv-btn {
+        align-self: flex-end;
+        width: 14px;
+        height: 8px;
+        border-radius: 3px;
+        background: var(--ds-background-action-primary);
+      }
+
+      #season-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-top: 16px;
+        border-top: 1px solid var(--ds-border-subtle);
+      }
+
+      .season-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .density {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-grow: 1;
       }
 
       h2 {
@@ -103,16 +264,11 @@
         font: var(--text-label);
       }
 
-      .rule {
-        height: 1px;
-        margin-bottom: 20px;
-        background: var(--ds-border-subtle);
-      }
-
       .grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 16px;
+        align-items: center;
       }
 
       [hidden] {
@@ -125,11 +281,12 @@
     />
     <link rel="stylesheet" href="../css/ds-compat.css" />
     <link rel="stylesheet" href="../css/themes.css" />
+    <link rel="stylesheet" href="../css/saisons.css" />
     <script src="../scripts/ds.js" type="module"></script>
     <script src="./settings.js" type="module"></script>
   </head>
   <body>
-    <div id="page">
+    <div id="page" class="fx-host">
       <header>
         <div id="badge" aria-hidden="true"><rds-icon name="settings"></rds-icon></div>
         <div id="heading">
@@ -149,30 +306,35 @@
           </rds-segmented-control>
           <span id="mode-help" class="helper"></span>
         </div>
-        <div id="appbar-settings" hidden>
-          <div class="rule"></div>
-          <rds-switch id="autohide" icons data-i18n="settings.appBarAutoHide">Masquer automatiquement</rds-switch>
-        </div>
-      </section>
-
-      <section aria-labelledby="sec-display">
-        <h2 id="sec-display" data-i18n="settings.sectionDisplay">Affichage</h2>
         <div class="grid">
-          <rds-select id="theme" label="Thème" data-i18n-label="settings.theme">
-            <option value="system" data-i18n="settings.themeSystem">Système</option>
-            <option value="clair" data-i18n="settings.themeClair">Clair</option>
-            <option value="sombre" data-i18n="settings.themeDark">Sombre</option>
-            <option value="marron" data-i18n="settings.themeMarron">Marron</option>
-            <option value="rouge" data-i18n="settings.themeRed">Rouge</option>
-            <option value="bleu" data-i18n="settings.themeBlue">Bleu</option>
-            <option value="vert" data-i18n="settings.themeGreen">Vert</option>
-            <option value="sapin" data-i18n="settings.themeSapin">Vert sapin</option>
-            <option value="blanc" data-i18n="settings.themeWhite">Blanc</option>
-            <option value="noir" data-i18n="settings.themeBlack">Noir</option>
-          </rds-select>
           <div id="display-setting" hidden>
             <rds-select id="displays" label="Écran" data-i18n-label="settings.display"></rds-select>
           </div>
+          <div id="appbar-settings" hidden>
+            <rds-switch id="autohide" icons data-i18n="settings.appBarAutoHide">Masquer automatiquement</rds-switch>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="sec-appearance">
+        <div class="card-head">
+          <h2 id="sec-appearance" data-i18n="settings.sectionAppearance">Apparence</h2>
+          <rds-segmented-control id="family" label="Famille de thèmes" data-i18n-label="settings.family"></rds-segmented-control>
+        </div>
+        <div id="themes" role="group" aria-label="Thème" data-i18n-aria-label="settings.themeGroup"></div>
+        <div id="season-options" hidden>
+          <div class="season-row">
+            <rds-switch id="fx" icons data-i18n="settings.effects">Effets de saison</rds-switch>
+            <div class="density">
+              <span class="label" data-i18n="settings.density">Densité</span>
+              <rds-segmented-control id="density" label="Densité des effets" data-i18n-label="settings.density" full>
+                <option value="discrete" data-i18n="settings.densityDiscrete">Discrète</option>
+                <option value="normale" data-i18n="settings.densityNormal">Normale</option>
+                <option value="abondante" data-i18n="settings.densityAbundant">Abondante</option>
+              </rds-segmented-control>
+            </div>
+          </div>
+          <span class="helper" data-i18n="settings.effectsHelp">Neige, feuilles, pétales, tournesols ou traîneau selon la saison. Coupés si Windows réduit les animations.</span>
         </div>
       </section>
     </div>
