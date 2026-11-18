@@ -131,6 +131,16 @@
   "settings.densityNormal": "Normal",
   "settings.densityAbundant": "Abundant",
   "settings.effectsHelp": "Snow, leaves, petals, sunflowers or a sleigh depending on the season. Off when Windows reduces animations.",
+  "settings.variantClassic": "Classic",
+  "settings.variantSapin": "Fir",
+  "settings.variantNeige": "Snow",
+  "settings.variantNoel": "Christmas",
+  "settings.variantFeuilles": "Leaves",
+  "settings.variantCerisier": "Cherry blossom",
+  "settings.variantOf": "{parent} variant",
+  "settings.auto": "Automatic theme",
+  "settings.autoBadge": "{season} · {next} from {date}",
+  "settings.autoHelp": "Follows the official season dates (equinoxes and solstices), with Christmas on 24 and 25 December. In spring: Cherry blossom until 31 March, then Spring. Picking a theme by hand turns this off.",
   "settings.display": "Display",
   "settings.version": "Version:"
 }
