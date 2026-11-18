@@ -3,8 +3,8 @@
   --ce-html-button-border: none;
   --ce-html-button-border-hover: none;
   --ce-html-button-border-active: none;
-  --scrollbar-color-thumb: #363a5b;
-  --scrollbar-color-track: #6d74b5;
+  --scrollbar-color-thumb: var(--ds-border-strong);
+  --scrollbar-color-track: transparent;
   --scrollbar-width: thin;
   --scrollbar-width-legacy: 10px;
 }
@@ -16,57 +16,101 @@ body {
   height: 100%;
 }
 #main {
-  background-color: var(--color-scheme, white);
-  color: var(--color-scheme-text, black);
+  box-sizing: border-box;
+  position: relative;
   display: flex;
   height: 100%;
   flex-direction: column;
-  border-radius: 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  background: var(--ds-background-surface-variant);
+  color: var(--ds-text-default);
+  font-family: var(--ds-font-sans);
+  border: 1px solid var(--ds-border-subtle);
+  border-left: none;
+  border-radius: 0;
+  box-shadow: var(--ds-shadow-3);
+}
+#head,
+#edit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+#head:empty {
+  display: none;
 }
 #apps {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
   flex: 1;
-  overflow: auto;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 0;
 }
-rotomeca-toolbar-button {
-  margin: 5px 0;
+.separator {
+  flex-shrink: 0;
+  width: 32px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ds-border-subtle);
 }
-/* Barre ancrée repliée : un rail fin aux angles droits, c'est la barre
-   elle-même qui sert de bouton (un clic ou le survol la déplie) */
-html.rail #main > * {
+.separator.group {
+  width: 24px;
+  height: 2px;
+  margin: 6px 0;
+  border-radius: var(--ds-radius-full, 999px);
+}
+/* Effets de saison actifs : un voile sombre sous les boutons du bas (décor derrière)
+   pour qu'ils restent lisibles */
+html[data-fx='on'] #edit {
+  margin-top: -20px;
+  padding-top: 20px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ds-background-surface-variant) 60%, transparent) 75%,
+    transparent
+  );
+}
+/* Barre ancrée repliée : une bande fine aux angles carrés, entièrement
+   cliquable (un clic ou le survol déplie la barre) */
+#rail-button {
+  display: none;
+}
+html.rail #main > :not(#rail-button) {
   display: none;
 }
 html.rail #main {
-  position: relative;
-  border-radius: 0;
-  cursor: pointer;
+  /* La fenêtre fait au moins 32 px : la bande de 24 px est calée à gauche */
+  width: 24px;
+  padding: 0;
+  gap: 0;
 }
-html.rail #main::after {
-  content: '\203A';
-  position: absolute;
-  inset: 0;
+html.rail #rail-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  line-height: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ds-text-action-tertiary);
+  font-size: 16px;
+  cursor: pointer;
 }
-html.rail #main:hover {
-  filter: brightness(1.2);
+html.rail #rail-button:hover {
+  background: var(--ds-background-action-tertiary-hover);
 }
-rds-divider {
-  width: calc(100% - 30px);
-  margin: 15px 0;
-  /* Les conteneurs sont en colonne flex : on centre sans toucher au display */
-  align-self: center;
-}
-
-#add-button,
-#hide-button {
-  display: block;
-  margin: 15px;
+html.rail #rail-button:focus-visible {
+  outline: 2px solid var(--ds-focus-ring-color);
+  outline-offset: -2px;
 }
 .blur {
   backdrop-filter: blur(5px);

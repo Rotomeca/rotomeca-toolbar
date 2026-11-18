@@ -1,25 +1,75 @@
 /**
- * Thèmes autorisés (liste blanche : la valeur sert à construire un chemin de fichier).
+ * Thèmes autorisés (liste blanche) et attributs `data-theme` / `data-palette`
+ * correspondants. « system » est résolu en clair ou sombre par resolveTheme().
  */
-const THEMES = Object.freeze([
-  'system',
-  'dark',
-  'red',
-  'blue',
-  'green',
-  'white',
-  'black',
-]);
+const THEME_ATTRS = Object.freeze({
+  system: null,
+  clair: { theme: 'light', palette: '' },
+  sombre: { theme: 'dark', palette: '' },
+  marron: { theme: 'dark', palette: 'marron' },
+  rouge: { theme: 'dark', palette: 'rouge' },
+  bleu: { theme: 'dark', palette: 'bleu' },
+  vert: { theme: 'dark', palette: 'vert' },
+  sapin: { theme: 'dark', palette: 'sapin' },
+  blanc: { theme: 'light', palette: 'blanc' },
+  noir: { theme: 'dark', palette: 'noir' },
+  hiver: { theme: 'dark', palette: 'hiver' },
+  automne: { theme: 'dark', palette: 'automne' },
+  printemps: { theme: 'dark', palette: 'printemps' },
+  cerisier: { theme: 'dark', palette: 'cerisier' },
+  ete: { theme: 'light', palette: 'ete' },
+  noel: { theme: 'dark', palette: 'noel' },
+});
+const THEMES = Object.freeze(Object.keys(THEME_ATTRS));
 const DEFAULT_THEME = 'system';
+
+/** Thèmes de saison : les seuls à porter des effets animés. */
+const SEASON_THEMES = Object.freeze(['hiver', 'automne', 'printemps', 'cerisier', 'ete', 'noel']);
+
+/** Densités des effets de saison. */
+const EFFECT_DENSITIES = Object.freeze(['discrete', 'normale', 'abondante']);
+const DEFAULT_DENSITY = 'normale';
+
+/**
+ * @param {unknown} value
+ * @returns {string} Une densité valide, ou la densité par défaut
+ */
+function sanitizeDensity(value) {
+  return EFFECT_DENSITIES.includes(value) ? value : DEFAULT_DENSITY;
+}
+
+/** Anciennes valeurs enregistrées (avant 3.x) → thème équivalent. */
+const LEGACY_THEMES = Object.freeze({
+  dark: 'sombre',
+  red: 'rouge',
+  blue: 'bleu',
+  green: 'vert',
+  white: 'blanc',
+  black: 'noir',
+});
 
 /**
  * @param {unknown} value
  * @returns {string} Un thème valide, ou le thème par défaut
  */
 function sanitizeTheme(value) {
-  return typeof value === 'string' && THEMES.includes(value)
-    ? value
-    : DEFAULT_THEME;
+  if (typeof value !== 'string') return DEFAULT_THEME;
+  if (Object.hasOwn(LEGACY_THEMES, value)) return LEGACY_THEMES[value];
+  return THEMES.includes(value) ? value : DEFAULT_THEME;
+}
+
+/**
+ * @param {string} theme Réglage de thème (déjà validé)
+ * @param {boolean} systemIsDark Mode sombre de Windows
+ * @returns {{theme: 'light'|'dark', palette: string}}
+ */
+function resolveTheme(theme, systemIsDark) {
+  return (
+    THEME_ATTRS[sanitizeTheme(theme)] ?? {
+      theme: systemIsDark ? 'dark' : 'light',
+      palette: '',
+    }
+  );
 }
 
 /**
@@ -93,6 +143,57 @@ class Settings {
   }
 
   /**
+   * Thème automatique : suit les dates officielles des saisons (par défaut non).
+   * @type {boolean}
+   */
+  get themeAuto() {
+    return this.#_config.themeAuto === true;
+  }
+
+  set themeAuto(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.themeAuto = value === true;
+  }
+
+  /**
+   * Thème réellement appliqué : celui de la saison du jour en mode automatique,
+   * sinon le choix manuel.
+   * @type {string}
+   */
+  get effectiveTheme() {
+    if (!this.themeAuto) return this.theme;
+
+    const { seasonThemeFor } = require('./src/scripts/Seasons.js');
+    return seasonThemeFor();
+  }
+
+  /**
+   * Effets de saison activés (par défaut oui).
+   * @type {boolean}
+   */
+  get effetsSaison() {
+    return this.#_config.effetsSaison !== false;
+  }
+
+  set effetsSaison(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.effetsSaison = value !== false;
+  }
+
+  /**
+   * Densité des effets de saison.
+   * @type {'discrete'|'normale'|'abondante'}
+   */
+  get densiteEffets() {
+    return sanitizeDensity(this.#_config.densiteEffets);
+  }
+
+  set densiteEffets(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.densiteEffets = sanitizeDensity(value);
+  }
+
+  /**
    * Identifiant de l'écran choisi (`null` = écran principal).
    * @type {number|null}
    */
@@ -118,6 +219,9 @@ class Settings {
       appBarEnabled: this.appBarEnabled,
       appBarAutoHide: this.appBarAutoHide,
       theme: this.theme,
+      themeAuto: this.themeAuto,
+      effetsSaison: this.effetsSaison,
+      densiteEffets: this.densiteEffets,
       displayId: this.displayId,
     });
   }
@@ -150,4 +254,12 @@ Object.defineProperty(Params, 'Instance', {
   },
 });
 
-module.exports = { Params, THEMES, sanitizeTheme, sanitizeDisplayId };
+module.exports = {
+  Params,
+  THEMES,
+  sanitizeTheme,
+  sanitizeDensity,
+  resolveTheme,
+  SEASON_THEMES,
+  sanitizeDisplayId,
+};

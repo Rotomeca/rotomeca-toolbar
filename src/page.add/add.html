@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta
       name="viewport"
@@ -18,49 +18,161 @@
         padding: 0;
         width: 100%;
         height: 100%;
-        overflow: auto;
+        overflow: hidden;
+        background: var(--ds-body-background-color);
+        color: var(--ds-text-default);
+        font-family: var(--ds-font-sans);
       }
 
       #layout {
+        box-sizing: border-box;
         height: 100%;
-        width: calc(100% - 40px);
-        padding: 0 20px;
-        color: var(--color-scheme-text, black);
-        background-color: var(--color-scheme, white);
-        /* border-radius: 8px; */
-      }
-
-      #predefined-apps {
-        width: 100%;
+        padding: 28px 32px;
         display: flex;
-        justify-content: space-evenly;
+        flex-direction: column;
+        gap: 24px;
       }
 
-      rotomeca-toolbar-button {
-        padding: 0;
+      section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+      }
+
+      #search-section {
+        flex: 1;
+      }
+
+      .head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      h2 {
+        margin: 0;
+        font: var(--text-title);
+      }
+
+      .helper {
+        font: var(--text-helper);
+        color: var(--ds-text-muted);
+      }
+
+      /* Populaires : grille de 4 colonnes */
+      #predefined-apps {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .popular {
+        box-sizing: border-box;
+        height: 84px;
+        padding: 8px 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--ds-border-subtle);
+        border-radius: var(--ds-radius-lg);
+        background: var(--ds-background-surface-variant);
+        color: var(--ds-text-default);
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      .popular:hover:not(:disabled) {
+        border-color: var(--ds-border-strong);
+        background: var(--ds-background-surface-strong);
+      }
+
+      .popular:focus-visible {
+        outline: 2px solid var(--ds-focus-ring-color);
+        outline-offset: 2px;
+      }
+
+      .popular:disabled {
+        cursor: default;
+      }
+
+      .popular-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--ds-radius-full, 999px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ds-background-surface-strong);
+        font-size: 18px;
+      }
+
+      .popular-icon img {
+        width: 20px;
+        height: 20px;
+      }
+
+      .popular.added .popular-icon {
+        background: var(--ds-background-tone-success);
+        color: var(--ds-text-tone-success);
+      }
+
+      .popular-name {
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font: var(--text-caption);
+      }
+
+      /* Résultats Google : conteneur à défilement interne */
+      #search {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        border-radius: var(--ds-radius-lg);
+        background: var(--ds-background-surface-variant);
+        border: 1px solid var(--ds-border-subtle);
+      }
+
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: transparent;
       }
     </style>
-    <script src="./page.js" type="module"></script>
+    <link rel="stylesheet" href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css" />
+    <link rel="stylesheet" href="../css/ds-compat.css" />
+    <link rel="stylesheet" href="../css/themes.css" />
     <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
+    <script src="../scripts/ds.js" type="module"></script>
+    <script src="./page.js" type="module"></script>
   </head>
   <body>
     <div id="layout">
-      <h1 style="margin-top: 0; padding-top: 10px" data-i18n="add.popular">Populaire</h1>
-      <div id="predefined-apps"></div>
-      <h1 data-i18n="add.search">Chercher un lien</h1>
-      <div id="search">
-        <iframe
-          sandbox="allow-scripts allow-forms allow-popups"
-          style="
-            width: 100%;
-            height: 313px;
-            border: none;
-            border-radius: 15px;
-            background-color: white;
-          "
-          data-src="./search.html"
-        ></iframe>
-      </div>
+      <section aria-labelledby="sec-popular">
+        <div class="head">
+          <h2 id="sec-popular" data-i18n="add.popular">Populaires</h2>
+          <span class="helper" data-i18n="add.hint">Un clic pour ajouter</span>
+        </div>
+        <div id="predefined-apps"></div>
+      </section>
+
+      <section id="search-section" aria-labelledby="sec-search">
+        <h2 id="sec-search" data-i18n="add.search">Chercher un site</h2>
+        <div id="search">
+          <iframe
+            title="Recherche"
+            sandbox="allow-scripts allow-forms allow-popups"
+            data-src="./search.html"
+          ></iframe>
+        </div>
+      </section>
     </div>
   </body>
   <footer></footer>

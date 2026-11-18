@@ -33,6 +33,11 @@ const INVOKE_CHANNELS = new Set([
   'rotomeca-context-menu',
   'edgeEnter',
   'requestToggle',
+  'openSettings',
+  'tooltipShow',
+  'tooltipHide',
+  'getSavedUrls',
+  'getSeasonInfo',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */
@@ -52,6 +57,7 @@ const ON_CHANNELS = new Set([
   'settingsStart',
   'appIndicators',
   'mediaState',
+  'tooltipState',
 ]);
 
 // #region Traductions

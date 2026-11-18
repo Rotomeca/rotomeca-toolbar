@@ -29,4 +29,9 @@ export const appEventList = Object.freeze({
   rotomecaContextMenu: 'rotomeca-context-menu',
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
+  openSettings: 'openSettings',
+  tooltipShow: 'tooltipShow',
+  tooltipHide: 'tooltipHide',
+  getSavedUrls: 'getSavedUrls',
+  getSeasonInfo: 'getSeasonInfo',
 });

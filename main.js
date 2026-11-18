@@ -6,6 +6,8 @@ if (require('electron-squirrel-startup')) {
 
 const {
   app,
+  nativeTheme,
+  powerMonitor,
   BrowserWindow,
   session,
   WebContentsView,
@@ -46,24 +48,32 @@ const {
 } = require('./src/scripts/AppIndicators.js');
 
 // Largeur (px) de la bande réservée à la barre ancrée (AppBar)
-const APPBAR_WIDTH = 64;
+const APPBAR_WIDTH = 72;
 
-// Largeur (px) du rail qui reste visible quand la barre est repliée. Windows
-// impose 32 px au minimum à une fenêtre : en dessous, elle dépasserait la place
-// réservée.
-const RAIL_WIDTH = 32;
+// Largeur (px) du rail qui reste visible quand la barre est repliée, et place
+// réservée à l'écran. Windows impose 32 px au minimum à la fenêtre (vérifié) :
+// la page dessine donc une bande de 24 px et laisse les 8 px restants transparents.
+const RAIL_WIDTH = 24;
 
 // Barre ancrée en masquage automatique : délai (ms) avant de se replier une
 // fois la souris sortie, et période (ms) de la surveillance du curseur
 const AUTOHIDE_DELAY = 700;
 const AUTOHIDE_POLL = 150;
 
+// Fenêtre « Ajouter une application » (contenu, en px)
+const ADD_DIALOG_WIDTH = 640;
+const ADD_DIALOG_HEIGHT = 760;
+
 // Hauteur (px) du bandeau d'actions au-dessus des applications
 const APPS_HEADER_HEIGHT = 32;
 
-const MEDIA_POPUP_WIDTH = 300;
-const MEDIA_POPUP_HEIGHT = 96;
+const MEDIA_POPUP_WIDTH = 340;
+const MEDIA_POPUP_HEIGHT = 200;
 const MEDIA_POPUP_HIDE_DELAY = 250;
+
+// Infobulle de la barre : fenêtre transparente sans clic, plus grande que son contenu
+const TOOLTIP_WIDTH = 320;
+const TOOLTIP_HEIGHT = 48;
 
 // Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
 const EDGE_WIDTH = 4;
@@ -152,6 +162,15 @@ class AppMain extends BaseAppObject {
       this.main.icon = path.join(__dirname, '/src/pictures/icon.png');
 
     return this.main.icon;
+  }
+
+  /**
+   * Icône de la zone de notification : le .ico (16 à 256 px) reste net sous Windows.
+   */
+  get trayIcon() {
+    return process.platform === 'win32'
+      ? path.join(__dirname, '/src/pictures/icon.ico')
+      : this.appIcon;
   }
 
   get preloadPath() {
@@ -251,6 +270,35 @@ class AppMain extends BaseAppObject {
         otherArgs: { focusable: false },
       })
     );
+  }
+
+  /**
+   * Infobulle affichée à côté d'un bouton de la barre.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get tooltipWindow() {
+    if (!this.getWindow('tooltip')) {
+      const win = this.createBrowserWindow('tooltip', {
+        width: TOOLTIP_WIDTH,
+        height: TOOLTIP_HEIGHT,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.tooltip/tooltip.html'),
+        show: false,
+        otherArgs: { focusable: false },
+      });
+      // Ne capte jamais la souris : elle reste sur le bouton survolé
+      win.setIgnoreMouseEvents(true);
+    }
+
+    return this.getWindow('tooltip');
   }
 
   /**
@@ -405,6 +453,12 @@ class AppMain extends BaseAppObject {
   main() {
     super.main();
 
+    this.applyThemeOnLoad();
+    this.scheduleSeasonCheck();
+
+    // « Système » : suit le mode clair/sombre de Windows en direct
+    nativeTheme.on('updated', () => this.broadcastTheme());
+
     if (AppMain.hasAutoUpdater) AppMain.CheckForUpdate();
 
     this.initContextMenu().initTray();
@@ -482,6 +536,15 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.requestToggle, () =>
         this.toggleFromOutside(),
       )
+      .addEventListener(appEventList.openSettings, () =>
+        this.event_tray_on_click(),
+      )
+      .addEventListener(appEventList.tooltipShow, this.event_tooltip_show.bind(this))
+      .addEventListener(appEventList.tooltipHide, () => this.hideTooltip())
+      .addEventListener(appEventList.getSeasonInfo, () =>
+        require('./src/scripts/Seasons.js').seasonInfo(),
+      )
+      .addEventListener(appEventList.getSavedUrls, () => this.event_get_saved_urls())
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -718,7 +781,7 @@ class AppMain extends BaseAppObject {
       : {
           x: wa.x + 10,
           y: wa.y + 10,
-          width: 64,
+          width: APPBAR_WIDTH,
           height: wa.height - (this.settingIsButton ? 52 : 20),
         };
 
@@ -741,8 +804,8 @@ class AppMain extends BaseAppObject {
       addDialog: {
         x: toolbar.x + toolbar.width + 10,
         y: toolbar.y,
-        width: Math.round(wa.width / 4),
-        height: Math.round(toolbar.height / 2),
+        width: Math.min(ADD_DIALOG_WIDTH, wa.width),
+        height: Math.min(ADD_DIALOG_HEIGHT, wa.height),
       },
       edge: {
         x: bounds.x,
@@ -868,7 +931,7 @@ class AppMain extends BaseAppObject {
 
     const appContextMenu = Menu.buildFromTemplate(menu);
 
-    this.tray = new Tray(this.appIcon);
+    this.tray = new Tray(this.trayIcon);
     this.tray.setToolTip(t('tray.tooltip'));
     this.tray.setContextMenu(appContextMenu);
     this.tray.on('click', () => this.toggleFromOutside());
@@ -907,6 +970,8 @@ class AppMain extends BaseAppObject {
     let win = this.createBrowserWindow('settings', {
       title: t('window.settings'),
       icon: this.appIcon,
+      width: 800,
+      height: 920,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
@@ -964,6 +1029,7 @@ class AppMain extends BaseAppObject {
       // Ancrée, la barre reste affichée mais réduite à un rail fin
       if (!this.settingIsAppBar) this.toolbarWindow.hide();
       this.hideMediaPopup();
+      this.hideTooltip();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
@@ -1021,15 +1087,32 @@ class AppMain extends BaseAppObject {
     this.addDialogWindow.show();
   }
 
+  /**
+   * Adresses des applications déjà dans la barre (pour marquer « Ajouté »).
+   * @returns {string[]}
+   */
+  event_get_saved_urls() {
+    return this.saves
+      .filter((save) => save && typeof save === 'object')
+      .map((save) => save.url);
+  }
+
+  /**
+   * Ajoute une application depuis la fenêtre d'ajout, qui reste ouverte.
+   * @returns {boolean} `true` si l'application est dans la barre (ajoutée ou déjà présente)
+   */
   event_request_add_data(_, data) {
     const clean = AppMain.SanitizeAppData(data);
-    if (!clean) return;
+    if (!clean) return false;
 
-    this.removeWindow('add_dialog');
+    if (this.saves.some((save) => save?.url === clean.url)) return true;
+
     this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
 
     this.saves.push(clean);
     this.save();
+
+    return true;
   }
 
   event_request_add_separator(_, data) {
@@ -1305,6 +1388,61 @@ class AppMain extends BaseAppObject {
     });
 
     if (url) this.updateIndicators(url, { media: sanitizeMediaState(raw) });
+  }
+
+  /**
+   * Affiche l'infobulle à droite de la barre, centrée sur le bouton.
+   * @param {*} _
+   * @param {{text: string, badge: ?string, y: number}} args
+   */
+  event_tooltip_show(_, { text, badge, y } = {}) {
+    if (typeof text !== 'string' || text === '' || typeof y !== 'number')
+      return;
+
+    const toolbar = this.toolbarWindow.getBounds();
+    const wa = this.workArea;
+    const top = Math.min(
+      Math.max(toolbar.y + y - TOOLTIP_HEIGHT / 2, wa.y),
+      wa.y + wa.height - TOOLTIP_HEIGHT,
+    );
+
+    const win = this.tooltipWindow;
+    win.setPosition(
+      Math.round(toolbar.x + toolbar.width + 8),
+      Math.round(top),
+    );
+
+    const payload = {
+      text: text.slice(0, 200),
+      badge: typeof badge === 'string' ? badge.slice(0, 10) : null,
+    };
+    const send = () =>
+      win.webContents.postMessage(pageEventList.tooltipState, payload);
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
+    else send();
+
+    win.showInactive();
+  }
+
+  /**
+   * Thème automatique : réévalue le thème de saison au réveil de veille et chaque minute
+   * (dont minuit), et ne rediffuse que s'il a changé.
+   */
+  scheduleSeasonCheck() {
+    this.lastEffectiveTheme = this.settings.effectiveTheme;
+
+    const check = () => {
+      if (this.settings.effectiveTheme !== this.lastEffectiveTheme)
+        this.broadcastTheme();
+    };
+
+    setInterval(check, 60 * 1000).unref?.();
+    powerMonitor.on('resume', check);
+  }
+
+  hideTooltip() {
+    const win = this.getWindow('tooltip');
+    if (win && !win.isDestroyed() && win.isVisible()) win.hide();
   }
 
   event_media_hover(_, { url, hovering, y } = {}) {
@@ -1594,6 +1732,9 @@ class AppMain extends BaseAppObject {
 
     // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
+    this.settings.themeAuto = settings.themeAuto === true;
+    this.settings.effetsSaison = settings.effetsSaison;
+    this.settings.densiteEffets = settings.densiteEffets;
     this.settings.isButtonModeEnabled = isButtonModeEnabled;
     this.settings.appBarEnabled = appBarEnabled;
     this.settings.appBarAutoHide = appBarAutoHide;
@@ -1606,18 +1747,7 @@ class AppMain extends BaseAppObject {
 
     if (displayUpdated) this.repositionWindows();
 
-    const css = this.update_root_css();
-    for (const win of [
-      this.settingIsButton && this.mainWindow,
-      this.toolbarWindow,
-    ].filter(Boolean)) {
-      win.webContents.insertCSS(css);
-      win.webContents
-        .executeJavaScript(
-          `document.documentElement.dataset.appTheme = ${JSON.stringify(this.settings.theme)}`,
-        )
-        .catch(console.error);
-    }
+    this.broadcastTheme();
 
     if (buttonModeUpdated) {
       // Libère l'espace réservé avant de détruire la fenêtre qui le porte
