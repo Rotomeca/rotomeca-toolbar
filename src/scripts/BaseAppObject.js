@@ -124,7 +124,7 @@ class BaseAppObject {
   get themeScript() {
     const { resolveTheme, SEASON_THEMES } = require('../../settings.js');
     const attrs = resolveTheme(
-      this.settings.theme,
+      this.settings.effectiveTheme,
       nativeTheme.shouldUseDarkColors,
     );
     // Effets de saison : seulement sur un thème de saison, interrupteur actif
@@ -137,6 +137,7 @@ class BaseAppObject {
    * Applique le thème courant à toutes les fenêtres ouvertes.
    */
   broadcastTheme() {
+    this.lastEffectiveTheme = this.settings.effectiveTheme;
     const script = this.themeScript;
     for (const contents of webContents.getAllWebContents()) {
       if (contents.isDestroyed() || !contents.getURL().startsWith('file://'))

@@ -7,6 +7,7 @@ if (require('electron-squirrel-startup')) {
 const {
   app,
   nativeTheme,
+  powerMonitor,
   BrowserWindow,
   session,
   WebContentsView,
@@ -453,6 +454,7 @@ class AppMain extends BaseAppObject {
     super.main();
 
     this.applyThemeOnLoad();
+    this.scheduleSeasonCheck();
 
     // « Système » : suit le mode clair/sombre de Windows en direct
     nativeTheme.on('updated', () => this.broadcastTheme());
@@ -539,6 +541,9 @@ class AppMain extends BaseAppObject {
       )
       .addEventListener(appEventList.tooltipShow, this.event_tooltip_show.bind(this))
       .addEventListener(appEventList.tooltipHide, () => this.hideTooltip())
+      .addEventListener(appEventList.getSeasonInfo, () =>
+        require('./src/scripts/Seasons.js').seasonInfo(),
+      )
       .addEventListener(appEventList.getSavedUrls, () => this.event_get_saved_urls())
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
@@ -966,7 +971,7 @@ class AppMain extends BaseAppObject {
       title: t('window.settings'),
       icon: this.appIcon,
       width: 800,
-      height: 860,
+      height: 920,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
@@ -1419,6 +1424,22 @@ class AppMain extends BaseAppObject {
     win.showInactive();
   }
 
+  /**
+   * Thème automatique : réévalue le thème de saison au réveil de veille et chaque minute
+   * (dont minuit), et ne rediffuse que s'il a changé.
+   */
+  scheduleSeasonCheck() {
+    this.lastEffectiveTheme = this.settings.effectiveTheme;
+
+    const check = () => {
+      if (this.settings.effectiveTheme !== this.lastEffectiveTheme)
+        this.broadcastTheme();
+    };
+
+    setInterval(check, 60 * 1000).unref?.();
+    powerMonitor.on('resume', check);
+  }
+
   hideTooltip() {
     const win = this.getWindow('tooltip');
     if (win && !win.isDestroyed() && win.isVisible()) win.hide();
@@ -1711,6 +1732,7 @@ class AppMain extends BaseAppObject {
 
     // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
+    this.settings.themeAuto = settings.themeAuto === true;
     this.settings.effetsSaison = settings.effetsSaison;
     this.settings.densiteEffets = settings.densiteEffets;
     this.settings.isButtonModeEnabled = isButtonModeEnabled;

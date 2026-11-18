@@ -99,7 +99,7 @@
       /* Vignettes de thème */
       #themes {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 10px;
       }
 
@@ -227,6 +227,88 @@
         background: var(--ds-background-action-primary);
       }
 
+      /* Pastille « +N » : le parent a des variantes */
+      .tile-name .plus {
+        padding: 0 6px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-neutral);
+        color: var(--ds-text-tone-neutral);
+        font: var(--text-caption);
+      }
+
+      /* Ligne « Variante de … » */
+      #variants {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      #variant-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        height: 36px;
+        padding: 0 14px 0 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: var(--ds-radius-full, 999px);
+        border: 2px solid var(--ds-border-subtle);
+        background: var(--ds-background-surface);
+        color: var(--ds-text-default);
+        font: var(--text-label);
+        cursor: pointer;
+      }
+
+      .pill[aria-pressed='true'] {
+        border-color: var(--ds-background-action-primary);
+      }
+
+      .pill:focus-visible {
+        outline: 2px solid var(--ds-focus-ring-color);
+        outline-offset: 2px;
+      }
+
+      .pill-dot {
+        width: 22px;
+        height: 22px;
+        border-radius: var(--ds-radius-full, 999px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ds-body-background-color);
+        border: 1px solid var(--ds-border-strong);
+        box-sizing: border-box;
+      }
+
+      .pill-dot > span {
+        width: 9px;
+        height: 9px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-action-primary);
+      }
+
+      /* Pastille de la saison en cours (thème automatique) */
+      #auto-badge {
+        padding: 4px 10px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-brand);
+        color: var(--ds-text-tone-brand);
+        font: var(--text-caption);
+      }
+
+      .auto-block {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--ds-border-subtle);
+      }
+
       #season-options {
         display: flex;
         flex-direction: column;
@@ -322,7 +404,18 @@
           <rds-segmented-control id="family" label="Famille de thèmes" data-i18n-label="settings.family"></rds-segmented-control>
         </div>
         <div id="themes" role="group" aria-label="Thème" data-i18n-aria-label="settings.themeGroup"></div>
+        <div id="variants" hidden>
+          <span class="label" id="variants-label"></span>
+          <div id="variant-pills" role="group"></div>
+        </div>
         <div id="season-options" hidden>
+          <div class="auto-block">
+            <div class="season-row">
+              <rds-switch id="auto" icons data-i18n="settings.auto">Thème automatique</rds-switch>
+              <span id="auto-badge" hidden></span>
+            </div>
+            <span class="helper" data-i18n="settings.autoHelp">Suit les dates officielles des saisons (équinoxes et solstices), avec Noël les 24 et 25 décembre. Au printemps : Cerisier jusqu’au 31 mars, puis Printemps. Choisir un thème à la main désactive ce mode.</span>
+          </div>
           <div class="season-row">
             <rds-switch id="fx" icons data-i18n="settings.effects">Effets de saison</rds-switch>
             <div class="density">

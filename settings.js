@@ -143,6 +143,31 @@ class Settings {
   }
 
   /**
+   * Thème automatique : suit les dates officielles des saisons (par défaut non).
+   * @type {boolean}
+   */
+  get themeAuto() {
+    return this.#_config.themeAuto === true;
+  }
+
+  set themeAuto(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.themeAuto = value === true;
+  }
+
+  /**
+   * Thème réellement appliqué : celui de la saison du jour en mode automatique,
+   * sinon le choix manuel.
+   * @type {string}
+   */
+  get effectiveTheme() {
+    if (!this.themeAuto) return this.theme;
+
+    const { seasonThemeFor } = require('./src/scripts/Seasons.js');
+    return seasonThemeFor();
+  }
+
+  /**
    * Effets de saison activés (par défaut oui).
    * @type {boolean}
    */
@@ -194,6 +219,7 @@ class Settings {
       appBarEnabled: this.appBarEnabled,
       appBarAutoHide: this.appBarAutoHide,
       theme: this.theme,
+      themeAuto: this.themeAuto,
       effetsSaison: this.effetsSaison,
       densiteEffets: this.densiteEffets,
       displayId: this.displayId,

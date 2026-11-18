@@ -37,6 +37,7 @@ const INVOKE_CHANNELS = new Set([
   'tooltipShow',
   'tooltipHide',
   'getSavedUrls',
+  'getSeasonInfo',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */
