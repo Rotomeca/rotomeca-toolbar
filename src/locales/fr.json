@@ -86,6 +86,7 @@
   "settings.modeButton": "Bouton",
   "settings.modeMouse": "Souris à gauche",
   "settings.modeAppBar": "Barre ancrée",
+  "settings.appBarAutoHide": "Masquer automatiquement",
   "settings.theme": "Thème",
   "settings.themeSystem": "Système",
   "settings.themeDark": "Sombre",

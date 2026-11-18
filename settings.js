@@ -70,6 +70,19 @@ class Settings {
     this.#_settings.appBarEnabled = value === true;
   }
 
+  /**
+   * Barre ancrée qui se replie quand la souris la quitte.
+   * @type {boolean}
+   */
+  get appBarAutoHide() {
+    return this.#_config.appBarAutoHide === true;
+  }
+
+  set appBarAutoHide(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.appBarAutoHide = value === true;
+  }
+
   get theme() {
     return sanitizeTheme(this.#_config.theme);
   }
@@ -103,6 +116,7 @@ class Settings {
     this.fileData.save({
       isButtonModeEnabled: this.isButtonModeEnabled,
       appBarEnabled: this.appBarEnabled,
+      appBarAutoHide: this.appBarAutoHide,
       theme: this.theme,
       displayId: this.displayId,
     });

@@ -69,8 +69,19 @@ export class PageSettings {
     if (isAppBar) control.value = 'appbar';
     else control.value = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
 
+    const autoHide = document.querySelector('#autohide');
+    const appBarSettings = document.querySelector('#appbar-settings');
+    appBarSettings.hidden = !isAppBar;
+
+    autoHide.checked = this.settings.appBarAutoHide === true;
+    autoHide.addEventListener('rds-switch:change', (event) => {
+      this.settings.appBarAutoHide = event.detail.checked;
+      this.#saveSettings();
+    });
+
     control.addEventListener('rds-segmented-control:change', (event) => {
       const mode = event.detail.value;
+      appBarSettings.hidden = mode !== 'appbar';
 
       this.settings.appBarEnabled = mode === 'appbar';
       // En mode ancré, on conserve le dernier choix bouton/souris
