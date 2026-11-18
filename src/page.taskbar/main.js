@@ -20,6 +20,17 @@ function createSeparator() {
 }
 
 /**
+ * Retrouve le bouton d'une application via son URL (échappée : l'URL peut
+ * contenir des guillemets ou d'autres caractères spéciaux).
+ * @param {string} url
+ * @returns {?Element}
+ */
+function findButtonByUrl(url) {
+  if (typeof url !== 'string') return null;
+  return document.querySelector(`[href="${CSS.escape(url)}"]`);
+}
+
+/**
  * @class
  * @classdesc Gère la toolbar des applications
  */
@@ -103,28 +114,30 @@ export class Main {
       let element =
         url === 0
           ? document.querySelector(SEPARATOR_TAG)
-          : document.querySelector(`[href="${url}"]`).nextElementSibling;
+          : findButtonByUrl(url)?.nextElementSibling;
 
-      if (element.nodeName === SEPARATOR_TAG.toUpperCase())
+      if (element?.nodeName === SEPARATOR_TAG.toUpperCase())
         element.remove();
     });
 
     window.api.on(pageEventList.toolbarAppDeleted, (_, url) => {
-      document.querySelector(`[href="${url}"]`)?.remove?.();
+      findButtonByUrl(url)?.remove?.();
     });
 
     window.api.on(pageEventList.windowAppMovement, (_, args) => {
       const { url, type, modifier } = args;
 
-      let appMoved = document.querySelector(`[href="${url}"]`);
+      let appMoved = findButtonByUrl(url);
       let element = appMoved;
 
-      for (let index = 0; index <= modifier; ++index) {
+      for (let index = 0; element && index <= modifier; ++index) {
         element =
           type === 'up'
             ? element.previousElementSibling
             : element.nextElementSibling;
       }
+
+      if (!appMoved || !element) return;
 
       switch (type) {
         case 'up':

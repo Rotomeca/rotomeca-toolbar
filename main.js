@@ -49,6 +49,9 @@ const MEDIA_POPUP_WIDTH = 300;
 const MEDIA_POPUP_HEIGHT = 96;
 const MEDIA_POPUP_HIDE_DELAY = 250;
 
+// Taille maximale (caractères) d'une icône d'application encodée en data URL
+const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
+
 /**
  * @callback SavesUpdatedCallback
  * @param {Array<string, string | Object<string, *>>} saves
@@ -681,10 +684,13 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_add_data(_, data) {
-    this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
+    const clean = AppMain.SanitizeAppData(data);
+    if (!clean) return;
 
-    this.saves.push(data);
+    this.removeWindow('add_dialog');
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
+
+    this.saves.push(clean);
     this.save();
   }
 
@@ -715,26 +721,41 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_add_data_edit(_, data) {
-    this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
+    const clean = AppMain.SanitizeAppData(data);
+    if (!clean) return;
 
-    this.saves.push(data);
+    this.removeWindow('add_dialog');
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
+
+    this.saves.push(clean);
     this.save();
-    data.index = this.saves.length - 1;
-    this.event_toolbar_add_button_click(data);
+    this.event_toolbar_add_button_click({
+      ...clean,
+      index: this.saves.length - 1,
+    });
   }
 
   event_request_updated_data(_, data) {
+    const clean = AppMain.SanitizeAppData(data);
+    const id = data?.id;
+    const target = Number.isInteger(id) ? this.saves[id] : null;
+
+    // Un séparateur est une chaîne : on ne modifie que de vraies applications
+    if (!clean || !target || typeof target !== 'object') return;
+
     this.removeWindow('add_dialog');
-    const { id, name, url, picture } = data;
 
-    data.oldLink = this.saves[id].url;
+    const oldLink = target.url;
 
-    this.saves[id].name = name;
-    this.saves[id].url = url;
-    this.saves[id].picture = picture;
+    target.name = clean.name;
+    target.url = clean.url;
+    target.picture = clean.picture;
 
-    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, data);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, {
+      ...clean,
+      id,
+      oldLink,
+    });
 
     this.save();
   }
@@ -1009,6 +1030,8 @@ class AppMain extends BaseAppObject {
         height: Math.max(0, bounds.height - APPS_HEADER_HEIGHT),
       });
 
+      AppMain.HardenWebContents(view.webContents);
+
       this.views[url] = { view, badge: 0, audible: false };
       this.appsWindow.contentView.addChildView(view);
       this.bindIndicators(url, view);
@@ -1030,8 +1053,15 @@ class AppMain extends BaseAppObject {
 
   event_app_delete(_, url) {
     if (this.views[url]) {
-      this.appsWindow.contentView.removeChildView(this.views[url].view);
+      /**@type {WebContentsView} */
+      const view = this.views[url].view;
+      view.setVisible(false);
+      this.appsWindow.contentView.removeChildView(view);
+      view.webContents.stop();
+      view.webContents.close();
+      view.webContents?.destroy?.();
       delete this.views[url];
+      this.sendIndicators(url);
     }
 
     this.toolbarWindow.webContents.postMessage(
@@ -1096,8 +1126,10 @@ class AppMain extends BaseAppObject {
     if (!this.mainWindow.isAlwaysOnTop()) this.mainWindow.blur();
   }
 
-  event_request_movement(_, args) {
-    const { url, type } = args;
+  event_request_movement(_, rawArgs) {
+    const { url, type } = rawArgs ?? {};
+    if (typeof url !== 'string' || !['up', 'down'].includes(type)) return;
+    const args = { url, type };
 
     const index = this.saves.findIndex((x) => x.url === url);
     if (index < 0) return;
@@ -1214,16 +1246,21 @@ class AppMain extends BaseAppObject {
   }
 
   event_settings_updated(_, settings) {
+    if (!settings || typeof settings !== 'object') return;
+
+    const isButtonModeEnabled = settings.isButtonModeEnabled === true;
     let buttonModeUpdated = false;
-    if (this.settingIsButton !== settings.isButtonModeEnabled) {
+    if (this.settingIsButton !== isButtonModeEnabled) {
       buttonModeUpdated = true;
     }
 
+    // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
-    this.settings.isButtonModeEnabled = settings.isButtonModeEnabled;
+    this.settings.isButtonModeEnabled = isButtonModeEnabled;
 
-    const displayUpdated = this.settings.displayId !== (settings.displayId ?? null);
-    this.settings.displayId = settings.displayId ?? null;
+    const previousDisplayId = this.settings.displayId;
+    this.settings.displayId = settings.displayId;
+    const displayUpdated = this.settings.displayId !== previousDisplayId;
 
     this.settings.save();
 
@@ -1360,6 +1397,133 @@ class AppMain extends BaseAppObject {
     }
   }
 
+  /**
+   * Valide et nettoie les données d'une application reçues d'une page (IPC).
+   * @param {unknown} data
+   * @returns {{name:string, url:string, picture:?string}|null} null si invalide
+   */
+  static SanitizeAppData(data) {
+    if (!data || typeof data !== 'object') return null;
+
+    const { name, url, picture } = data;
+    if (typeof url !== 'string' || !AppMain.IsSafeUrl(url)) return null;
+
+    let cleanPicture = null;
+    if (typeof picture === 'string' && picture !== '') {
+      const isDataImage =
+        /^data:image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon|bmp);/i.test(
+          picture,
+        ) && picture.length <= MAX_PICTURE_LENGTH;
+      const isFont = /^font:[\w-]{1,64}$/.test(picture);
+
+      if (isDataImage || isFont) cleanPicture = picture;
+    }
+
+    return {
+      name:
+        typeof name === 'string' && name.trim() !== ''
+          ? name.slice(0, 200)
+          : url,
+      url,
+      picture: cleanPicture,
+    };
+  }
+
+  /**
+   * Restreint ce qu'un site tiers peut faire : popups, navigation et permissions.
+   * @param {Electron.WebContents} contents
+   */
+  static HardenWebContents(contents) {
+    // Popups : uniquement http(s) (ex. connexion OAuth), jamais d'autre schéma
+    contents.setWindowOpenHandler(({ url }) => {
+      if (!AppMain.IsSafeUrl(url)) return { action: 'deny' };
+
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: { autoHideMenuBar: true },
+      };
+    });
+
+    // Les popups autorisées héritent des mêmes restrictions de navigation
+    contents.on('did-create-window', (child) => {
+      AppMain.HardenWebContents(child.webContents);
+    });
+
+    // Navigation : on bloque file:, javascript:, data:, etc.
+    const blockUnsafeNavigation = (event, url) => {
+      if (!AppMain.IsSafeUrl(url)) event.preventDefault();
+    };
+    contents.on('will-navigate', blockUnsafeNavigation);
+    contents.on('will-redirect', blockUnsafeNavigation);
+
+    // Pas de <webview> dans les sites tiers
+    contents.on('will-attach-webview', (event) => event.preventDefault());
+  }
+
+  /**
+   * Politique de permissions des sites tiers (session par défaut).
+   * Les permissions sensibles (caméra/micro, localisation) demandent
+   * une confirmation, mémorisée pour la durée de l'exécution.
+   * @param {Electron.Session} ses
+   */
+  static InstallPermissionHandlers(ses) {
+    const ALLOWED = new Set([
+      'notifications',
+      'fullscreen',
+      'pointerLock',
+      'clipboard-sanitized-write',
+      'mediaKeySystem', // DRM (Spotify, Netflix...)
+      'speaker-selection',
+    ]);
+    const ASK = new Set(['media', 'geolocation']);
+    const LABELS = {
+      media: 'utiliser votre caméra ou votre micro',
+      geolocation: 'accéder à votre position',
+    };
+    /** @type {Map<string, boolean>} */
+    const decisions = new Map();
+
+    const originOf = (url) => {
+      try {
+        return new URL(url).origin;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    ses.setPermissionCheckHandler((_, permission, requestingOrigin) => {
+      if (ALLOWED.has(permission)) return true;
+      if (ASK.has(permission))
+        return decisions.get(`${requestingOrigin}|${permission}`) === true;
+      return false;
+    });
+
+    ses.setPermissionRequestHandler(
+      async (contents, permission, callback, details) => {
+        if (ALLOWED.has(permission)) return callback(true);
+        if (!ASK.has(permission)) return callback(false);
+
+        const origin = originOf(details?.requestingUrl ?? contents?.getURL());
+        if (!origin || !AppMain.IsSafeUrl(origin)) return callback(false);
+
+        const key = `${origin}|${permission}`;
+        if (!decisions.has(key)) {
+          const { response } = await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Autoriser', 'Refuser'],
+            defaultId: 1,
+            cancelId: 1,
+            title: 'Autorisation demandée',
+            message: `${origin} souhaite ${LABELS[permission]}.`,
+          });
+          decisions.set(key, response === 0);
+        }
+
+        callback(decisions.get(key));
+      },
+    );
+  }
+
   static get hasAutoUpdater() {
     return !!this.InitAutoUpdater.hasAutoUpdater;
   }
@@ -1393,6 +1557,7 @@ app.on('ready', async () => {
     migrateLegacyData(app, FileData.BasePath);
     restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession);
+    AppMain.InstallPermissionHandlers(session.defaultSession);
     AppMain.InitAutoUpdater().Run();
   } catch (error) {
     console.error(error);
