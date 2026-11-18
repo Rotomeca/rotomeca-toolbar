@@ -20,9 +20,11 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        # ubuntu-24.04 épinglé : rpm >= 4.20 (ubuntu-latest récent) casse
+        # electron-installer-redhat (« cp: cannot stat 'usr/*' »)
+        os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
