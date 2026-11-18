@@ -27,3 +27,8 @@
   --color-scheme-text-hover: var(--ds-text-default);
   --color-scheme-text-active: var(--ds-text-default);
 }
+
+/* Police de base : le design system ne la pose pas sur body */
+body {
+  font-family: var(--ds-font-sans);
+}
