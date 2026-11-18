@@ -21,23 +21,12 @@
         overflow: hidden;
       }
 
-      :root {
-        --color-scheme: #1f2933;
-        --color-scheme-primary: #323f4b;
-        --color-scheme-primary-hover: #96845f;
-        --color-scheme-primary-active: #3e4c59;
-        --color-scheme-text: #c7dfff;
-        --color-scheme-text-primary: #c7dfff;
-        --color-scheme-text-hover: #1f2933;
-        --color-scheme-text-active: #e1c58f;
-      }
-
       #layout {
         width: calc(100% - 2px);
         height: calc(100% - 2px);
-        background-color: var(--color-scheme);
+        background-color: var(--ds-background-overlay);
         border-radius: 10px;
-        border: solid thin white;
+        border: 1px solid var(--ds-border-strong);
         display: flex;
         flex-direction: column;
       }

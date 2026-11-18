@@ -37,19 +37,17 @@
       (function () {
         var MESSAGE_ADD = 'requestAddData';
         var MESSAGE_ADD_EDIT = 'requestAddDataEdit';
-        // Icône "ajouter une image" (même SVG que src/pictures/add_photo_alternate_*.svg)
-        var ICON_SRC =
-          'data:image/svg+xml;utf8,' +
-          encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></svg>',
-          );
+        // Icône "ajouter une image" (même tracé que src/pictures/add_photo_alternate_*.svg),
+        // en SVG en ligne pour hériter de la couleur du texte du bouton
+        var ICON_SVG =
+          '<svg xmlns="http://www.w3.org/2000/svg" height="12px" viewBox="0 -960 960 960" width="12px" fill="currentColor"><path d="M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></svg>';
 
         function createButton(content, type, name, url) {
           var button = document.createElement('button');
           button.type = 'button';
           button.style.cssText =
             'margin-left:5px;padding:2px 8px;border:0;border-radius:4px;' +
-            'background:#3b4a6b;color:#fff;cursor:pointer;vertical-align:middle;';
+            'background:ButtonFace;color:ButtonText;cursor:pointer;vertical-align:middle;';
 
           if (typeof content === 'string') button.textContent = content;
           else button.appendChild(content);
@@ -89,9 +87,8 @@
               add.setAttribute('data-rotomeca-add', '');
               link.parentElement.appendChild(add);
 
-              var img = document.createElement('img');
-              img.setAttribute('src', ICON_SRC);
-              img.style.width = '12px';
+              var img = document.createElement('span');
+              img.innerHTML = ICON_SVG;
               link.parentElement.appendChild(
                 createButton(img, MESSAGE_ADD_EDIT, name, url),
               );

@@ -5,6 +5,8 @@ const {
   screen,
   systemPreferences,
   nativeTheme,
+  webContents,
+  app,
 } = require('electron');
 const path = require('path');
 const { t } = require('./i18n');
@@ -133,10 +135,24 @@ class BaseAppObject {
    */
   broadcastTheme() {
     const script = this.themeScript;
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (win.isDestroyed()) continue;
-      win.webContents.executeJavaScript(script).catch(console.error);
+    for (const contents of webContents.getAllWebContents()) {
+      if (contents.isDestroyed() || !contents.getURL().startsWith('file://'))
+        continue;
+      contents.executeJavaScript(script).catch(console.error);
     }
+  }
+
+  /**
+   * Applique le thème à chaque page locale de l'interface dès son chargement
+   * (fenêtres, mais aussi vues intégrées comme celle de la fenêtre des applications).
+   */
+  applyThemeOnLoad() {
+    app.on('web-contents-created', (_, contents) => {
+      contents.on('dom-ready', () => {
+        if (!contents.getURL().startsWith('file://')) return;
+        contents.executeJavaScript(this.themeScript).catch(console.error);
+      });
+    });
   }
 
   /**
@@ -224,10 +240,6 @@ class BaseAppObject {
     win.webContents.on('dom-ready', () => {
       if (this.baseCSS !== '')
         win.webContents.insertCSS(this.baseCSS).catch(console.error);
-
-      win.webContents
-        .executeJavaScript(this.themeScript)
-        .catch(console.error);
     });
 
     this.addWindow(index, win);
