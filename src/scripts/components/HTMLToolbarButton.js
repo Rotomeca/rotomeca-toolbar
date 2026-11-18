@@ -1,10 +1,8 @@
-import { HTMLPrimaryButton } from '../../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
 import { HTMLPrimaryPressedButton } from '../../../lib/RotomecaWebComponents/component/HTMLPrimaryPressedButton.js';
 import { TAG_PREFIX } from '../../../lib/RotomecaWebComponents/libs/config.js';
 import { EMPTY_STRING } from '../../../lib/RotomecaWebComponents/libs/constants.js';
 import { StyleComponent } from '../../../lib/RotomecaWebComponents/libs/StyleComponent.js';
 import { ToolbarAppData } from '../ToolbarAppData.js';
-import { HTMLGrouppedButton } from './HTMLGrouppedButton.js';
 
 export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_itemData = null;
@@ -110,66 +108,6 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
 
     childNode = null;
     mainDiv = null;
-
-    this.oncontextmenu = (ev) => {
-      return;
-      if (this.root.querySelector(HTMLGrouppedButton.TAG)) {
-        return this.root.querySelector(HTMLGrouppedButton.TAG)?.remove?.();
-      }
-
-      let groupped = HTMLGrouppedButton.CreateNode();
-
-      let btnDelete = HTMLPrimaryButton.CreateNode({ content: '🚮' }).addClass(
-        'delete',
-      );
-      let edit = HTMLPrimaryButton.CreateNode({ content: '✏️' }).addClass(
-        'edit',
-      );
-
-      btnDelete.onclick = (e) => {
-        e.preventDefault();
-        this.not = true;
-        window.api.invoke('appDelete', this.itemData.link);
-        this.remove();
-      };
-
-      edit.onclick = (e) => {
-        e.preventDefault();
-        this.not = true;
-        window.api.invoke('appEdit', {
-          url: this.itemData.link,
-          picture: this.itemData.picture,
-          title: this.itemData.title,
-        });
-      };
-
-      const rules = StyleComponent.RuleClass.Write({
-        ':host': {
-          position: 'absolute',
-          top: '-18px',
-          left: '-2px',
-        },
-      });
-
-      groupped.append(
-        new StyleComponent().addSomeCss(rules).build(),
-        btnDelete,
-      );
-
-      if (!this.isOnEditMode) groupped.appendChild(edit);
-
-      this.root.appendChild(groupped);
-
-      groupped = null;
-      btnDelete = null;
-      edit = null;
-    };
-
-    this.addEventListener('click', () => {
-      if (this.root.querySelector(HTMLGrouppedButton.TAG)) {
-        return this.root.querySelector(HTMLGrouppedButton.TAG).remove();
-      }
-    });
 
     if (this.shadowEnabled()) {
       this.startingStyle.addSomeCss(HTMLToolbarButton.CssRules);

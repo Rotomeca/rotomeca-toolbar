@@ -18,6 +18,7 @@
         padding: 0;
         width: 100%;
         height: 100%;
+        overflow: hidden;
       }
 
       :root {
@@ -41,24 +42,34 @@
         flex-direction: column;
       }
 
-      rotomeca-primary-button {
-        border-radius: 0;
+      rds-button {
+        display: block;
       }
 
-      rotomeca-primary-button:first-of-type {
+      rds-button::part(button) {
+        width: 100%;
+        height: 30px;
+        min-height: 30px;
+        padding-block: 0;
+        border-radius: 0;
+        justify-content: flex-start;
+      }
+
+      rds-button:first-of-type::part(button) {
         border-top-left-radius: 10px;
         border-top-right-radius: 10px;
       }
 
-      rotomeca-primary-button:last-of-type {
+      rds-button:last-of-type::part(button) {
         border-bottom-left-radius: 10px;
         border-bottom-right-radius: 10px;
       }
     </style>
-    <!-- <script
-      src="../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js"
-      type="module"
-    ></script> -->
+    <link
+      rel="stylesheet"
+      href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css"
+    />
+    <link rel="stylesheet" href="../css/ds-bridge.css" />
     <script src="./main.js" type="module"></script>
   </head>
   <body>

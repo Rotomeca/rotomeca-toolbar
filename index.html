@@ -22,34 +22,33 @@
         overflow: hidden;
       }
 
-      rotomeca-fullscreen-primary-pressed-button:focus {
-        box-shadow: none !important;
+      #main {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #main::part(button) {
+        width: 100%;
+        height: 100%;
+        border-radius: 5px 5px 0 0;
       }
     </style>
     <link rel="stylesheet" href="./src/index/index.css" />
-    <script
-      type="module"
-      src="./src/scripts/components/HTMLFullScreenPressedButton.js"
-    ></script>
+    <link rel="stylesheet" href="./node_modules/@rotomeca/design-system/out/rotomeca-design-system.css" />
+    <link rel="stylesheet" href="./src/css/ds-bridge.css" />
+    <script type="module" src="./src/scripts/ds.js"></script>
   </head>
   <body>
-    <template id="pict">
-      <img
-        src="./src/pictures/keyboard_arrow_down_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
-        id="pictdown"
-        style="display: none"
-      />
-      <img
-        src="./src/pictures/keyboard_arrow_up_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
-        id="pictup"
-      />
-    </template>
-    <rotomeca-fullscreen-primary-pressed-button
-      data-template-id="pict"
+    <rds-icon-button
       id="main"
-      class="full-screen"
-      data-form="secondary"
-    ></rotomeca-fullscreen-primary-pressed-button>
+      toggle
+      square
+      variant="primary"
+      icon="chevron-up"
+      selected-icon="chevron-down"
+      label="Afficher ou cacher la barre"
+    ></rds-icon-button>
   </body>
   <footer>
     <script src="./src/index/renderer.js" type="module"></script>

@@ -1,0 +1,11 @@
+/* Thème « système » : couleurs natives du design system (clair ou sombre selon l'OS) */
+:root {
+  --color-scheme: var(--ds-background-surface);
+  --color-scheme-primary: var(--ds-background-action-primary);
+  --color-scheme-primary-hover: var(--ds-background-action-primary-hover);
+  --color-scheme-primary-active: var(--ds-background-action-primary-active);
+  --color-scheme-text: var(--ds-text-default);
+  --color-scheme-text-primary: var(--ds-text-action-primary);
+  --color-scheme-text-hover: var(--ds-text-action-primary);
+  --color-scheme-text-active: var(--ds-text-action-primary);
+}

@@ -18,61 +18,89 @@
         padding: 0;
         width: 100%;
         height: 100%;
-        overflow: auto;
+        overflow: hidden;
+        background-color: var(--color-scheme, #1f2933);
+        color: var(--color-scheme-text, #c7dfff);
+        user-select: none;
       }
 
-      rotomeca-primary-button {
-        margin-right: 0;
-        height: 20px;
-        border-radius: 0;
-        padding: 0 10px;
-        border: none;
-        font-size: 10px;
-        line-height: 1.7;
+      #header {
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 4px;
+        border-bottom: 1px solid var(--color-scheme-primary, #323f4b);
       }
 
-      rotomeca-primary-button#close {
-        --ce-html-button-background-color: red;
+      #title {
+        flex: 1;
+        min-width: 0;
+        padding: 0 8px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 12px;
+        opacity: 0.8;
+        text-align: center;
       }
-      rotomeca-primary-button#kill {
-        --ce-html-button-background-color: black;
+
+      .group {
+        display: flex;
+        gap: 2px;
+      }
+
+      rds-icon-button::part(button) {
+        width: 26px;
+        min-width: 26px;
+        height: 24px;
+        min-height: 24px;
+        padding: 0;
+        border-radius: 6px;
+      }
+
+      #close:hover::part(button) {
+        background-color: #d32f2f;
+        color: #fff;
       }
     </style>
+    <link rel="stylesheet" href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css" />
+    <link rel="stylesheet" href="../../src/css/ds-bridge.css" />
     <link rel="stylesheet" href="./apps.css" />
     <script type="module" src="./main.js"></script>
   </head>
   <body>
-    <rotomeca-primary-button
-      id="refresh"
-      data-form="secondary"
-      title="Recharger la page"
-      ><img
-        src="../pictures/refresh_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
-        style="max-width: 13px; margin-top: 2px"
-    /></rotomeca-primary-button>
-    <rotomeca-primary-button
-      id="open"
-      data-form="secondary"
-      title="Arrêter et ouvrir dans le navigateur"
-      style="margin-left: -4px"
-      ><img
-        src="../pictures/open_in_new_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
-        style="max-width: 13px; margin-top: 2px"
-    /></rotomeca-primary-button>
-    <div style="float: right; display: flex">
-      <rotomeca-primary-button
-        id="kill"
-        data-form="secondary"
-        title="Arrêter la fenêtre"
-        >🗑</rotomeca-primary-button
-      >
-      <rotomeca-primary-button
-        id="close"
-        data-form="secondary"
-        title="Fermer la fenêtre"
-        style="padding-left: 15px; padding-right: 15px"
-        >X</rotomeca-primary-button
-      >
+    <div id="header">
+      <div class="group">
+        <rds-icon-button
+          id="refresh"
+          icon="refresh-cw"
+          label="Recharger la page"
+          title="Recharger la page"
+        ></rds-icon-button>
+        <rds-icon-button
+          id="open"
+          icon="external-link"
+          label="Arrêter et ouvrir dans le navigateur"
+          title="Arrêter et ouvrir dans le navigateur"
+        ></rds-icon-button>
+      </div>
+      <div id="title"></div>
+      <div class="group">
+        <rds-icon-button
+          id="kill"
+          icon="trash-2"
+          label="Arrêter la fenêtre"
+          title="Arrêter la fenêtre"
+        ></rds-icon-button>
+        <rds-icon-button
+          id="close"
+          icon="x"
+          label="Fermer la fenêtre"
+          title="Fermer la fenêtre"
+        ></rds-icon-button>
+      </div>
     </div>
   </body>
   <footer>

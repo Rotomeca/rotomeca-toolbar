@@ -1,3 +1,4 @@
+import '../scripts/ds.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
@@ -5,6 +6,13 @@ export class PageSettings {
   constructor() {
     this.settings ??= {};
     this.main();
+  }
+
+  /**
+   * Notifie le processus principal que les réglages ont changé
+   */
+  #saveSettings() {
+    window.api.invoke(appEventList.settingsUpdated, this.settings);
   }
 
   async #initDisplays() {
@@ -16,29 +24,66 @@ export class PageSettings {
       displays.find((d) => d.id === this.settings.displayId) ??
       displays.find((d) => d.isPrimary) ??
       displays[0];
-    const container = document.querySelector('#displays');
+    const select = document.querySelector('#displays');
 
     for (const display of displays) {
-      const button = document.createElement('rotomeca-primary-pressed-button');
-      button.dataset.form = 'secondary';
-      button.classList.add('setting', 'setting-display');
-      button.textContent = display.label;
-      container.appendChild(button);
-
-      if (display.id === selected.id) button.press({ enableEvent: false });
-
-      button.addEventListener('event:custom:state.pressed', (event) => {
-        document
-          .querySelectorAll('.setting-display')
-          .forEach((element) => element.unpress());
-        event.currentTarget.press({ enableEvent: false });
-
-        this.settings.displayId = display.id;
-        window.api.invoke(appEventList.settingsUpdated, this.settings);
-      });
+      const option = document.createElement('option');
+      option.value = String(display.id);
+      option.textContent = display.label;
+      select.appendChild(option);
     }
 
+    select.value = String(selected.id);
+
+    select.addEventListener('rds-select:change', (event) => {
+      const display = displays.find(
+        (d) => String(d.id) === event.detail.value,
+      );
+      if (!display) return;
+
+      this.settings.displayId = display.id;
+      this.#saveSettings();
+    });
+
     document.querySelector('#display-setting').hidden = false;
+  }
+
+  #initMode() {
+    const control = document.querySelector('#mode');
+    control.value = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
+
+    control.addEventListener('rds-segmented-control:change', (event) => {
+      const isButton = event.detail.value === 'button';
+
+      this.settings.isButtonModeEnabled = isButton;
+      this.#saveSettings();
+
+      document.documentElement.classList.toggle('without-button', !isButton);
+    });
+  }
+
+  #initTheme() {
+    const select = document.querySelector('#theme');
+    select.value = this.settings.theme;
+
+    select.addEventListener('rds-select:change', (event) => {
+      const theme = event.detail.value;
+
+      this.settings.theme = theme;
+      this.#saveSettings();
+
+      let style = document.querySelector('#rootcolor');
+
+      if (!style) {
+        style = document.createElement('link');
+        style.setAttribute('rel', 'stylesheet');
+        style.setAttribute('id', 'rootcolor');
+        document.querySelector('head').appendChild(style);
+      }
+
+      style.setAttribute('href', `../css/themes/${theme}.css`);
+      document.documentElement.dataset.appTheme = theme;
+    });
   }
 
   async main() {
@@ -65,61 +110,8 @@ export class PageSettings {
       this.settings.theme ??= 'system';
 
       await this.#initDisplays();
-
-      document.querySelectorAll('.setting-mode').forEach((button) => {
-        if (this.settings.isButtonModeEnabled && button.id === 'button')
-          button.press({ enableEvent: false });
-        else if (!this.settings.isButtonModeEnabled && button.id === 'mouse')
-          button.press({ enableEvent: false });
-
-        button.addEventListener('event:custom:state.pressed', (event) => {
-          const caller = event.currentTarget;
-
-          document.querySelectorAll('.setting-mode').forEach((element) => {
-            element.unpress();
-          });
-
-          caller.press({ enableEvent: false });
-
-          this.settings.isButtonModeEnabled = caller.id === 'button';
-          window.api.invoke(appEventList.settingsUpdated, this.settings);
-
-          if (caller.id === 'button')
-            document.querySelector('html').classList.remove('without-button');
-          else document.querySelector('html').classList.add('without-button');
-        });
-      });
-
-      document.querySelectorAll('.setting-theme').forEach((button) => {
-        if (this.settings.theme === button.id)
-          button.press({ enableEvent: false });
-
-        button.addEventListener('event:custom:state.pressed', (event) => {
-          const caller = event.currentTarget;
-
-          document.querySelectorAll('.setting-theme').forEach((element) => {
-            element.unpress();
-          });
-
-          caller.press({ enableEvent: false });
-
-          this.settings.theme = caller.id;
-          window.api.invoke(appEventList.settingsUpdated, this.settings);
-
-          let style = document.querySelector('#rootcolor');
-
-          if (!style) {
-            style = document.createElement('link');
-            //rel="stylesheet" href="../css/fonts/icofont/icofont.min.css"
-            style.setAttribute('rel', 'stylesheet');
-            style.setAttribute('id', 'rootcolor');
-            document.querySelector('head').appendChild(style);
-          }
-
-          if (button.id === 'system') style.remove();
-          else style.setAttribute('href', `../css/themes/${caller.id}.css`);
-        });
-      });
+      this.#initMode();
+      this.#initTheme();
     });
   }
 }

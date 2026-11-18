@@ -1,3 +1,4 @@
+import '../scripts/ds.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
@@ -71,20 +72,21 @@ class Main {
 		const bar = document.getElementById('bar');
 		bar.hidden = !state.duration;
 		if (state.duration)
-			bar.style.setProperty(
-				'--progress',
-				`${(state.position / state.duration) * 100}%`,
-			);
+			bar.value = Math.round((state.position / state.duration) * 100);
 
 		const has = action => state.actions.includes(action);
 		document.getElementById('prev').disabled = !has('previoustrack');
 		document.getElementById('next').disabled = !has('nexttrack');
 		// Sans handler, le script injecté pilote directement les lecteurs audio/vidéo
-		document.getElementById('toggle').textContent = state.playing ? '⏸' : '▶';
+		document
+			.getElementById('toggle')
+			.setAttribute('icon', state.playing ? 'pause' : 'play');
 
 		const mute = document.getElementById('mute');
-		mute.textContent = state.muted ? '🔇' : '🔊';
-		mute.title = state.muted ? 'Réactiver le son' : 'Couper le son';
+		const muteLabel = state.muted ? 'Réactiver le son' : 'Couper le son';
+		mute.setAttribute('icon', state.muted ? 'volume-x' : 'volume-2');
+		mute.setAttribute('label', muteLabel);
+		mute.title = muteLabel;
 	}
 }
 

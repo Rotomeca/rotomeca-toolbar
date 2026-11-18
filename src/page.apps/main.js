@@ -1,6 +1,6 @@
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
-import { HTMLPrimaryButton } from '../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
+import '../scripts/ds.js';
 
 /**
  * @class
@@ -25,29 +25,36 @@ export class Main {
     //Met à jour l'url en cours si une autre frame est ouverte
     window.api.on(pageEventList.frameOpen, (_, url) => {
       this.#_url = url;
+
+      // Affiche le site en cours dans le bandeau
+      try {
+        document.querySelector('#title').textContent = new URL(url).hostname;
+      } catch {
+        document.querySelector('#title').textContent = url ?? '';
+      }
     });
 
     //Ajout des listeners pour les différentes actions
     document
-      .querySelector('rotomeca-primary-button#close')
+      .querySelector('#close')
       .addEventListener('click', () => {
         window.api.invoke(appEventList.closeApps);
       });
 
     document
-      .querySelector('rotomeca-primary-button#kill')
+      .querySelector('#kill')
       .addEventListener('click', () => {
         window.api.invoke(appEventList.killApp, this.url);
       });
 
     document
-      .querySelector('rotomeca-primary-button#open')
+      .querySelector('#open')
       .addEventListener('click', () => {
         window.api.invoke(appEventList.killApp, this.url, true);
       });
 
     document
-      .querySelector('rotomeca-primary-button#refresh')
+      .querySelector('#refresh')
       .addEventListener('click', () => {
         window.api.invoke(appEventList.refreshApp, this.url);
       });

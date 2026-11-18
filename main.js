@@ -41,6 +41,9 @@ const {
   MEDIA_ACTIONS,
 } = require('./src/scripts/AppIndicators.js');
 
+// Hauteur (px) du bandeau d'actions au-dessus des applications
+const APPS_HEADER_HEIGHT = 32;
+
 const TRAY_DEFAULT_TOOLTIP = "Gérer la barre d'outils";
 const MEDIA_POPUP_WIDTH = 300;
 const MEDIA_POPUP_HEIGHT = 96;
@@ -261,9 +264,12 @@ class AppMain extends BaseAppObject {
         this.appsWindow.contentView.children.forEach((view, i) => {
           view.setBounds({
             x: 0,
-            y: i === 0 ? 0 : 20,
+            y: i === 0 ? 0 : APPS_HEADER_HEIGHT,
             width: this.appsWindow.getBounds().width,
-            height: i === 0 ? 20 : this.appsWindow.getBounds().height,
+            height:
+              i === 0
+                ? APPS_HEADER_HEIGHT
+                : this.appsWindow.getBounds().height - APPS_HEADER_HEIGHT,
           });
         });
       });
@@ -281,7 +287,12 @@ class AppMain extends BaseAppObject {
       view.webContents.loadFile(
         path.join(__dirname, '/src/page.apps/apps.html'),
       );
-      view.setBounds({ x: 0, y: 0, width: win.getBounds().width, height: 20 });
+      view.setBounds({
+        x: 0,
+        y: 0,
+        width: win.getBounds().width,
+        height: APPS_HEADER_HEIGHT,
+      });
       // view.webContents.openDevTools();
 
       view.webContents.addListener('dom-ready', () => {
@@ -993,9 +1004,9 @@ class AppMain extends BaseAppObject {
       const bounds = this.appsWindow.getBounds();
       view.setBounds({
         x: 0,
-        y: 20,
+        y: APPS_HEADER_HEIGHT,
         width: bounds.width,
-        height: Math.max(0, bounds.height - 20),
+        height: Math.max(0, bounds.height - APPS_HEADER_HEIGHT),
       });
 
       this.views[url] = { view, badge: 0, audible: false };
@@ -1219,8 +1230,14 @@ class AppMain extends BaseAppObject {
     if (displayUpdated) this.repositionWindows();
 
     const css = this.update_root_css();
-    this.mainWindow.webContents.insertCSS(css);
-    this.toolbarWindow.webContents.insertCSS(css);
+    for (const win of [this.mainWindow, this.toolbarWindow]) {
+      win.webContents.insertCSS(css);
+      win.webContents
+        .executeJavaScript(
+          `document.documentElement.dataset.appTheme = ${JSON.stringify(this.settings.theme)}`,
+        )
+        .catch(console.error);
+    }
 
     if (buttonModeUpdated) {
       this.removeWindow('toolbar');

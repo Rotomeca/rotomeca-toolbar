@@ -93,40 +93,13 @@ class BaseAppObject {
    */
   get rootCSS() {
     if (!this.#_css_root) {
-      if (this.settings.theme === 'system') {
-        const base_color = `#${(
-          systemPreferences?.getAccentColor?.() || 'ffffffff'
-        ).substring(0, 6)}cc`;
-        const primary_color = BaseAppObject.ColorLuminance(base_color, 1.3);
-        const hover_color = BaseAppObject.ColorLuminance(base_color, 2);
-        const active_color = BaseAppObject.ColorLuminance(base_color, 2, 100);
-
-        const base_text_color = this.kGetColor(base_color);
-        const primary_text_color = this.kGetColor(primary_color);
-        const hover_text_color = this.kGetColor(hover_color);
-        const active_text_color = this.kGetColor(active_color);
-
-        this.#_css_root = `
-        :root {
-          --color-scheme: ${base_color};
-          --color-scheme-primary: ${primary_color};
-          --color-scheme-primary-hover: ${hover_color};
-          --color-scheme-primary-active: ${active_color};
-
-          --color-scheme-text: ${base_text_color};
-          --color-scheme-text-primary: ${primary_text_color};
-          --color-scheme-text-hover: ${hover_text_color};
-          --color-scheme-text-active: ${active_text_color};
-        }`;
-      } else {
-        const fs = require('fs');
-        this.#_css_root =
-          fs
-            .readFileSync(
-              path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
-            )
-            ?.toString?.() ?? '';
-      }
+      const fs = require('fs');
+      this.#_css_root =
+        fs
+          .readFileSync(
+            path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
+          )
+          ?.toString?.() ?? '';
     }
 
     return this.#_css_root;
@@ -241,7 +214,9 @@ class BaseAppObject {
         .executeJavaScript(
           `document.querySelector('html').classList.add('dark-mode-${
             nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
-          }')`,
+          }'); document.documentElement.dataset.appTheme = ${JSON.stringify(
+            this.settings.theme,
+          )}`,
         )
         .catch(console.error);
     });

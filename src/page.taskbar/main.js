@@ -1,8 +1,23 @@
-import { HTMLPrimaryButton } from '../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
-import { HTMLSeparator } from '../scripts/components/HTMLSeparator.js';
+import '../scripts/ds.js';
 import { HTMLToolbarButton } from '../scripts/components/HTMLToolbarButton.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
+
+/**
+ * Balise du séparateur entre les applications
+ * @type {string}
+ */
+const SEPARATOR_TAG = 'rds-divider';
+
+/**
+ * Crée un séparateur
+ * @returns {HTMLElement}
+ */
+function createSeparator() {
+  const separator = document.createElement(SEPARATOR_TAG);
+  separator.setAttribute('spacing', 'none');
+  return separator;
+}
 
 /**
  * @class
@@ -24,7 +39,7 @@ export class Main {
 
   /**
    * Bouton d'ajout d'une application
-   * @type {HTMLPrimaryButton}
+   * @type {HTMLElement}
    * @readonly
    */
   get addButton() {
@@ -41,7 +56,7 @@ export class Main {
   add(_, data, { request = false } = {}) {
     if (data === 'separator') {
       if (document.querySelectorAll(HTMLToolbarButton.TAG).length !== 0)
-        this.root.appendChild(HTMLSeparator.CreateNode());
+        this.root.appendChild(createSeparator());
       return;
     }
 
@@ -78,7 +93,7 @@ export class Main {
     if (request === true) return button;
 
     if (document.querySelectorAll(HTMLToolbarButton.TAG).length === 0)
-      this.root.appendChild(HTMLSeparator.CreateNode());
+      this.root.appendChild(createSeparator());
 
     this.root.appendChild(button);
   }
@@ -87,10 +102,10 @@ export class Main {
     window.api.on(pageEventList.toolbarAppSeparatorDelete, (_, url) => {
       let element =
         url === 0
-          ? document.querySelector(HTMLSeparator.TAG)
+          ? document.querySelector(SEPARATOR_TAG)
           : document.querySelector(`[href="${url}"]`).nextElementSibling;
 
-      if (element.nodeName === HTMLSeparator.TAG.toUpperCase())
+      if (element.nodeName === SEPARATOR_TAG.toUpperCase())
         element.remove();
     });
 
@@ -135,20 +150,16 @@ export class Main {
           .forEach((element) => {
             element.disable();
           });
-        document.querySelector('#add-button').disable();
-        document
-          .querySelector('#edit rotomeca-primary-pressed-button')
-          .disable();
+        document.querySelector('#add-button').disabled = true;
+        document.querySelector('#edit-button').disabled = true;
       } else {
         document
           .querySelectorAll('#apps rotomeca-toolbar-button')
           .forEach((element) => {
             element.enable();
           });
-        document.querySelector('#add-button').enable();
-        document
-          .querySelector('#edit rotomeca-primary-pressed-button')
-          .enable();
+        document.querySelector('#add-button').disabled = false;
+        document.querySelector('#edit-button').disabled = false;
       }
     });
 
@@ -177,19 +188,17 @@ export class Main {
       }
 
       if (!settings?.isButton) {
-        let node = HTMLPrimaryButton.CreateNode({
-          form: 'secondary',
-          content: '<',
-        });
+        let node = document.createElement('rds-icon-button');
+        node.setAttribute('icon', 'chevron-left');
+        node.setAttribute('variant', 'primary');
+        node.setAttribute('square', '');
+        node.setAttribute('label', 'Cacher la barre');
+        node.setAttribute('title', 'Cacher la barre');
+        node.id = 'hide-button';
 
         node.onclick = () => {
           window.api.invoke(appEventList.toggleToolbar);
         };
-        node.style.textAlign = 'center';
-        node.style.borderBottomLeftRadius = 0;
-        node.style.borderBottomRightRadius = 0;
-
-        node.setAttribute('title', 'Cacher la barre');
 
         document.querySelector('#main').prepend(node);
         node = null;
@@ -203,7 +212,7 @@ export class Main {
 
       if (button) {
         if (data === 'separator')
-          button.after(document.createElement(HTMLSeparator.TAG));
+          button.after(createSeparator());
         else button.after(this.add(null, data, { request: true }));
       }
     });
@@ -220,27 +229,18 @@ export class Main {
       window.api.invoke(appEventList.requestAdd);
     });
 
-    let editButton = document.querySelector(
-      '#edit rotomeca-primary-pressed-button',
-    );
-    editButton.addEventListener('event:custom:state.pressed', () => {
-      document
-        .querySelectorAll('#apps rotomeca-toolbar-button')
-        .forEach((element) => {
-          element.classList.add('edit');
-        });
-      document.querySelector('#add-button').disable();
-    });
+    document
+      .querySelector('#edit-button')
+      .addEventListener('rds-icon-button:toggle', (event) => {
+        const editing = event.detail.selected;
 
-    editButton.addEventListener('event:custom:state.unpressed', () => {
-      document
-        .querySelectorAll('#apps rotomeca-toolbar-button')
-        .forEach((element) => {
-          element.classList.remove('edit');
-        });
-
-      document.querySelector('#add-button').enable();
-    });
+        document
+          .querySelectorAll('#apps rotomeca-toolbar-button')
+          .forEach((element) => {
+            element.classList.toggle('edit', editing);
+          });
+        document.querySelector('#add-button').disabled = editing;
+      });
   }
 
   event_button_pressed(e) {
