@@ -16,3 +16,15 @@
 body {
   font-family: var(--ds-font-sans);
 }
+
+/*
+ * Clair et Sombre du design system : le survol des boutons secondaires et discrets
+ * a la couleur de la surface variante (barre, cartes) et reste invisible. On le
+ * remplace par la surface forte. Les palettes définissent leurs propres survols.
+ */
+html[data-theme] {
+  --ds-background-action-secondary-hover: var(--ds-background-surface-strong);
+  --ds-background-action-tertiary-hover: var(--ds-background-surface-strong);
+  --ds-background-action-secondary-active: color-mix(in srgb, var(--ds-background-surface-strong) 75%, var(--ds-text-default));
+  --ds-background-action-tertiary-active: color-mix(in srgb, var(--ds-background-surface-strong) 75%, var(--ds-text-default));
+}
