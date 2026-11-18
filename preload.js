@@ -33,6 +33,7 @@ const INVOKE_CHANNELS = new Set([
   'rotomeca-context-menu',
   'edgeEnter',
   'requestToggle',
+  'openSettings',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */

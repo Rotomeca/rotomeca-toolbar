@@ -4,18 +4,19 @@ import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
 /**
- * Balise du séparateur entre les applications
+ * Sélecteur des séparateurs de groupe entre les applications
  * @type {string}
  */
-const SEPARATOR_TAG = 'rds-divider';
+const SEPARATOR_SELECTOR = '#apps .separator';
 
 /**
- * Crée un séparateur
+ * Crée un séparateur de groupe (trait court, couleur d'accent)
  * @returns {HTMLElement}
  */
 function createSeparator() {
-  const separator = document.createElement(SEPARATOR_TAG);
-  separator.setAttribute('spacing', 'none');
+  const separator = document.createElement('div');
+  separator.classList.add('separator', 'group');
+  separator.setAttribute('aria-hidden', 'true');
   return separator;
 }
 
@@ -116,8 +117,8 @@ export class Main {
     document.documentElement.addEventListener('mouseenter', () => {
       if (isRail()) window.api.invoke(appEventList.edgeEnter);
     });
-    document.documentElement.addEventListener('click', () => {
-      if (isRail()) window.api.invoke(appEventList.toggleToolbar);
+    document.querySelector('#rail-button').addEventListener('click', () => {
+      window.api.invoke(appEventList.toggleToolbar);
     });
 
     // Échap cache la barre (ouverte au clavier ou à la souris)
@@ -129,11 +130,10 @@ export class Main {
     window.api.on(pageEventList.toolbarAppSeparatorDelete, (_, url) => {
       let element =
         url === 0
-          ? document.querySelector(SEPARATOR_TAG)
+          ? document.querySelector(SEPARATOR_SELECTOR)
           : findButtonByUrl(url)?.nextElementSibling;
 
-      if (element?.nodeName === SEPARATOR_TAG.toUpperCase())
-        element.remove();
+      if (element?.classList.contains('separator')) element.remove();
     });
 
     window.api.on(pageEventList.toolbarAppDeleted, (_, url) => {
@@ -219,18 +219,21 @@ export class Main {
       if (!settings?.isButton) {
         let node = document.createElement('rds-icon-button');
         node.setAttribute('icon', 'chevron-left');
-        node.setAttribute('variant', 'primary');
         node.setAttribute('square', '');
-        node.setAttribute('label', 'Cacher la barre');
-        node.setAttribute('title', 'Cacher la barre');
+        node.setAttribute('size', 'sm');
+        node.setAttribute('label', window.api.t('toolbar.hide'));
+        node.setAttribute('title', window.api.t('toolbar.hide'));
         node.id = 'hide-button';
 
         node.onclick = () => {
           window.api.invoke(appEventList.toggleToolbar);
         };
 
-        // Même gabarit que le bouton d'ajout (centré), suivi d'un séparateur
-        document.querySelector('#main').prepend(node, createSeparator());
+        // Bouton réduire en tête de barre, suivi d'un séparateur simple
+        const separator = document.createElement('div');
+        separator.classList.add('separator');
+        separator.setAttribute('aria-hidden', 'true');
+        document.querySelector('#head').append(node, separator);
         node = null;
       }
     });
@@ -254,6 +257,12 @@ export class Main {
     window.api.on(pageEventList.windowAppsClosed, () => {
       document.querySelector('[aria-pressed="true"]')?.unpress?.();
     });
+
+    document
+      .querySelector('#settings-button')
+      .addEventListener('click', () => {
+        window.api.invoke(appEventList.openSettings);
+      });
 
     this.addButton.addEventListener('click', () => {
       window.api.invoke(appEventList.requestAdd);

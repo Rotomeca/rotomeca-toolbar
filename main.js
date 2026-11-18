@@ -47,7 +47,7 @@ const {
 } = require('./src/scripts/AppIndicators.js');
 
 // Largeur (px) de la bande réservée à la barre ancrée (AppBar)
-const APPBAR_WIDTH = 64;
+const APPBAR_WIDTH = 72;
 
 // Largeur (px) du rail qui reste visible quand la barre est repliée. Windows
 // impose 32 px au minimum à une fenêtre : en dessous, elle dépasserait la place
@@ -486,6 +486,9 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.requestToggle, () =>
         this.toggleFromOutside(),
       )
+      .addEventListener(appEventList.openSettings, () =>
+        this.event_tray_on_click(),
+      )
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -722,7 +725,7 @@ class AppMain extends BaseAppObject {
       : {
           x: wa.x + 10,
           y: wa.y + 10,
-          width: 64,
+          width: APPBAR_WIDTH,
           height: wa.height - (this.settingIsButton ? 52 : 20),
         };
 

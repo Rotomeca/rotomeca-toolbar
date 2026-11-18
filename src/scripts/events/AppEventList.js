@@ -29,5 +29,6 @@ const appEventList = Object.freeze({
   rotomecaContextMenu: 'rotomeca-context-menu',
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
+  openSettings: 'openSettings',
 });
  module.exports = { appEventList };

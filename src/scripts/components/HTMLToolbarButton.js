@@ -25,6 +25,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_coverNode = null;
   #_badgeNode = null;
   #_audioNode = null;
+  #_audioIcon = null;
   constructor() {
     super();
   }
@@ -96,7 +97,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#_audioNode = document.createElement('span');
     this.#_audioNode.classList.add('audio');
     this.#_audioNode.setAttribute('aria-hidden', 'true');
-    this.#_audioNode.appendChild(this.createText('🔊'));
+    this.#_audioIcon = document.createElement('rds-icon');
+    this.#_audioIcon.setAttribute('name', 'volume-2');
+    this.#_audioNode.appendChild(this.#_audioIcon);
     this.#_coverNode = document.createElement('img');
     this.#_coverNode.classList.add('cover');
     this.#_coverNode.alt = '';
@@ -122,14 +125,9 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
 
       let style = document.createElement('style');
       style.appendChild(
-        document.createTextNode(`@keyframes rainbow {
-          to {
-            filter: hue-rotate(360deg);
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .progress {
-            animation: none;
+        document.createTextNode(`@media (prefers-reduced-motion: reduce) {
+          :host(.edit) img, :host(.edit) p, :host(.edit) i {
+            animation: none !important;
           }
         }
         @keyframes tremble {
@@ -220,7 +218,10 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#_badgeNode.hidden = this.#_badge <= 0;
     this.#_badgeNode.textContent = this.#_badge > 99 ? '99+' : this.#_badge;
     this.#_audioNode.hidden = !this.#_audible && !this.#_muted;
-    this.#_audioNode.textContent = this.#_muted ? '🔇' : '🔊';
+    this.#_audioIcon.setAttribute(
+      'name',
+      this.#_muted ? 'volume-x' : 'volume-2',
+    );
 
     const states = [];
     if (this.#_badge > 0) states.push(translate('button.unread', { count: this.#_badge }));
@@ -240,15 +241,47 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   static get CssRules() {
     return StyleComponent.RuleClass.Write({
       ':host': {
-        width: '40px',
+        width: '44px',
         display: 'block',
         position: 'relative',
+        'box-sizing': 'border-box',
         'aspect-ratio': '1 / 1',
-        'border-radius': '15px',
+        'flex-shrink': '0',
+        'border-radius': 'var(--ds-radius-full, 999px)',
+        'border-style': 'solid !important',
+        'border-width': '1px !important',
+        'border-color': 'var(--ds-border-subtle) !important',
+        'background-color': 'var(--ds-background-surface-strong)',
+        color: 'var(--ds-text-default)',
+        'font-size': '20px',
+        cursor: 'pointer',
+      },
+      ':host(:hover), :host(:active)': {
+        'border-color': 'var(--ds-border-strong) !important',
+        'background-color': 'var(--ds-background-surface-strong)',
+        color: 'var(--ds-text-default)',
+      },
+      ':host(:focus-visible)': {
+        outline: '2px solid var(--ds-focus-ring-color)',
+        'outline-offset': '2px',
+        'box-shadow': 'none',
+      },
+      // Raccourci actif : tuile arrondie, avec un trait collé au bord de la barre
+      ':host(:state(pressed)), :host(:state(pressed):hover), :host(:state(pressed):active)': {
+        'border-radius': '14px',
         'border-color': 'transparent !important',
-        // La bordure est invisible : sans largeur, la boîte (et l'anneau de
-        // progression) fait toujours 40px quel que soit l'état du bouton
-        'border-width': '0 !important',
+        'background-color': 'var(--ds-background-tone-brand-bold)',
+        color: 'var(--ds-text-tone-brand-bold)',
+      },
+      ':host(:state(pressed))::before': {
+        content: '""',
+        position: 'absolute',
+        top: '10px',
+        left: '-14px',
+        width: '4px',
+        height: '24px',
+        'border-radius': '0 4px 4px 0',
+        background: 'var(--ds-background-action-primary)',
       },
       ':host(.edit) img, :host(.edit) p, :host(.edit) i': {
         animation: 'tremble 0.5s infinite',
@@ -259,7 +292,6 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
         display: 'flex',
         'align-items': 'center',
         'justify-content': 'center',
-        // 'font-size: '20px',
       },
       img: {
         width: '24px',
@@ -267,64 +299,82 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
       },
       p: {
         margin: '0px',
+        'font-family': 'var(--ds-font-sans)',
+        'font-weight': '600',
       },
+      // Pochette ronde de 40 px au centre de la tuile de 44 px
       '.cover': {
         position: 'absolute',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
+        top: '1px',
+        left: '1px',
+        width: '40px',
+        height: '40px',
         'object-fit': 'cover',
-        'border-radius': '15px',
+        'border-radius': 'var(--ds-radius-full, 999px)',
         'pointer-events': 'none',
       },
-      // Anneau d'avancée fin, aux dimensions du contour : un arc-en-ciel évidé
-      // par un masque : l'arc parcouru porte tout le spectre, le reste est grisé
+      // Anneau d'avancée de 52 px : piste border-subtle, progression action-primary,
+      // départ à 12 h (évidé par un masque)
       '.progress': {
         position: 'absolute',
-        top: '0',
-        left: '0',
-        right: '0',
-        bottom: '0',
-        padding: '2px',
+        top: '-5px',
+        left: '-5px',
+        width: '52px',
+        height: '52px',
+        padding: '3px',
         'box-sizing': 'border-box',
-        'border-radius': '15px',
+        'border-radius': 'var(--ds-radius-full, 999px)',
         background:
-          'conic-gradient(#ff3b30 calc(var(--progress, 0%) * 0.0), #ffcc00 calc(var(--progress, 0%) * 0.1667), #34c759 calc(var(--progress, 0%) * 0.3333), #00c7be calc(var(--progress, 0%) * 0.5), #0a84ff calc(var(--progress, 0%) * 0.6667), #bf5af2 calc(var(--progress, 0%) * 0.8333), #ff3b30 calc(var(--progress, 0%) * 1.0), transparent 0), rgba(255, 255, 255, 0.18)',
+          'conic-gradient(var(--ds-background-action-primary) var(--progress, 0%), var(--ds-border-subtle) 0)',
         '-webkit-mask':
           'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
         '-webkit-mask-composite': 'xor',
         'mask-composite': 'exclude',
-        animation: 'rainbow 3s linear infinite',
         'pointer-events': 'none',
       },
+      // Pastille de notification : coin haut droit, chiffre centré
       '.badge': {
         position: 'absolute',
         top: '-4px',
-        right: '-4px',
-        'min-width': '16px',
-        height: '16px',
+        right: '-6px',
+        display: 'flex',
+        'align-items': 'center',
+        'justify-content': 'center',
+        'min-width': '18px',
+        height: '18px',
         padding: '0 4px',
         'box-sizing': 'border-box',
-        'border-radius': '8px',
-        background: '#e53935',
-        color: '#fff',
+        'border-radius': 'var(--ds-radius-full, 999px)',
+        border: '2px solid var(--ds-background-surface-variant)',
+        background: 'var(--ds-background-tone-accent-bold)',
+        color: 'var(--ds-text-tone-accent-bold)',
         'font-size': '10px',
-        'font-weight': 'bold',
-        'line-height': '16px',
-        'text-align': 'center',
+        'font-weight': '700',
+        'line-height': '1',
+        'font-variant-numeric': 'tabular-nums',
         'pointer-events': 'none',
       },
+      // Pastille son : coin bas droit
       '.audio': {
         position: 'absolute',
-        bottom: '-2px',
-        right: '-2px',
-        'font-size': '11px',
+        bottom: '-4px',
+        right: '-4px',
+        display: 'flex',
+        'align-items': 'center',
+        'justify-content': 'center',
+        width: '20px',
+        height: '20px',
+        'box-sizing': 'border-box',
+        'border-radius': 'var(--ds-radius-full, 999px)',
+        border: '2px solid var(--ds-background-surface-variant)',
+        background: 'var(--ds-background-action-primary)',
+        color: 'var(--ds-text-action-primary)',
+        'font-size': '10px',
         'line-height': '1',
         'pointer-events': 'none',
       },
       '[hidden]': {
-        display: 'none',
+        display: 'none !important',
       },
     });
   }

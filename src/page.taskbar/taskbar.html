@@ -22,6 +22,7 @@
   </head>
   <body>
     <div id="main">
+      <div id="head"></div>
       <rds-icon-button
         id="add-button"
         icon="plus"
@@ -33,7 +34,8 @@
         data-i18n-title="toolbar.add"
       ></rds-icon-button>
       <div id="apps"></div>
-      <div id="edit" style="text-align: center">
+      <div id="edit">
+        <div class="separator" aria-hidden="true"></div>
         <rds-icon-button
           id="edit-button"
           toggle
@@ -44,7 +46,25 @@
           data-i18n-label="toolbar.edit"
           data-i18n-title="toolbar.edit"
         ></rds-icon-button>
+        <rds-icon-button
+          id="settings-button"
+          square
+          icon="settings"
+          label="Paramètres"
+          title="Paramètres"
+          data-i18n-label="toolbar.settings"
+          data-i18n-title="toolbar.settings"
+        ></rds-icon-button>
       </div>
+      <button
+        type="button"
+        id="rail-button"
+        aria-label="Afficher la barre"
+        data-i18n-label="toolbar.show"
+        hidden
+      >
+        <rds-icon name="chevron-right"></rds-icon>
+      </button>
     </div>
   </body>
   <footer></footer>

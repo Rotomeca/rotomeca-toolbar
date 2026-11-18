@@ -65,6 +65,8 @@
   "toolbar.edit": "Modifier les applications",
   "toolbar.toggle": "Afficher ou cacher la barre",
   "toolbar.hide": "Cacher la barre",
+  "toolbar.show": "Afficher la barre",
+  "toolbar.settings": "Paramètres",
   "toolbar.sendBack": "Clic molette pour passer en arrière-plan",
 
   "apps.title": "Applications",

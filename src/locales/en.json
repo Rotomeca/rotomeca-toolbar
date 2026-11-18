@@ -65,6 +65,8 @@
   "toolbar.edit": "Edit applications",
   "toolbar.toggle": "Show or hide the toolbar",
   "toolbar.hide": "Hide the toolbar",
+  "toolbar.show": "Show the bar",
+  "toolbar.settings": "Settings",
   "toolbar.sendBack": "Middle-click to send to the back",
 
   "apps.title": "Applications",
