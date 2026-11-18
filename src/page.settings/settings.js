@@ -102,18 +102,6 @@ export class PageSettings {
 
       this.settings.theme = theme;
       this.#saveSettings();
-
-      let style = document.querySelector('#rootcolor');
-
-      if (!style) {
-        style = document.createElement('link');
-        style.setAttribute('rel', 'stylesheet');
-        style.setAttribute('id', 'rootcolor');
-        document.querySelector('head').appendChild(style);
-      }
-
-      style.setAttribute('href', `../css/themes/${theme}.css`);
-      document.documentElement.dataset.appTheme = theme;
     });
   }
 

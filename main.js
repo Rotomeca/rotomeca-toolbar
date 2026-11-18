@@ -6,6 +6,7 @@ if (require('electron-squirrel-startup')) {
 
 const {
   app,
+  nativeTheme,
   BrowserWindow,
   session,
   WebContentsView,
@@ -404,6 +405,9 @@ class AppMain extends BaseAppObject {
 
   main() {
     super.main();
+
+    // « Système » : suit le mode clair/sombre de Windows en direct
+    nativeTheme.on('updated', () => this.broadcastTheme());
 
     if (AppMain.hasAutoUpdater) AppMain.CheckForUpdate();
 
@@ -1606,18 +1610,7 @@ class AppMain extends BaseAppObject {
 
     if (displayUpdated) this.repositionWindows();
 
-    const css = this.update_root_css();
-    for (const win of [
-      this.settingIsButton && this.mainWindow,
-      this.toolbarWindow,
-    ].filter(Boolean)) {
-      win.webContents.insertCSS(css);
-      win.webContents
-        .executeJavaScript(
-          `document.documentElement.dataset.appTheme = ${JSON.stringify(this.settings.theme)}`,
-        )
-        .catch(console.error);
-    }
+    this.broadcastTheme();
 
     if (buttonModeUpdated) {
       // Libère l'espace réservé avant de détruire la fenêtre qui le porte

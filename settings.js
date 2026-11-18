@@ -1,25 +1,54 @@
 /**
- * Thèmes autorisés (liste blanche : la valeur sert à construire un chemin de fichier).
+ * Thèmes autorisés (liste blanche) et attributs `data-theme` / `data-palette`
+ * correspondants. « system » est résolu en clair ou sombre par resolveTheme().
  */
-const THEMES = Object.freeze([
-  'system',
-  'dark',
-  'red',
-  'blue',
-  'green',
-  'white',
-  'black',
-]);
+const THEME_ATTRS = Object.freeze({
+  system: null,
+  clair: { theme: 'light', palette: '' },
+  sombre: { theme: 'dark', palette: '' },
+  marron: { theme: 'dark', palette: 'marron' },
+  rouge: { theme: 'dark', palette: 'rouge' },
+  bleu: { theme: 'dark', palette: 'bleu' },
+  vert: { theme: 'dark', palette: 'vert' },
+  sapin: { theme: 'dark', palette: 'sapin' },
+  blanc: { theme: 'light', palette: 'blanc' },
+  noir: { theme: 'dark', palette: 'noir' },
+});
+const THEMES = Object.freeze(Object.keys(THEME_ATTRS));
 const DEFAULT_THEME = 'system';
+
+/** Anciennes valeurs enregistrées (avant 3.x) → thème équivalent. */
+const LEGACY_THEMES = Object.freeze({
+  dark: 'sombre',
+  red: 'rouge',
+  blue: 'bleu',
+  green: 'vert',
+  white: 'blanc',
+  black: 'noir',
+});
 
 /**
  * @param {unknown} value
  * @returns {string} Un thème valide, ou le thème par défaut
  */
 function sanitizeTheme(value) {
-  return typeof value === 'string' && THEMES.includes(value)
-    ? value
-    : DEFAULT_THEME;
+  if (typeof value !== 'string') return DEFAULT_THEME;
+  if (Object.hasOwn(LEGACY_THEMES, value)) return LEGACY_THEMES[value];
+  return THEMES.includes(value) ? value : DEFAULT_THEME;
+}
+
+/**
+ * @param {string} theme Réglage de thème (déjà validé)
+ * @param {boolean} systemIsDark Mode sombre de Windows
+ * @returns {{theme: 'light'|'dark', palette: string}}
+ */
+function resolveTheme(theme, systemIsDark) {
+  return (
+    THEME_ATTRS[sanitizeTheme(theme)] ?? {
+      theme: systemIsDark ? 'dark' : 'light',
+      palette: '',
+    }
+  );
 }
 
 /**
@@ -150,4 +179,10 @@ Object.defineProperty(Params, 'Instance', {
   },
 });
 
-module.exports = { Params, THEMES, sanitizeTheme, sanitizeDisplayId };
+module.exports = {
+  Params,
+  THEMES,
+  sanitizeTheme,
+  resolveTheme,
+  sanitizeDisplayId,
+};

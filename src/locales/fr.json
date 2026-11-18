@@ -94,6 +94,9 @@
   "settings.themeBlue": "Bleu",
   "settings.themeGreen": "Vert",
   "settings.themeWhite": "Blanc",
+  "settings.themeClair": "Clair",
+  "settings.themeMarron": "Marron",
+  "settings.themeSapin": "Vert sapin",
   "settings.themeBlack": "Noir",
   "settings.display": "Écran",
   "settings.version": "Version :"

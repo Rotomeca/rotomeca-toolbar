@@ -15,7 +15,6 @@ class BaseAppObject {
    */
   #_windows = {};
   #_base_css = null;
-  #_css_root = null;
   #_params = null;
   constructor() {
     this.init();
@@ -108,24 +107,6 @@ class BaseAppObject {
     return this.#_base_css;
   }
 
-  /**
-   * @type {string}
-   * @readonly
-   */
-  get rootCSS() {
-    if (!this.#_css_root) {
-      const fs = require('fs');
-      this.#_css_root =
-        fs
-          .readFileSync(
-            path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
-          )
-          ?.toString?.() ?? '';
-    }
-
-    return this.#_css_root;
-  }
-
   get windows() {
     return this.#_windows;
   }
@@ -135,12 +116,27 @@ class BaseAppObject {
   main() {}
 
   /**
-   *
+   * Script qui applique le thème courant (data-theme / data-palette) sur <html>.
    * @returns {string}
    */
-  update_root_css() {
-    this.#_css_root = null;
-    return this.rootCSS;
+  get themeScript() {
+    const { resolveTheme } = require('../../settings.js');
+    const attrs = resolveTheme(
+      this.settings.theme,
+      nativeTheme.shouldUseDarkColors,
+    );
+    return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; }`;
+  }
+
+  /**
+   * Applique le thème courant à toutes les fenêtres ouvertes.
+   */
+  broadcastTheme() {
+    const script = this.themeScript;
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue;
+      win.webContents.executeJavaScript(script).catch(console.error);
+    }
   }
 
   /**
@@ -226,19 +222,11 @@ class BaseAppObject {
     // Injecté à chaque chargement de page : la fenêtre peut ne pas avoir de
     // page au moment de sa création (ex: chargée plus tard via loadFile).
     win.webContents.on('dom-ready', () => {
-      win.webContents.insertCSS(this.rootCSS).catch(console.error);
-
       if (this.baseCSS !== '')
         win.webContents.insertCSS(this.baseCSS).catch(console.error);
 
       win.webContents
-        .executeJavaScript(
-          `document.querySelector('html').classList.add('dark-mode-${
-            nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
-          }'); document.documentElement.dataset.appTheme = ${JSON.stringify(
-            this.settings.theme,
-          )}`,
-        )
+        .executeJavaScript(this.themeScript)
         .catch(console.error);
     });
 
