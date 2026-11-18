@@ -33,6 +33,29 @@ body {
 rotomeca-toolbar-button {
   margin: 5px 0;
 }
+/* Barre ancrée repliée : un rail fin aux angles droits, c'est la barre
+   elle-même qui sert de bouton (un clic ou le survol la déplie) */
+html.rail #main > * {
+  display: none;
+}
+html.rail #main {
+  position: relative;
+  border-radius: 0;
+  cursor: pointer;
+}
+html.rail #main::after {
+  content: '\203A';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+}
+html.rail #main:hover {
+  filter: brightness(1.2);
+}
 rds-divider {
   width: calc(100% - 30px);
   margin: 15px 0;

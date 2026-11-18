@@ -110,6 +110,16 @@ export class Main {
   }
 
   main() {
+    // Réduite au rail, la barre se déplie au survol (masquage automatique,
+    // filtré côté principal) ou au clic
+    const isRail = () => document.documentElement.classList.contains('rail');
+    document.documentElement.addEventListener('mouseenter', () => {
+      if (isRail()) window.api.invoke(appEventList.edgeEnter);
+    });
+    document.documentElement.addEventListener('click', () => {
+      if (isRail()) window.api.invoke(appEventList.toggleToolbar);
+    });
+
     // Échap cache la barre (ouverte au clavier ou à la souris)
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape')
