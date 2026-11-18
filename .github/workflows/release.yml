@@ -53,8 +53,31 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg
 
+      # Signature Authenticode : définir les secrets WINDOWS_CERTIFICATE_BASE64
+      # (certificat .pfx encodé en base64) et WINDOWS_CERTIFICATE_PASSWORD.
+      # Sans eux, l'installeur Windows est produit non signé.
+      - name: Préparer le certificat de signature Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$CERT_BASE64" ]; then
+            echo "::warning::Pas de certificat de signature : installeur Windows non signé"
+            exit 0
+          fi
+          echo "$CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/codesign.pfx"
+          echo "WINDOWS_CERTIFICATE_FILE=$RUNNER_TEMP/codesign.pfx" >> "$GITHUB_ENV"
+          echo "WINDOWS_CERTIFICATE_PASSWORD=$CERT_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build
         run: pnpm run make
+
+      - name: Supprimer le certificat de signature
+        if: always() && runner.os == 'Windows'
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/codesign.pfx"
 
       - name: Envoyer les fichiers Windows
         if: runner.os == 'Windows'

@@ -83,7 +83,9 @@ class Main {
 			.setAttribute('icon', state.playing ? 'pause' : 'play');
 
 		const mute = document.getElementById('mute');
-		const muteLabel = state.muted ? 'Réactiver le son' : 'Couper le son';
+		const muteLabel = window.api.t(
+			state.muted ? 'media.unmute' : 'media.mute',
+		);
 		mute.setAttribute('icon', state.muted ? 'volume-x' : 'volume-2');
 		mute.setAttribute('label', muteLabel);
 		mute.title = muteLabel;

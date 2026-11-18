@@ -7,6 +7,7 @@ const {
   nativeTheme,
 } = require('electron');
 const path = require('path');
+const { t } = require('./i18n');
 
 class BaseAppObject {
   /**
@@ -49,17 +50,37 @@ class BaseAppObject {
 
   /**
    * Écrans disponibles, pour la page des paramètres.
+   * Ils sont numérotés de gauche à droite (puis de haut en bas) et nommés par
+   * leur libellé système ; la résolution et l'échelle ne servent qu'à les
+   * distinguer quand plusieurs écrans portent le même nom.
    * @returns {{id:number, label:string, isPrimary:boolean}[]}
    */
   getDisplaysInfo() {
     const primaryId = screen.getPrimaryDisplay().id;
-    return screen.getAllDisplays().map((d, i) => ({
-      id: d.id,
-      label:
-        `${d.label || `Écran ${i + 1}`} (${d.bounds.width}x${d.bounds.height})` +
-        (d.id === primaryId ? ' - principal' : ''),
-      isPrimary: d.id === primaryId,
-    }));
+    const displays = [...screen.getAllDisplays()].sort(
+      (a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y,
+    );
+
+    const names = displays.map(
+      (d, i) => d.label?.trim() || t('display.fallbackName', { n: i + 1 }),
+    );
+
+    return displays.map((d, i) => {
+      const isDuplicate = names.filter((name) => name === names[i]).length > 1;
+      const details = isDuplicate
+        ? ` (${d.size.width}x${d.size.height}${
+            d.scaleFactor !== 1 ? ` @${Math.round(d.scaleFactor * 100)}%` : ''
+          })`
+        : '';
+
+      return {
+        id: d.id,
+        label:
+          `${i + 1}. ${names[i]}${details}` +
+          (d.id === primaryId ? ` - ${t('display.primary')}` : ''),
+        isPrimary: d.id === primaryId,
+      };
+    });
   }
 
   /**

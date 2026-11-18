@@ -4,6 +4,14 @@ import { EMPTY_STRING } from '../../../lib/RotomecaWebComponents/libs/constants.
 import { StyleComponent } from '../../../lib/RotomecaWebComponents/libs/StyleComponent.js';
 import { ToolbarAppData } from '../ToolbarAppData.js';
 
+/**
+ * Traduit une clé (le preload expose `window.api.t`).
+ * @param {string} key
+ * @param {Object<string, string|number>} [vars]
+ * @returns {string}
+ */
+const translate = (key, vars) => window.api?.t?.(key, vars) ?? key;
+
 export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #_itemData = null;
   #_badge = 0;
@@ -215,11 +223,11 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#_audioNode.textContent = this.#_muted ? '🔇' : '🔊';
 
     const states = [];
-    if (this.#_badge > 0) states.push(`${this.#_badge} non lu(s)`);
-    if (this.#_muted) states.push('son coupé');
-    else if (this.#_audible) states.push('son en cours');
+    if (this.#_badge > 0) states.push(translate('button.unread', { count: this.#_badge }));
+    if (this.#_muted) states.push(translate('button.muted'));
+    else if (this.#_audible) states.push(translate('button.audible'));
     if (this.#_ignored)
-      states.push('lecture ignorée dans la barre des tâches : seul le premier lecteur est pris en compte');
+      states.push(translate('button.ignored'));
 
     this.setAttribute(
       'title',

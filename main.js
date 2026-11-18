@@ -17,6 +17,8 @@ const {
   Notification,
   dialog,
   ipcMain,
+  globalShortcut,
+  net,
 } = require('electron');
 
 const path = require('path');
@@ -33,7 +35,8 @@ const {
   flushSession,
   keepLoginsAlive,
 } = require('./src/scripts/Persistence.js');
-const { appEventList } =require('./src/scripts/events/AppEventList.js');
+const { appEventList } = require('./src/scripts/events/AppEventList.js');
+const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const {
   parseUnreadCount,
@@ -44,10 +47,18 @@ const {
 // Hauteur (px) du bandeau d'actions au-dessus des applications
 const APPS_HEADER_HEIGHT = 32;
 
-const TRAY_DEFAULT_TOOLTIP = "Gérer la barre d'outils";
 const MEDIA_POPUP_WIDTH = 300;
 const MEDIA_POPUP_HEIGHT = 96;
 const MEDIA_POPUP_HIDE_DELAY = 250;
+
+// Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
+const EDGE_WIDTH = 4;
+
+// Raccourci clavier global qui affiche ou cache la barre
+const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
+
+// Intervalle (ms) entre deux vérifications de nouvelle version (Linux)
+const MANUAL_UPDATE_INTERVAL = 6 * 60 * 60 * 1000;
 
 // Taille maximale (caractères) d'une icône d'application encodée en data URL
 const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
@@ -122,10 +133,7 @@ class AppMain extends BaseAppObject {
     return (
       this.getWindow('main') ??
       this.createBrowserWindow('main', {
-        width: 64,
-        height: 32,
-        x: this.workArea.x + 10,
-        y: this.workArea.y + this.workArea.height - 32,
+        ...this.layout.main,
         alwaysOnTop: true,
         frame: false,
         useContentSize: true,
@@ -149,10 +157,7 @@ class AppMain extends BaseAppObject {
     return (
       this.getWindow('toolbar') ??
       this.createBrowserWindow('toolbar', {
-        width: 64,
-        height: this.workArea.height - (this.settingIsButton ? 52 : 20),
-        x: this.workArea.x + 10,
-        y: this.workArea.y + 10,
+        ...this.layout.toolbar,
         alwaysOnTop: true,
         frame: false,
         transparent: true,
@@ -204,14 +209,8 @@ class AppMain extends BaseAppObject {
       // app.files =
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
       const win = this.createBrowserWindow('add_dialog', {
-        title: 'Ajouter une application',
-        width: this.workArea.width / 4,
-        height: this.toolbarWindow.getBounds().height / 2,
-        y: this.toolbarWindow.getBounds().y,
-        x:
-          this.toolbarWindow.getBounds().x +
-          this.toolbarWindow.getBounds().width +
-          10,
+        title: t('window.add'),
+        ...this.layout.addDialog,
         transparent: false,
         frame: true,
         alwaysOnTop: true,
@@ -247,15 +246,38 @@ class AppMain extends BaseAppObject {
     return this.getWindow('add_dialog');
   }
 
+  /**
+   * Fine fenêtre quasi invisible collée au bord gauche de l'écran : l'entrée
+   * de la souris dans cette zone ouvre la barre (mode souris), sans sondage.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get edgeWindow() {
+    return (
+      this.getWindow('edge') ??
+      this.createBrowserWindow('edge', {
+        ...this.layout.edge,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.edge/edge.html'),
+        show: false,
+        otherArgs: { focusable: false, hasShadow: false },
+      })
+    );
+  }
+
   get appsWindow() {
     let win = this.getWindow('apps');
 
     if (!win) {
       win = new BaseWindow({
-        width: this.workArea.width / 4,
-        height: this.toolbarWindow.getBounds().height,
-        x: this.workArea.x + 64 + 20,
-        y: this.workArea.y + 10,
+        ...this.layout.apps,
         alwaysOnTop: true,
         frame: false,
         skipTaskbar: true,
@@ -399,6 +421,13 @@ class AppMain extends BaseAppObject {
         appEventList.settingsUpdated,
         this.event_settings_updated.bind(this),
       )
+      .addEventListener(appEventList.edgeEnter, () => {
+        // Seule la zone du bord gauche (mode souris) peut ouvrir la barre ainsi
+        if (!this.settingIsButton && !this.state) this.event_main_click();
+      })
+      .addEventListener(appEventList.requestToggle, () =>
+        this.toggleFromOutside(),
+      )
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
       .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
@@ -411,6 +440,15 @@ class AppMain extends BaseAppObject {
     // Envoyé par le preload des sites (pas par nos pages locales)
     ipcMain.on('rtb-media-state', this.event_media_state.bind(this));
 
+    // Traductions demandées (de façon synchrone) par le preload de nos pages
+    ipcMain.on('rtb-i18n', (event) => {
+      const frame = event.senderFrame;
+      event.returnValue =
+        frame && frame === event.sender.mainFrame && frame.url.startsWith('file://')
+          ? { locale: getLocale(), dict: getDictionary() }
+          : {};
+    });
+
     for (const eventName of [
       'display-metrics-changed',
       'display-added',
@@ -421,52 +459,125 @@ class AppMain extends BaseAppObject {
     if (!this.settingIsButton) this.startDetectMousePosition();
   }
 
+  /**
+   * Affiche ou cache la barre depuis le clavier ou la zone de notification.
+   * En mode bouton, on passe par le bouton pour que son état reste cohérent.
+   */
+  toggleFromOutside() {
+    const opening = !this.state;
+
+    if (this.settingIsButton)
+      this.mainWindow.webContents.postMessage(pageEventList.toolbarClosed, true);
+    else this.event_main_click();
+
+    // Au clavier, la barre doit recevoir le focus pour réagir à Échap
+    if (opening) this.toolbarWindow.focus();
+  }
+
+  /**
+   * Disposition des fenêtres sur l'écran choisi (coordonnées en pixels
+   * indépendants de la densité, comme toute l'API de fenêtres d'Electron).
+   * @type {{main:Electron.Rectangle, toolbar:Electron.Rectangle, apps:Electron.Rectangle, addDialog:Electron.Rectangle, edge:Electron.Rectangle}}
+   * @readonly
+   */
+  get layout() {
+    const wa = this.workArea;
+    const { bounds } = this.primaryScreen;
+    const toolbar = {
+      x: wa.x + 10,
+      y: wa.y + 10,
+      width: 64,
+      height: wa.height - (this.settingIsButton ? 52 : 20),
+    };
+
+    return {
+      main: {
+        x: wa.x + 10,
+        y: wa.y + wa.height - 32,
+        width: 64,
+        height: 32,
+      },
+      toolbar,
+      apps: {
+        x: wa.x + 64 + 20,
+        y: wa.y + 10,
+        width: Math.round(wa.width / 4),
+        height: toolbar.height,
+      },
+      addDialog: {
+        x: toolbar.x + toolbar.width + 10,
+        y: toolbar.y,
+        width: Math.round(wa.width / 4),
+        height: Math.round(toolbar.height / 2),
+      },
+      edge: {
+        x: bounds.x,
+        y: bounds.y,
+        width: EDGE_WIDTH,
+        height: bounds.height,
+      },
+    };
+  }
+
+  /**
+   * Affiche la zone sensible du bord gauche (mode souris).
+   */
   startDetectMousePosition() {
-    if (!this.mouseInterval) {
-      this.mouseInterval = setInterval(() => {
-        // Bord gauche de l'écran principal uniquement (pas d'un écran voisin)
-        const { bounds } = this.primaryScreen;
-        const cursor = screen.getCursorScreenPoint();
-        if (
-          cursor.x >= bounds.x &&
-          cursor.x <= bounds.x + 10 &&
-          cursor.y >= bounds.y &&
-          cursor.y < bounds.y + bounds.height
-        ) {
-          clearInterval(this.mouseInterval);
-          this.mouseInterval = null;
-          this.event_main_click();
-        }
-      }, 100);
-    }
+    if (this.settingIsButton) return;
+
+    const edge = this.edgeWindow;
+    this.moveWindow(edge, this.layout.edge);
+    edge.showInactive();
+  }
+
+  /**
+   * Cache la zone sensible du bord gauche.
+   */
+  stopDetectMousePosition() {
+    const edge = this.getWindow('edge');
+    if (edge && !edge.isDestroyed()) edge.hide();
+  }
+
+  /**
+   * Déplace et redimensionne une fenêtre, y compris vers un écran dont
+   * l'échelle d'affichage est différente (sous Windows, Electron convertit
+   * alors la taille avec l'échelle de l'ancien écran : on réapplique donc les
+   * dimensions une fois la fenêtre sur le nouvel écran).
+   * @param {?BaseWindow} win
+   * @param {Electron.Rectangle} bounds
+   */
+  moveWindow(win, bounds) {
+    if (!win || win.isDestroyed()) return;
+
+    const target = screen.getDisplayMatching(bounds);
+    const current = screen.getDisplayMatching(win.getBounds());
+
+    win.setBounds(bounds);
+    if (target.scaleFactor !== current.scaleFactor) win.setBounds(bounds);
   }
 
   /**
    * Replace les fenêtres existantes quand la configuration des écrans change.
    */
   repositionWindows() {
-    const wa = this.workArea;
-    const main = this.getWindow('main');
-    const toolbar = this.getWindow('toolbar');
-    const apps = this.getWindow('apps');
+    const layout = this.layout;
 
-    if (toolbar && !toolbar.isDestroyed())
-      toolbar.setBounds({
-        x: wa.x + 10,
-        y: wa.y + 10,
-        width: 64,
-        height: wa.height - (this.settingIsButton ? 52 : 20),
+    for (const name of ['main', 'toolbar', 'apps', 'edge'])
+      this.moveWindow(this.getWindow(name), layout[name]);
+
+    // La fenêtre d'ajout est un dialogue : on la replace sans la redimensionner
+    // si l'utilisateur a changé sa taille
+    const addDialog = this.getWindow('add_dialog');
+    if (addDialog && !addDialog.isDestroyed()) {
+      const { width, height } = addDialog.getBounds();
+      this.moveWindow(addDialog, {
+        ...layout.addDialog,
+        width: Math.min(width, layout.addDialog.width * 2),
+        height: Math.min(height, this.workArea.height),
       });
+    }
 
-    if (main && !main.isDestroyed())
-      main.setBounds({
-        x: wa.x + 10,
-        y: wa.y + wa.height - 32,
-        width: 64,
-        height: 32,
-      });
-
-    if (apps && !apps.isDestroyed()) apps.setPosition(wa.x + 64 + 20, wa.y + 10);
+    this.hideMediaPopup();
   }
 
   initContextMenu() {
@@ -487,11 +598,17 @@ class AppMain extends BaseAppObject {
   initTray() {
     let menu = [
       {
-        label: 'Paramètres',
+        label: t('tray.toggle'),
+        accelerator: TOGGLE_SHORTCUT,
+        registerAccelerator: false, // enregistré globalement par ailleurs
+        click: () => this.toggleFromOutside(),
+      },
+      {
+        label: t('tray.settings'),
         click: this.event_tray_on_click.bind(this),
       },
       {
-        label: "Quitter l'application",
+        label: t('tray.quit'),
         click: app.quit.bind(app),
       },
     ];
@@ -517,8 +634,9 @@ class AppMain extends BaseAppObject {
     const appContextMenu = Menu.buildFromTemplate(menu);
 
     this.tray = new Tray(this.appIcon);
-    this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
+    this.tray.setToolTip(t('tray.tooltip'));
     this.tray.setContextMenu(appContextMenu);
+    this.tray.on('click', () => this.toggleFromOutside());
 
     return this;
   }
@@ -529,8 +647,8 @@ class AppMain extends BaseAppObject {
     } catch (e) {
       console.error('Failed to save the file', e);
       dialog.showErrorBox(
-        'Erreur',
-        "Impossible de sauvegarder la liste des applications : " + e.message,
+        t('dialog.error'),
+        t('dialog.saveFailed', { error: e.message }),
       );
     }
   }
@@ -552,7 +670,7 @@ class AppMain extends BaseAppObject {
     }
 
     let win = this.createBrowserWindow('settings', {
-      title: 'Paramètres',
+      title: t('window.settings'),
       icon: this.appIcon,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
@@ -597,6 +715,7 @@ class AppMain extends BaseAppObject {
       clearTimeout(this.timeout);
 
       if (this.settingIsButton) this.mainWindow.setAlwaysOnTop(true);
+      else this.stopDetectMousePosition();
 
       this.toolbarWindow.show();
 
@@ -668,7 +787,7 @@ class AppMain extends BaseAppObject {
       this.addDialogWindow.loadFile(
         path.join(__dirname, '/src/page.add/edit.html'),
       );
-      this.addDialogWindow.title = 'Modifier une application';
+      this.addDialogWindow.title = t('window.edit');
       this.addDialogWindow.webContents.on('dom-ready', () => {
         this.addDialogWindow.webContents.postMessage(
           pageEventList.modeEdit,
@@ -858,7 +977,7 @@ class AppMain extends BaseAppObject {
     if (!this.tray || this.tray.isDestroyed()) return;
 
     if (!first) {
-      this.tray.setToolTip(TRAY_DEFAULT_TOOLTIP);
+      this.tray.setToolTip(t('tray.tooltip'));
       return;
     }
 
@@ -871,9 +990,7 @@ class AppMain extends BaseAppObject {
     ];
     if (progress !== null) lines.push(`${Math.round(progress * 100)} %`);
     if (others.length)
-      lines.push(
-        `Seul le premier lecteur est pris en compte (+${others.length} ignoré(s))`,
-      );
+      lines.push(t('tray.ignoredPlayers', { count: others.length }));
 
     this.tray.setToolTip(lines.join('\n'));
   }
@@ -1284,7 +1401,7 @@ class AppMain extends BaseAppObject {
 
       if (this.settingIsButton) {
         this.mainWindow.show();
-        clearInterval(this.mouseInterval);
+        this.stopDetectMousePosition();
       } else {
         this.mainWindow.hide();
         this.startDetectMousePosition();
@@ -1327,12 +1444,11 @@ class AppMain extends BaseAppObject {
           const showDialogInfos = () => {
             const dialogOpts = {
               type: 'info',
-              buttons: ['Redémarrer', 'Plus tard'],
-              title: 'Application Update',
+              buttons: [t('update.restart'), t('update.later')],
+              title: t('update.title'),
               message:
                 process.platform === 'win32' ? releaseNotes : releaseName,
-              detail:
-                "Une nouvelle version a été téléchargée. Vous pouvez redémarrer l'application pour appliquer les mises à jours.",
+              detail: t('update.downloadedDetail'),
             };
 
             dialog.showMessageBox(dialogOpts).then((returnValue) => {
@@ -1353,8 +1469,8 @@ class AppMain extends BaseAppObject {
 
           if (Notification.isSupported()) {
             let notification = new Notification({
-              title: 'Une nouvelle version a été téléchargée ! !',
-              body: "Une nouvelle version est disponible et a été téléchargé ! Cliquez ici pour plus d'informations !",
+              title: t('update.downloadedNotifTitle'),
+              body: t('update.downloadedNotifBody'),
               icon: path.join(__dirname, '/src/pictures/icon.png'),
               urgency: 'normal',
             });
@@ -1370,8 +1486,8 @@ class AppMain extends BaseAppObject {
       autoUpdater.on('update-available', () => {
         if (Notification.isSupported()) {
           new Notification({
-            title: 'Une nouvelle version est disponible !',
-            body: "Une nouvelle version est disponible et est entrain d'être téléchargée en arrière plan ! Vous serez prévenu quand le téléchargement sera fini.",
+            title: t('update.availableNotifTitle'),
+            body: t('update.availableNotifBody'),
             icon: path.join(__dirname, '/src/pictures/icon.png'),
             urgency: 'normal',
           }).show();
@@ -1477,8 +1593,8 @@ class AppMain extends BaseAppObject {
     ]);
     const ASK = new Set(['media', 'geolocation']);
     const LABELS = {
-      media: 'utiliser votre caméra ou votre micro',
-      geolocation: 'accéder à votre position',
+      media: 'permission.media',
+      geolocation: 'permission.geolocation',
     };
     /** @type {Map<string, boolean>} */
     const decisions = new Map();
@@ -1510,11 +1626,14 @@ class AppMain extends BaseAppObject {
         if (!decisions.has(key)) {
           const { response } = await dialog.showMessageBox({
             type: 'question',
-            buttons: ['Autoriser', 'Refuser'],
+            buttons: [t('permission.allow'), t('permission.deny')],
             defaultId: 1,
             cancelId: 1,
-            title: 'Autorisation demandée',
-            message: `${origin} souhaite ${LABELS[permission]}.`,
+            title: t('permission.title'),
+            message: t('permission.message', {
+              origin,
+              action: t(LABELS[permission]),
+            }),
           });
           decisions.set(key, response === 0);
         }
@@ -1522,6 +1641,88 @@ class AppMain extends BaseAppObject {
         callback(decisions.get(key));
       },
     );
+  }
+
+  /**
+   * Compare deux versions `x.y.z`.
+   * @param {string} a
+   * @param {string} b
+   * @returns {number} > 0 si `a` est plus récente que `b`
+   */
+  static CompareVersions(a, b) {
+    const parse = (v) =>
+      String(v)
+        .replace(/^v/i, '')
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0);
+    const left = parse(a);
+    const right = parse(b);
+
+    for (let i = 0; i < Math.max(left.length, right.length); ++i) {
+      const diff = (left[i] ?? 0) - (right[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Squirrel n'existe pas sous Linux : on vérifie la dernière version publiée
+   * sur GitHub et on propose d'ouvrir la page de téléchargement. L'installation
+   * d'un paquet deb ou rpm demande les droits administrateur, elle reste donc
+   * à la charge de l'utilisateur.
+   */
+  static StartManualUpdateCheck() {
+    const repo = require('./configs/appConfig.js').releasesRepo;
+    if (AppMain.IsDev || !app.isPackaged || process.platform !== 'linux' || !repo)
+      return;
+
+    let notifiedVersion = null;
+
+    const check = async () => {
+      try {
+        const response = await net.fetch(
+          `https://api.github.com/repos/${repo}/releases/latest`,
+          { headers: { Accept: 'application/vnd.github+json' } },
+        );
+        if (!response.ok) return;
+
+        const release = await response.json();
+        const version = String(release?.tag_name ?? '').replace(/^v/i, '');
+        const page = String(release?.html_url ?? '');
+
+        // N'ouvrir que la page des versions du dépôt, jamais une URL quelconque
+        if (
+          !/^\d+(\.\d+){0,2}$/.test(version) ||
+          !page.startsWith(`https://github.com/${repo}/`) ||
+          AppMain.CompareVersions(version, app.getVersion()) <= 0 ||
+          notifiedVersion === version
+        )
+          return;
+
+        notifiedVersion = version;
+
+        const { response: choice } = await dialog.showMessageBox({
+          type: 'info',
+          buttons: [t('update.manualDownload'), t('update.later')],
+          defaultId: 0,
+          cancelId: 1,
+          title: t('update.title'),
+          message: t('update.manualMessage', {
+            version,
+            current: app.getVersion(),
+          }),
+          detail: t('update.manualDetail'),
+        });
+
+        if (choice === 0) shell.openExternal(page);
+      } catch (error) {
+        console.error('Manual update check failed', error);
+      }
+    };
+
+    check();
+    setInterval(check, MANUAL_UPDATE_INTERVAL).unref();
   }
 
   static get hasAutoUpdater() {
@@ -1548,7 +1749,10 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
 app.on('before-quit', () => flushSession(session.defaultSession));
-app.on('will-quit', () => flushSession(session.defaultSession));
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  flushSession(session.defaultSession);
+});
 
 app.on('ready', async () => {
   if (!hasSingleInstanceLock) return;
@@ -1558,7 +1762,12 @@ app.on('ready', async () => {
     restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession);
     AppMain.InstallPermissionHandlers(session.defaultSession);
-    AppMain.InitAutoUpdater().Run();
+    const instance = AppMain.InitAutoUpdater().Run();
+    AppMain.StartManualUpdateCheck();
+
+    // Raccourci clavier global : afficher ou cacher la barre
+    if (!globalShortcut.register(TOGGLE_SHORTCUT, () => instance.toggleFromOutside()))
+      console.warn(`Raccourci ${TOGGLE_SHORTCUT} indisponible (déjà utilisé ?)`);
   } catch (error) {
     console.error(error);
     const dialogOpts = {

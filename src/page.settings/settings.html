@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -10,7 +10,7 @@
       name="viewport"
       content="width=device-width, height=device-height, initial-scale=1.0"
     />
-    <title>Applications</title>
+    <title data-i18n="window.settings">Applications</title>
     <style>
       html,
       body {
@@ -115,6 +115,7 @@
           square
           icon="plus"
           label="Ajouter une application"
+          data-i18n-label="toolbar.add"
         ></rds-icon-button>
         <rds-divider spacing="sm"></rds-divider>
         <rotomeca-toolbar-button
@@ -135,31 +136,32 @@
         square
         icon="chevron-up"
         label="Cacher la barre"
+        data-i18n-label="toolbar.hide"
       ></rds-icon-button>
     </div>
     <div id="settings">
-      <label>Mode d'activation</label>
+      <label data-i18n="settings.mode">Mode d'activation</label>
       <br />
-      <rds-segmented-control id="mode" label="Mode d'activation">
-        <option value="button">Bouton</option>
-        <option value="mouse">Souris à gauche</option>
+      <rds-segmented-control id="mode" label="Mode d'activation" data-i18n-label="settings.mode">
+        <option value="button" data-i18n="settings.modeButton">Bouton</option>
+        <option value="mouse" data-i18n="settings.modeMouse">Souris à gauche</option>
       </rds-segmented-control>
       <div class="setting-group">
-        <rds-select id="theme" label="Thème">
-          <option value="system">Système</option>
-          <option value="dark">Sombre</option>
-          <option value="red">Rouge</option>
-          <option value="blue">Bleu</option>
-          <option value="green">Vert</option>
-          <option value="white">Blanc</option>
-          <option value="black">Noir</option>
+        <rds-select id="theme" label="Thème" data-i18n-label="settings.theme">
+          <option value="system" data-i18n="settings.themeSystem">Système</option>
+          <option value="dark" data-i18n="settings.themeDark">Sombre</option>
+          <option value="red" data-i18n="settings.themeRed">Rouge</option>
+          <option value="blue" data-i18n="settings.themeBlue">Bleu</option>
+          <option value="green" data-i18n="settings.themeGreen">Vert</option>
+          <option value="white" data-i18n="settings.themeWhite">Blanc</option>
+          <option value="black" data-i18n="settings.themeBlack">Noir</option>
         </rds-select>
       </div>
       <div id="display-setting" class="setting-group" hidden>
-        <rds-select id="displays" label="Écran"></rds-select>
+        <rds-select id="displays" label="Écran" data-i18n-label="settings.display"></rds-select>
       </div>
       <div class="setting-group">
-        <label>Version : <span id="app-version"></span></label>
+        <label><span data-i18n="settings.version">Version :</span> <span id="app-version"></span></label>
       </div>
     </div>
   </body>

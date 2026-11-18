@@ -26,4 +26,6 @@ export const appEventList = Object.freeze({
   mediaControl: 'mediaControl',
   mediaHover: 'mediaHover',
   rotomecaContextMenu: 'rotomeca-context-menu',
+  edgeEnter: 'edgeEnter',
+  requestToggle: 'requestToggle',
 });

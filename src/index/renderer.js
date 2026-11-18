@@ -22,7 +22,7 @@ button.onauxclick = (e) => {
     window.api.invoke(appEventList.toggleStopTop);
   }
 };
-button.setAttribute('title', 'Click molette pour passer en arrière');
+button.setAttribute('title', window.api.t('toolbar.sendBack'));
 
 //Simuler le click du bouton pour fermer la toolbar
 window.api.on(pageEventList.toolbarClosed, () => {
