@@ -15,4 +15,5 @@ export const pageEventList = Object.freeze({
   settingsStart: 'settingsStart',
   appIndicators: 'appIndicators',
   mediaState: 'mediaState',
+  tooltipState: 'tooltipState',
 });

@@ -34,6 +34,8 @@ const INVOKE_CHANNELS = new Set([
   'edgeEnter',
   'requestToggle',
   'openSettings',
+  'tooltipShow',
+  'tooltipHide',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */
@@ -53,6 +55,7 @@ const ON_CHANNELS = new Set([
   'settingsStart',
   'appIndicators',
   'mediaState',
+  'tooltipState',
 ]);
 
 // #region Traductions

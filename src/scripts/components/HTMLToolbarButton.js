@@ -54,7 +54,8 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     super._p_main();
     this.setAttribute('id', this.getAttribute('id') || this._p_generate_id());
 
-    this.setAttribute('title', this.itemData.title);
+    this.dataset.tooltip = this.itemData.title;
+    this.setAttribute('aria-label', this.itemData.title);
     this.setAttribute('href', this.itemData.link);
 
     let childNode;
@@ -230,12 +231,13 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     if (this.#_ignored)
       states.push(translate('button.ignored'));
 
-    this.setAttribute(
-      'title',
-      states.length
-        ? `${this.itemData.title} (${states.join(', ')})`
-        : this.itemData.title,
-    );
+    const label = states.length
+      ? `${this.itemData.title} (${states.join(', ')})`
+      : this.itemData.title;
+    this.setAttribute('aria-label', label);
+    this.dataset.tooltip = this.itemData.title;
+    if (this.#_badge > 0) this.dataset.tooltipBadge = this.#_badgeNode.textContent;
+    else delete this.dataset.tooltipBadge;
   }
 
   static get CssRules() {

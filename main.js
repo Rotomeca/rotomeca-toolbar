@@ -66,6 +66,10 @@ const MEDIA_POPUP_WIDTH = 340;
 const MEDIA_POPUP_HEIGHT = 200;
 const MEDIA_POPUP_HIDE_DELAY = 250;
 
+// Infobulle de la barre : fenêtre transparente sans clic, plus grande que son contenu
+const TOOLTIP_WIDTH = 320;
+const TOOLTIP_HEIGHT = 48;
+
 // Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
 const EDGE_WIDTH = 4;
 
@@ -261,6 +265,35 @@ class AppMain extends BaseAppObject {
         otherArgs: { focusable: false },
       })
     );
+  }
+
+  /**
+   * Infobulle affichée à côté d'un bouton de la barre.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get tooltipWindow() {
+    if (!this.getWindow('tooltip')) {
+      const win = this.createBrowserWindow('tooltip', {
+        width: TOOLTIP_WIDTH,
+        height: TOOLTIP_HEIGHT,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.tooltip/tooltip.html'),
+        show: false,
+        otherArgs: { focusable: false },
+      });
+      // Ne capte jamais la souris : elle reste sur le bouton survolé
+      win.setIgnoreMouseEvents(true);
+    }
+
+    return this.getWindow('tooltip');
   }
 
   /**
@@ -498,6 +531,8 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.openSettings, () =>
         this.event_tray_on_click(),
       )
+      .addEventListener(appEventList.tooltipShow, this.event_tooltip_show.bind(this))
+      .addEventListener(appEventList.tooltipHide, () => this.hideTooltip())
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -982,6 +1017,7 @@ class AppMain extends BaseAppObject {
       // Ancrée, la barre reste affichée mais réduite à un rail fin
       if (!this.settingIsAppBar) this.toolbarWindow.hide();
       this.hideMediaPopup();
+      this.hideTooltip();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
@@ -1323,6 +1359,45 @@ class AppMain extends BaseAppObject {
     });
 
     if (url) this.updateIndicators(url, { media: sanitizeMediaState(raw) });
+  }
+
+  /**
+   * Affiche l'infobulle à droite de la barre, centrée sur le bouton.
+   * @param {*} _
+   * @param {{text: string, badge: ?string, y: number}} args
+   */
+  event_tooltip_show(_, { text, badge, y } = {}) {
+    if (typeof text !== 'string' || text === '' || typeof y !== 'number')
+      return;
+
+    const toolbar = this.toolbarWindow.getBounds();
+    const wa = this.workArea;
+    const top = Math.min(
+      Math.max(toolbar.y + y - TOOLTIP_HEIGHT / 2, wa.y),
+      wa.y + wa.height - TOOLTIP_HEIGHT,
+    );
+
+    const win = this.tooltipWindow;
+    win.setPosition(
+      Math.round(toolbar.x + toolbar.width + 8),
+      Math.round(top),
+    );
+
+    const payload = {
+      text: text.slice(0, 200),
+      badge: typeof badge === 'string' ? badge.slice(0, 10) : null,
+    };
+    const send = () =>
+      win.webContents.postMessage(pageEventList.tooltipState, payload);
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
+    else send();
+
+    win.showInactive();
+  }
+
+  hideTooltip() {
+    const win = this.getWindow('tooltip');
+    if (win && !win.isDestroyed() && win.isVisible()) win.hide();
   }
 
   event_media_hover(_, { url, hovering, y } = {}) {

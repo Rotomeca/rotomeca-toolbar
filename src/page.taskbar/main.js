@@ -121,6 +121,51 @@ export class Main {
       window.api.invoke(appEventList.toggleToolbar);
     });
 
+    // Infobulle : au survol (après 400 ms) et au focus clavier (immédiat)
+    let tooltipTimer = null;
+    let tooltipTarget = null;
+    const tooltipHost = (target) =>
+      target?.closest?.('rotomeca-toolbar-button, rds-icon-button') ?? null;
+    const showTooltip = (element) => {
+      // Un bouton qui joue un morceau affiche déjà le lecteur
+      if (element.hasMedia) return;
+
+      const text = element.dataset.tooltip ?? element.getAttribute('label');
+      if (!text) return;
+
+      const rect = element.getBoundingClientRect();
+      window.api.invoke(appEventList.tooltipShow, {
+        text,
+        badge: element.dataset.tooltipBadge || null,
+        y: rect.top + rect.height / 2,
+      });
+    };
+    const hideTooltip = () => {
+      clearTimeout(tooltipTimer);
+      tooltipTarget = null;
+      window.api.invoke(appEventList.tooltipHide);
+    };
+    document.addEventListener('mouseover', (event) => {
+      const element = tooltipHost(event.target);
+      if (element === tooltipTarget) return;
+
+      hideTooltip();
+      if (!element) return;
+      tooltipTarget = element;
+      tooltipTimer = setTimeout(() => showTooltip(element), 400);
+    });
+    document.addEventListener('mouseleave', hideTooltip);
+    document.addEventListener('focusin', (event) => {
+      const element = tooltipHost(event.target);
+      if (!element) return;
+
+      clearTimeout(tooltipTimer);
+      tooltipTarget = element;
+      showTooltip(element);
+    });
+    document.addEventListener('focusout', hideTooltip);
+    document.addEventListener('click', hideTooltip);
+
     // Échap cache la barre (ouverte au clavier ou à la souris)
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape')
@@ -222,7 +267,6 @@ export class Main {
         node.setAttribute('square', '');
         node.setAttribute('size', 'sm');
         node.setAttribute('label', window.api.t('toolbar.hide'));
-        node.setAttribute('title', window.api.t('toolbar.hide'));
         node.id = 'hide-button';
 
         node.onclick = () => {

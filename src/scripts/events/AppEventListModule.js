@@ -30,4 +30,6 @@ export const appEventList = Object.freeze({
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
   openSettings: 'openSettings',
+  tooltipShow: 'tooltipShow',
+  tooltipHide: 'tooltipHide',
 });
