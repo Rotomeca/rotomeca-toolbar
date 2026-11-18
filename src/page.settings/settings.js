@@ -48,6 +48,19 @@ export class PageSettings {
     document.querySelector('#display-setting').hidden = false;
   }
 
+  /**
+   * Texte d'aide propre au mode d'activation choisi
+   * @param {'button'|'mouse'|'appbar'} mode
+   */
+  #showModeHelp(mode) {
+    const keys = {
+      button: 'settings.helpButton',
+      mouse: 'settings.helpMouse',
+      appbar: 'settings.helpAppBar',
+    };
+    document.querySelector('#mode-help').textContent = window.api.t(keys[mode]);
+  }
+
   async #initMode() {
     const control = document.querySelector('#mode');
 
@@ -65,6 +78,9 @@ export class PageSettings {
     }
 
     const isAppBar = appBarSupported && this.settings.appBarEnabled === true;
+    let current = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
+    if (isAppBar) current = 'appbar';
+    this.#showModeHelp(current);
 
     if (isAppBar) control.value = 'appbar';
     else control.value = this.settings.isButtonModeEnabled ? 'button' : 'mouse';
@@ -81,6 +97,7 @@ export class PageSettings {
 
     control.addEventListener('rds-segmented-control:change', (event) => {
       const mode = event.detail.value;
+      this.#showModeHelp(mode);
       appBarSettings.hidden = mode !== 'appbar';
 
       this.settings.appBarEnabled = mode === 'appbar';
@@ -88,8 +105,6 @@ export class PageSettings {
       if (mode !== 'appbar')
         this.settings.isButtonModeEnabled = mode === 'button';
       this.#saveSettings();
-
-      document.documentElement.classList.toggle('without-button', mode !== 'button');
     });
   }
 
@@ -121,8 +136,10 @@ export class PageSettings {
           console.error('error: ' + err);
         });
 
-      document.querySelector('#app-version').textContent =
-        await window.api.invoke(appEventList.getVersion);
+      document.querySelector('#version').textContent = window.api.t(
+        'settings.versionLabel',
+        { version: await window.api.invoke(appEventList.getVersion) },
+      );
 
       this.settings ??= {};
       this.settings.isButtonModeEnabled ??= true;

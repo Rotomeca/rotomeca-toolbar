@@ -100,6 +100,14 @@
   "settings.themeMarron": "Marron",
   "settings.themeSapin": "Vert sapin",
   "settings.themeBlack": "Noir",
+  "settings.title": "Paramètres",
+  "settings.subtitle": "Comportement et apparence de la barre d'outils",
+  "settings.sectionBehavior": "Comportement",
+  "settings.sectionDisplay": "Affichage",
+  "settings.helpButton": "Un bouton en bas à gauche de l'écran affiche ou cache la barre.",
+  "settings.helpMouse": "La barre s'affiche quand la souris touche le bord gauche de l'écran.",
+  "settings.helpAppBar": "La barre reste fixée sur le bord gauche de l'écran.",
+  "settings.versionLabel": "Version {version}",
   "settings.display": "Écran",
   "settings.version": "Version :"
 }

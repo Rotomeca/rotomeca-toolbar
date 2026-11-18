@@ -100,6 +100,14 @@
   "settings.themeMarron": "Brown",
   "settings.themeSapin": "Fir green",
   "settings.themeBlack": "Black",
+  "settings.title": "Settings",
+  "settings.subtitle": "Behavior and appearance of the toolbar",
+  "settings.sectionBehavior": "Behavior",
+  "settings.sectionDisplay": "Display",
+  "settings.helpButton": "A button at the bottom left of the screen shows or hides the bar.",
+  "settings.helpMouse": "The bar appears when the mouse touches the screen's left edge.",
+  "settings.helpAppBar": "The bar stays docked to the screen's left edge.",
+  "settings.versionLabel": "Version {version}",
   "settings.display": "Display",
   "settings.version": "Version:"
 }

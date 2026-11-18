@@ -914,6 +914,8 @@ class AppMain extends BaseAppObject {
     let win = this.createBrowserWindow('settings', {
       title: t('window.settings'),
       icon: this.appIcon,
+      width: 800,
+      height: 640,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
