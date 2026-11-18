@@ -3,6 +3,10 @@
 
 Ajoute une toolbar à gauche pour lancer des sites web an arrière plan.  
 
+## Licence
+
+Ce logiciel est distribué sous [licence publique de l'Union européenne (EUPL) v. 1.2](LICENSE), une licence copyleft : les versions modifiées que vous distribuez doivent rester sous la même licence (ou une licence compatible listée en annexe de l'EUPL).
+
 ## Contribuer / publier une version
 
 Le changelog est généré par [git-cliff](https://git-cliff.org) (`cliff.toml`) à partir des messages de commit (`feat:`, `fix:`, `ci:`, ...).

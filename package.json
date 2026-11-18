@@ -16,7 +16,7 @@
 		"url": "git+https://github.com/Rotomeca/rotomeca-toolbar.git"
 	},
 	"author": "Rotomeca",
-	"license": "ISC",
+	"license": "EUPL-1.2",
 	"devDependencies": {
 		"@electron-forge/cli": "^8.0.1",
 		"@electron-forge/maker-deb": "^8.0.1",
