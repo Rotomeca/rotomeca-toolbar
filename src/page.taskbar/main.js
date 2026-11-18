@@ -229,7 +229,8 @@ export class Main {
           window.api.invoke(appEventList.toggleToolbar);
         };
 
-        document.querySelector('#main').prepend(node);
+        // Même gabarit que le bouton d'ajout (centré), suivi d'un séparateur
+        document.querySelector('#main').prepend(node, createSeparator());
         node = null;
       }
     });

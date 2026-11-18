@@ -59,9 +59,12 @@ html.rail #main:hover {
 rds-divider {
   width: calc(100% - 30px);
   margin: 15px 0;
+  /* Les conteneurs sont en colonne flex : on centre sans toucher au display */
+  align-self: center;
 }
 
-#add-button {
+#add-button,
+#hide-button {
   display: block;
   margin: 15px;
 }
