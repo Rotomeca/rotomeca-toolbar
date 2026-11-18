@@ -76,7 +76,12 @@
   "apps.close": "Close the window",
 
   "add.popular": "Popular",
-  "add.search": "Search for a link",
+  "add.search": "Search for a site",
+  "add.hint": "One click to add",
+  "add.addNamed": "Add {name}",
+  "add.added": "Added",
+  "add.addToBar": "Add to the bar",
+  "add.customize": "Customize before adding",
   "add.url": "Url",
   "add.name": "Site name",
   "add.icon": "Icon",

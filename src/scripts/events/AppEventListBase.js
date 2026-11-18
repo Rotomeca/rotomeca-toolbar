@@ -31,4 +31,5 @@ const appEventList = Object.freeze({
   requestToggle: 'requestToggle',
   tooltipShow: 'tooltipShow',
   tooltipHide: 'tooltipHide',
+  getSavedUrls: 'getSavedUrls',
 });

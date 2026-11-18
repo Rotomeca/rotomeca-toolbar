@@ -32,4 +32,5 @@ export const appEventList = Object.freeze({
   openSettings: 'openSettings',
   tooltipShow: 'tooltipShow',
   tooltipHide: 'tooltipHide',
+  getSavedUrls: 'getSavedUrls',
 });

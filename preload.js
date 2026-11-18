@@ -36,6 +36,7 @@ const INVOKE_CHANNELS = new Set([
   'openSettings',
   'tooltipShow',
   'tooltipHide',
+  'getSavedUrls',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */

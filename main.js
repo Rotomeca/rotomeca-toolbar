@@ -59,6 +59,10 @@ const RAIL_WIDTH = 24;
 const AUTOHIDE_DELAY = 700;
 const AUTOHIDE_POLL = 150;
 
+// Fenêtre « Ajouter une application » (contenu, en px)
+const ADD_DIALOG_WIDTH = 640;
+const ADD_DIALOG_HEIGHT = 760;
+
 // Hauteur (px) du bandeau d'actions au-dessus des applications
 const APPS_HEADER_HEIGHT = 32;
 
@@ -535,6 +539,7 @@ class AppMain extends BaseAppObject {
       )
       .addEventListener(appEventList.tooltipShow, this.event_tooltip_show.bind(this))
       .addEventListener(appEventList.tooltipHide, () => this.hideTooltip())
+      .addEventListener(appEventList.getSavedUrls, () => this.event_get_saved_urls())
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -794,8 +799,8 @@ class AppMain extends BaseAppObject {
       addDialog: {
         x: toolbar.x + toolbar.width + 10,
         y: toolbar.y,
-        width: Math.round(wa.width / 4),
-        height: Math.round(toolbar.height / 2),
+        width: Math.min(ADD_DIALOG_WIDTH, wa.width),
+        height: Math.min(ADD_DIALOG_HEIGHT, wa.height),
       },
       edge: {
         x: bounds.x,
@@ -1077,15 +1082,32 @@ class AppMain extends BaseAppObject {
     this.addDialogWindow.show();
   }
 
+  /**
+   * Adresses des applications déjà dans la barre (pour marquer « Ajouté »).
+   * @returns {string[]}
+   */
+  event_get_saved_urls() {
+    return this.saves
+      .filter((save) => save && typeof save === 'object')
+      .map((save) => save.url);
+  }
+
+  /**
+   * Ajoute une application depuis la fenêtre d'ajout, qui reste ouverte.
+   * @returns {boolean} `true` si l'application est dans la barre (ajoutée ou déjà présente)
+   */
   event_request_add_data(_, data) {
     const clean = AppMain.SanitizeAppData(data);
-    if (!clean) return;
+    if (!clean) return false;
 
-    this.removeWindow('add_dialog');
+    if (this.saves.some((save) => save?.url === clean.url)) return true;
+
     this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
 
     this.saves.push(clean);
     this.save();
+
+    return true;
   }
 
   event_request_add_separator(_, data) {
