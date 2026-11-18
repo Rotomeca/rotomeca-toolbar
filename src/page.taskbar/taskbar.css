@@ -77,6 +77,8 @@ html.rail #main > :not(#rail-button) {
   display: none;
 }
 html.rail #main {
+  /* La fenêtre fait au moins 32 px : la bande de 24 px est calée à gauche */
+  width: 24px;
   padding: 0;
   gap: 0;
 }

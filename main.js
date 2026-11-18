@@ -49,10 +49,10 @@ const {
 // Largeur (px) de la bande réservée à la barre ancrée (AppBar)
 const APPBAR_WIDTH = 72;
 
-// Largeur (px) du rail qui reste visible quand la barre est repliée. Windows
-// impose 32 px au minimum à une fenêtre : en dessous, elle dépasserait la place
-// réservée.
-const RAIL_WIDTH = 32;
+// Largeur (px) du rail qui reste visible quand la barre est repliée, et place
+// réservée à l'écran. Windows impose 32 px au minimum à la fenêtre (vérifié) :
+// la page dessine donc une bande de 24 px et laisse les 8 px restants transparents.
+const RAIL_WIDTH = 24;
 
 // Barre ancrée en masquage automatique : délai (ms) avant de se replier une
 // fois la souris sortie, et période (ms) de la surveillance du curseur
@@ -447,6 +447,8 @@ class AppMain extends BaseAppObject {
 
   main() {
     super.main();
+
+    this.applyThemeOnLoad();
 
     // « Système » : suit le mode clair/sombre de Windows en direct
     nativeTheme.on('updated', () => this.broadcastTheme());

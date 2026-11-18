@@ -71,7 +71,7 @@
 [data-palette="rouge"] {
   --p-bg: #1f1114; --p-variant: #2e181d; --p-strong: #45242b; --p-overlay: #2e181d;
   --p-text: #f8e6e8; --p-muted: #d9aeb5; --p-border-subtle: #45242b; --p-border-strong: #a0606c;
-  --p-primary: #e06c75; --p-primary-hover: #ea8a91; --p-primary-active: #c4545d; --p-on-primary: #1f1114;
+  --p-primary: #e06c75; --p-primary-hover: #ea8a91; --p-primary-active: #d05e67; --p-on-primary: #1f1114;
   --p-action-text: #f09aa0; --p-hover: #3a1f25; --p-press: #45242b;
   --p-accent: #e8a54b; --p-on-accent: #1f1114; --p-accent-soft: #4a3014; --p-on-accent-soft: #f0c27e;
   --p-brand-soft: #4d1f27; --p-on-brand-soft: #f09aa0;

@@ -101,6 +101,17 @@ export class Main {
         hovering: false,
       });
     });
+    // Un clic sur la tuile ouvre aussi le lecteur (utile s'il vient de se fermer)
+    button.addEventListener('click', () => {
+      if (!button.hasMedia) return;
+
+      const rect = button.getBoundingClientRect();
+      window.api.invoke(appEventList.mediaHover, {
+        url: data.url,
+        hovering: true,
+        y: rect.top + rect.height / 2,
+      });
+    });
 
     if (request === true) return button;
 
