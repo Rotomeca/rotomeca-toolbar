@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -10,7 +10,7 @@
       name="viewport"
       content="width=device-width, height=device-height, initial-scale=1.0"
     />
-    <title>Applications</title>
+    <title data-i18n="window.settings">Applications</title>
     <style>
       html,
       body {
@@ -38,12 +38,14 @@
       }
 
       #add {
-        aspect-ratio: 1 / 1;
         margin-top: 10px;
-        margin-left: 6px;
+        margin-left: 5px;
         margin-bottom: 10px;
         pointer-events: none;
-        border-color: transparent;
+      }
+
+      rds-divider {
+        margin: 0 15px;
       }
 
       rotomeca-toolbar-button {
@@ -57,16 +59,27 @@
         margin-top: 10px;
       }
 
-      rotomeca-primary-pressed-button {
-        border-color: transparent;
-      }
-
       html.without-button #up {
         display: none;
       }
 
       html.without-button #toolbar {
         height: calc(100% - 20px);
+      }
+
+      #up {
+        margin-left: 10px;
+        pointer-events: none;
+      }
+
+      #up::part(button) {
+        width: 42px;
+        height: 28px;
+        border-radius: 8px 8px 0 0;
+      }
+
+      .setting-group {
+        margin-top: 15px;
       }
 
       #settings {
@@ -83,17 +96,28 @@
       src="../scripts/components/HTMLToolbarButton.js"
       type="module"
     ></script>
-    <script src="../scripts/components/HTMLSeparator.js" type="module"></script>
+    <link
+      rel="stylesheet"
+      href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css"
+    />
+    <link rel="stylesheet" href="../css/ds-bridge.css" />
+    <script src="../scripts/ds.js" type="module"></script>
     <script src="./settings.js" type="module"></script>
     <link rel="stylesheet" href="../css/fonts/icofont/icofont.min.css" />
   </head>
   <body>
     <div style="display: flex; flex-direction: column; height: 100%">
       <div id="toolbar">
-        <rotomeca-primary-button data-form="secondary" id="add"
-          >+</rotomeca-primary-button
-        >
-        <rotomeca-separator></rotomeca-separator>
+        <rds-icon-button
+          id="add"
+          variant="primary"
+          size="sm"
+          square
+          icon="plus"
+          label="Ajouter une application"
+          data-i18n-label="toolbar.add"
+        ></rds-icon-button>
+        <rds-divider spacing="sm"></rds-divider>
         <rotomeca-toolbar-button
           data-title="Reddit"
           data-picture="font:reddit"
@@ -106,86 +130,38 @@
           data-pressed="true"
         ></rotomeca-toolbar-button>
       </div>
-      <rotomeca-primary-button
-        style="
-          width: 42px;
-          border-bottom-right-radius: 0;
-          border-bottom-left-radius: 0;
-          padding: 0;
-          height: 28px;
-          margin-left: 10px;
-          border-color: transparent;
-          text-align: center;
-          pointer-events: none;
-        "
-        data-form="secondary"
+      <rds-icon-button
         id="up"
-        ><img
-          src="../pictures/keyboard_arrow_up_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg"
-      /></rotomeca-primary-button>
+        variant="primary"
+        square
+        icon="chevron-up"
+        label="Cacher la barre"
+        data-i18n-label="toolbar.hide"
+      ></rds-icon-button>
     </div>
     <div id="settings">
-      <div>
-        <label>Mode d'activation</label>
-        <br />
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="button"
-          class="setting setting-mode"
-          >Bouton</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="mouse"
-          class="setting setting-mode"
-          >Souris à gauche</rotomeca-primary-pressed-button
-        >
+      <label data-i18n="settings.mode">Mode d'activation</label>
+      <br />
+      <rds-segmented-control id="mode" label="Mode d'activation" data-i18n-label="settings.mode">
+        <option value="button" data-i18n="settings.modeButton">Bouton</option>
+        <option value="mouse" data-i18n="settings.modeMouse">Souris à gauche</option>
+      </rds-segmented-control>
+      <div class="setting-group">
+        <rds-select id="theme" label="Thème" data-i18n-label="settings.theme">
+          <option value="system" data-i18n="settings.themeSystem">Système</option>
+          <option value="dark" data-i18n="settings.themeDark">Sombre</option>
+          <option value="red" data-i18n="settings.themeRed">Rouge</option>
+          <option value="blue" data-i18n="settings.themeBlue">Bleu</option>
+          <option value="green" data-i18n="settings.themeGreen">Vert</option>
+          <option value="white" data-i18n="settings.themeWhite">Blanc</option>
+          <option value="black" data-i18n="settings.themeBlack">Noir</option>
+        </rds-select>
       </div>
-      <div style="margin-top: 15px">
-        <label>Thème</label>
-        <br />
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="system"
-          class="setting setting-theme"
-          >Système</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="dark"
-          class="setting setting-theme"
-          >Sombre</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="red"
-          class="setting setting-theme"
-          >Rouge</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="blue"
-          class="setting setting-theme"
-          >Bleu</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="green"
-          class="setting setting-theme"
-          >Vert</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="white"
-          class="setting setting-theme"
-          >Blanc</rotomeca-primary-pressed-button
-        >
-        <rotomeca-primary-pressed-button
-          data-form="secondary"
-          id="black"
-          class="setting setting-theme"
-          >Noir</rotomeca-primary-pressed-button
-        >
+      <div id="display-setting" class="setting-group" hidden>
+        <rds-select id="displays" label="Écran" data-i18n-label="settings.display"></rds-select>
+      </div>
+      <div class="setting-group">
+        <label><span data-i18n="settings.version">Version :</span> <span id="app-version"></span></label>
       </div>
     </div>
   </body>

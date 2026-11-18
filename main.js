@@ -16,6 +16,9 @@ const {
   autoUpdater,
   Notification,
   dialog,
+  ipcMain,
+  globalShortcut,
+  net,
 } = require('electron');
 
 const path = require('path');
@@ -32,8 +35,33 @@ const {
   flushSession,
   keepLoginsAlive,
 } = require('./src/scripts/Persistence.js');
-const { appEventList } =require('./src/scripts/events/AppEventList.js');
+const { appEventList } = require('./src/scripts/events/AppEventList.js');
+const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
+const {
+  parseUnreadCount,
+  sanitizeMediaState,
+  MEDIA_ACTIONS,
+} = require('./src/scripts/AppIndicators.js');
+
+// Hauteur (px) du bandeau d'actions au-dessus des applications
+const APPS_HEADER_HEIGHT = 32;
+
+const MEDIA_POPUP_WIDTH = 300;
+const MEDIA_POPUP_HEIGHT = 96;
+const MEDIA_POPUP_HIDE_DELAY = 250;
+
+// Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
+const EDGE_WIDTH = 4;
+
+// Raccourci clavier global qui affiche ou cache la barre
+const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
+
+// Intervalle (ms) entre deux vérifications de nouvelle version (Linux)
+const MANUAL_UPDATE_INTERVAL = 6 * 60 * 60 * 1000;
+
+// Taille maximale (caractères) d'une icône d'application encodée en data URL
+const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
 
 /**
  * @callback SavesUpdatedCallback
@@ -50,6 +78,12 @@ class AppMain extends BaseAppObject {
     this.tray;
     this.url;
     this.contextMenu;
+    /** Apps dont le son est coupé (conservé tant que l'application tourne) */
+    this.mutedUrls = new Set();
+    this.mediaHoverUrl = null;
+    this.mediaHideTimer = null;
+    /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
+    this.taskbarIgnored = new Set();
   }
 
   get settingIsButton() {
@@ -99,10 +133,7 @@ class AppMain extends BaseAppObject {
     return (
       this.getWindow('main') ??
       this.createBrowserWindow('main', {
-        width: 64,
-        height: 32,
-        x: this.workArea.x + 10,
-        y: this.workArea.y + this.workArea.height - 32,
+        ...this.layout.main,
         alwaysOnTop: true,
         frame: false,
         useContentSize: true,
@@ -126,10 +157,7 @@ class AppMain extends BaseAppObject {
     return (
       this.getWindow('toolbar') ??
       this.createBrowserWindow('toolbar', {
-        width: 64,
-        height: this.workArea.height - (this.settingIsButton ? 52 : 20),
-        x: this.workArea.x + 10,
-        y: this.workArea.y + 10,
+        ...this.layout.toolbar,
         alwaysOnTop: true,
         frame: false,
         transparent: true,
@@ -147,6 +175,32 @@ class AppMain extends BaseAppObject {
   }
 
   /**
+   * Petite fenêtre affichée au survol d'un bouton qui joue un morceau.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get mediaWindow() {
+    return (
+      this.getWindow('media') ??
+      this.createBrowserWindow('media', {
+        width: MEDIA_POPUP_WIDTH,
+        height: MEDIA_POPUP_HEIGHT,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.media/media.html'),
+        show: false,
+        otherArgs: { focusable: false },
+      })
+    );
+  }
+
+  /**
    * @type {BrowserWindow}
    * @readonly
    */
@@ -155,14 +209,8 @@ class AppMain extends BaseAppObject {
       // app.files =
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
       const win = this.createBrowserWindow('add_dialog', {
-        title: 'Ajouter une application',
-        width: this.workArea.width / 4,
-        height: this.toolbarWindow.getBounds().height / 2,
-        y: this.toolbarWindow.getBounds().y,
-        x:
-          this.toolbarWindow.getBounds().x +
-          this.toolbarWindow.getBounds().width +
-          10,
+        title: t('window.add'),
+        ...this.layout.addDialog,
         transparent: false,
         frame: true,
         alwaysOnTop: true,
@@ -198,15 +246,38 @@ class AppMain extends BaseAppObject {
     return this.getWindow('add_dialog');
   }
 
+  /**
+   * Fine fenêtre quasi invisible collée au bord gauche de l'écran : l'entrée
+   * de la souris dans cette zone ouvre la barre (mode souris), sans sondage.
+   * @type {BrowserWindow}
+   * @readonly
+   */
+  get edgeWindow() {
+    return (
+      this.getWindow('edge') ??
+      this.createBrowserWindow('edge', {
+        ...this.layout.edge,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        preload: this.preloadPath,
+        file: path.join(__dirname, '/src/page.edge/edge.html'),
+        show: false,
+        otherArgs: { focusable: false, hasShadow: false },
+      })
+    );
+  }
+
   get appsWindow() {
     let win = this.getWindow('apps');
 
     if (!win) {
       win = new BaseWindow({
-        width: this.workArea.width / 4,
-        height: this.toolbarWindow.getBounds().height,
-        x: this.workArea.x + 64 + 20,
-        y: this.workArea.y + 10,
+        ...this.layout.apps,
         alwaysOnTop: true,
         frame: false,
         skipTaskbar: true,
@@ -218,9 +289,12 @@ class AppMain extends BaseAppObject {
         this.appsWindow.contentView.children.forEach((view, i) => {
           view.setBounds({
             x: 0,
-            y: i === 0 ? 0 : 20,
+            y: i === 0 ? 0 : APPS_HEADER_HEIGHT,
             width: this.appsWindow.getBounds().width,
-            height: i === 0 ? 20 : this.appsWindow.getBounds().height,
+            height:
+              i === 0
+                ? APPS_HEADER_HEIGHT
+                : this.appsWindow.getBounds().height - APPS_HEADER_HEIGHT,
           });
         });
       });
@@ -238,7 +312,12 @@ class AppMain extends BaseAppObject {
       view.webContents.loadFile(
         path.join(__dirname, '/src/page.apps/apps.html'),
       );
-      view.setBounds({ x: 0, y: 0, width: win.getBounds().width, height: 20 });
+      view.setBounds({
+        x: 0,
+        y: 0,
+        width: win.getBounds().width,
+        height: APPS_HEADER_HEIGHT,
+      });
       // view.webContents.openDevTools();
 
       view.webContents.addListener('dom-ready', () => {
@@ -341,7 +420,34 @@ class AppMain extends BaseAppObject {
       .addEventListener(
         appEventList.settingsUpdated,
         this.event_settings_updated.bind(this),
-      );
+      )
+      .addEventListener(appEventList.edgeEnter, () => {
+        // Seule la zone du bord gauche (mode souris) peut ouvrir la barre ainsi
+        if (!this.settingIsButton && !this.state) this.event_main_click();
+      })
+      .addEventListener(appEventList.requestToggle, () =>
+        this.toggleFromOutside(),
+      )
+      .addEventListener(appEventList.getVersion, () => app.getVersion())
+      .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
+      .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
+      .addEventListener(
+        appEventList.mediaControl,
+        this.event_media_control.bind(this),
+      )
+      .addEventListener(appEventList.mediaHover, this.event_media_hover.bind(this));
+
+    // Envoyé par le preload des sites (pas par nos pages locales)
+    ipcMain.on('rtb-media-state', this.event_media_state.bind(this));
+
+    // Traductions demandées (de façon synchrone) par le preload de nos pages
+    ipcMain.on('rtb-i18n', (event) => {
+      const frame = event.senderFrame;
+      event.returnValue =
+        frame && frame === event.sender.mainFrame && frame.url.startsWith('file://')
+          ? { locale: getLocale(), dict: getDictionary() }
+          : {};
+    });
 
     for (const eventName of [
       'display-metrics-changed',
@@ -353,52 +459,125 @@ class AppMain extends BaseAppObject {
     if (!this.settingIsButton) this.startDetectMousePosition();
   }
 
+  /**
+   * Affiche ou cache la barre depuis le clavier ou la zone de notification.
+   * En mode bouton, on passe par le bouton pour que son état reste cohérent.
+   */
+  toggleFromOutside() {
+    const opening = !this.state;
+
+    if (this.settingIsButton)
+      this.mainWindow.webContents.postMessage(pageEventList.toolbarClosed, true);
+    else this.event_main_click();
+
+    // Au clavier, la barre doit recevoir le focus pour réagir à Échap
+    if (opening) this.toolbarWindow.focus();
+  }
+
+  /**
+   * Disposition des fenêtres sur l'écran choisi (coordonnées en pixels
+   * indépendants de la densité, comme toute l'API de fenêtres d'Electron).
+   * @type {{main:Electron.Rectangle, toolbar:Electron.Rectangle, apps:Electron.Rectangle, addDialog:Electron.Rectangle, edge:Electron.Rectangle}}
+   * @readonly
+   */
+  get layout() {
+    const wa = this.workArea;
+    const { bounds } = this.primaryScreen;
+    const toolbar = {
+      x: wa.x + 10,
+      y: wa.y + 10,
+      width: 64,
+      height: wa.height - (this.settingIsButton ? 52 : 20),
+    };
+
+    return {
+      main: {
+        x: wa.x + 10,
+        y: wa.y + wa.height - 32,
+        width: 64,
+        height: 32,
+      },
+      toolbar,
+      apps: {
+        x: wa.x + 64 + 20,
+        y: wa.y + 10,
+        width: Math.round(wa.width / 4),
+        height: toolbar.height,
+      },
+      addDialog: {
+        x: toolbar.x + toolbar.width + 10,
+        y: toolbar.y,
+        width: Math.round(wa.width / 4),
+        height: Math.round(toolbar.height / 2),
+      },
+      edge: {
+        x: bounds.x,
+        y: bounds.y,
+        width: EDGE_WIDTH,
+        height: bounds.height,
+      },
+    };
+  }
+
+  /**
+   * Affiche la zone sensible du bord gauche (mode souris).
+   */
   startDetectMousePosition() {
-    if (!this.mouseInterval) {
-      this.mouseInterval = setInterval(() => {
-        // Bord gauche de l'écran principal uniquement (pas d'un écran voisin)
-        const { bounds } = this.primaryScreen;
-        const cursor = screen.getCursorScreenPoint();
-        if (
-          cursor.x >= bounds.x &&
-          cursor.x <= bounds.x + 10 &&
-          cursor.y >= bounds.y &&
-          cursor.y < bounds.y + bounds.height
-        ) {
-          clearInterval(this.mouseInterval);
-          this.mouseInterval = null;
-          this.event_main_click();
-        }
-      }, 100);
-    }
+    if (this.settingIsButton) return;
+
+    const edge = this.edgeWindow;
+    this.moveWindow(edge, this.layout.edge);
+    edge.showInactive();
+  }
+
+  /**
+   * Cache la zone sensible du bord gauche.
+   */
+  stopDetectMousePosition() {
+    const edge = this.getWindow('edge');
+    if (edge && !edge.isDestroyed()) edge.hide();
+  }
+
+  /**
+   * Déplace et redimensionne une fenêtre, y compris vers un écran dont
+   * l'échelle d'affichage est différente (sous Windows, Electron convertit
+   * alors la taille avec l'échelle de l'ancien écran : on réapplique donc les
+   * dimensions une fois la fenêtre sur le nouvel écran).
+   * @param {?BaseWindow} win
+   * @param {Electron.Rectangle} bounds
+   */
+  moveWindow(win, bounds) {
+    if (!win || win.isDestroyed()) return;
+
+    const target = screen.getDisplayMatching(bounds);
+    const current = screen.getDisplayMatching(win.getBounds());
+
+    win.setBounds(bounds);
+    if (target.scaleFactor !== current.scaleFactor) win.setBounds(bounds);
   }
 
   /**
    * Replace les fenêtres existantes quand la configuration des écrans change.
    */
   repositionWindows() {
-    const wa = this.workArea;
-    const main = this.getWindow('main');
-    const toolbar = this.getWindow('toolbar');
-    const apps = this.getWindow('apps');
+    const layout = this.layout;
 
-    if (toolbar && !toolbar.isDestroyed())
-      toolbar.setBounds({
-        x: wa.x + 10,
-        y: wa.y + 10,
-        width: 64,
-        height: wa.height - (this.settingIsButton ? 52 : 20),
+    for (const name of ['main', 'toolbar', 'apps', 'edge'])
+      this.moveWindow(this.getWindow(name), layout[name]);
+
+    // La fenêtre d'ajout est un dialogue : on la replace sans la redimensionner
+    // si l'utilisateur a changé sa taille
+    const addDialog = this.getWindow('add_dialog');
+    if (addDialog && !addDialog.isDestroyed()) {
+      const { width, height } = addDialog.getBounds();
+      this.moveWindow(addDialog, {
+        ...layout.addDialog,
+        width: Math.min(width, layout.addDialog.width * 2),
+        height: Math.min(height, this.workArea.height),
       });
+    }
 
-    if (main && !main.isDestroyed())
-      main.setBounds({
-        x: wa.x + 10,
-        y: wa.y + wa.height - 32,
-        width: 64,
-        height: 32,
-      });
-
-    if (apps && !apps.isDestroyed()) apps.setPosition(wa.x + 64 + 20, wa.y + 10);
+    this.hideMediaPopup();
   }
 
   initContextMenu() {
@@ -409,6 +588,7 @@ class AppMain extends BaseAppObject {
         caller.id === this.getWindow('toolbar')?.id &&
         event.target.nodeName === 'ROTOMECA-TOOLBAR-BUTTON',
     );
+    this.contextMenu.isMuted = (url) => this.mutedUrls.has(url);
     this.onsave.push(this.contextMenu.getOnSaveCallback());
     this.onload.push(this.contextMenu.getOnLoadCallback());
 
@@ -418,11 +598,17 @@ class AppMain extends BaseAppObject {
   initTray() {
     let menu = [
       {
-        label: 'Paramètres',
+        label: t('tray.toggle'),
+        accelerator: TOGGLE_SHORTCUT,
+        registerAccelerator: false, // enregistré globalement par ailleurs
+        click: () => this.toggleFromOutside(),
+      },
+      {
+        label: t('tray.settings'),
         click: this.event_tray_on_click.bind(this),
       },
       {
-        label: "Quitter l'application",
+        label: t('tray.quit'),
         click: app.quit.bind(app),
       },
     ];
@@ -448,8 +634,9 @@ class AppMain extends BaseAppObject {
     const appContextMenu = Menu.buildFromTemplate(menu);
 
     this.tray = new Tray(this.appIcon);
-    this.tray.setToolTip("Gérer la barre d'outils");
+    this.tray.setToolTip(t('tray.tooltip'));
     this.tray.setContextMenu(appContextMenu);
+    this.tray.on('click', () => this.toggleFromOutside());
 
     return this;
   }
@@ -460,8 +647,8 @@ class AppMain extends BaseAppObject {
     } catch (e) {
       console.error('Failed to save the file', e);
       dialog.showErrorBox(
-        'Erreur',
-        "Impossible de sauvegarder la liste des applications : " + e.message,
+        t('dialog.error'),
+        t('dialog.saveFailed', { error: e.message }),
       );
     }
   }
@@ -483,7 +670,7 @@ class AppMain extends BaseAppObject {
     }
 
     let win = this.createBrowserWindow('settings', {
-      title: 'Paramètres',
+      title: t('window.settings'),
       icon: this.appIcon,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
@@ -528,6 +715,7 @@ class AppMain extends BaseAppObject {
       clearTimeout(this.timeout);
 
       if (this.settingIsButton) this.mainWindow.setAlwaysOnTop(true);
+      else this.stopDetectMousePosition();
 
       this.toolbarWindow.show();
 
@@ -551,12 +739,17 @@ class AppMain extends BaseAppObject {
               },
             });
           }
+
+          // La toolbar peut avoir été recréée alors que des sites tournent déjà
+          for (const url of new Set([...Object.keys(this.views), ...this.mutedUrls]))
+            this.sendIndicators(url);
         }
         });
       }
     } else {
       this.appsWindow.hide();
       this.toolbarWindow.hide();
+      this.hideMediaPopup();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
@@ -594,7 +787,7 @@ class AppMain extends BaseAppObject {
       this.addDialogWindow.loadFile(
         path.join(__dirname, '/src/page.add/edit.html'),
       );
-      this.addDialogWindow.title = 'Modifier une application';
+      this.addDialogWindow.title = t('window.edit');
       this.addDialogWindow.webContents.on('dom-ready', () => {
         this.addDialogWindow.webContents.postMessage(
           pageEventList.modeEdit,
@@ -610,10 +803,13 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_add_data(_, data) {
-    this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
+    const clean = AppMain.SanitizeAppData(data);
+    if (!clean) return;
 
-    this.saves.push(data);
+    this.removeWindow('add_dialog');
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
+
+    this.saves.push(clean);
     this.save();
   }
 
@@ -644,26 +840,41 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_add_data_edit(_, data) {
-    this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, data);
+    const clean = AppMain.SanitizeAppData(data);
+    if (!clean) return;
 
-    this.saves.push(data);
+    this.removeWindow('add_dialog');
+    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
+
+    this.saves.push(clean);
     this.save();
-    data.index = this.saves.length - 1;
-    this.event_toolbar_add_button_click(data);
+    this.event_toolbar_add_button_click({
+      ...clean,
+      index: this.saves.length - 1,
+    });
   }
 
   event_request_updated_data(_, data) {
+    const clean = AppMain.SanitizeAppData(data);
+    const id = data?.id;
+    const target = Number.isInteger(id) ? this.saves[id] : null;
+
+    // Un séparateur est une chaîne : on ne modifie que de vraies applications
+    if (!clean || !target || typeof target !== 'object') return;
+
     this.removeWindow('add_dialog');
-    const { id, name, url, picture } = data;
 
-    data.oldLink = this.saves[id].url;
+    const oldLink = target.url;
 
-    this.saves[id].name = name;
-    this.saves[id].url = url;
-    this.saves[id].picture = picture;
+    target.name = clean.name;
+    target.url = clean.url;
+    target.picture = clean.picture;
 
-    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, data);
+    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, {
+      ...clean,
+      id,
+      oldLink,
+    });
 
     this.save();
   }
@@ -696,6 +907,225 @@ class AppMain extends BaseAppObject {
     if (!loaded) this.appsWindow.hide();
   }
 
+  /**
+   * Suit le titre (non-lus) et l'état audio d'une vue pour les afficher sur son bouton.
+   * @param {string} url
+   * @param {WebContentsView} view
+   */
+  bindIndicators(url, view) {
+    const { webContents } = view;
+
+    webContents.on('page-title-updated', (_, title) => {
+      this.updateIndicators(url, { badge: parseUnreadCount(title) });
+    });
+    webContents.on('audio-state-changed', (event) => {
+      this.updateIndicators(url, { audible: event.audible });
+    });
+  }
+
+  /**
+   * @param {string} url
+   * @param {{badge?: number, audible?: boolean}} changes
+   */
+  updateIndicators(url, changes) {
+    const entry = this.views[url];
+    if (!entry) return;
+
+    Object.assign(entry, changes);
+    this.sendIndicators(url);
+  }
+
+  sendIndicators(url) {
+    this.postIndicators(url);
+    this.pushMediaState(url);
+    this.updateTaskbar();
+  }
+
+  postIndicators(url) {
+    const entry = this.views[url];
+    const toolbar = this.getWindow('toolbar');
+
+    if (toolbar && !toolbar.isDestroyed())
+      toolbar.webContents.postMessage(pageEventList.appIndicators, {
+        url,
+        badge: entry?.badge ?? 0,
+        audible: entry?.audible ?? false,
+        muted: this.mutedUrls.has(url),
+        cover: entry?.media?.artwork ?? null,
+        progress: this.getMediaProgress(entry?.media),
+        hasMedia: !!entry?.media,
+        ignored: this.taskbarIgnored.has(url),
+      });
+  }
+
+  /**
+   * Reflète le premier morceau en cours dans l'infobulle de l'icône de la zone
+   * de notification (un seul morceau affiché : les autres lecteurs sont ignorés).
+   */
+  updateTaskbar() {
+    const playing = Object.keys(this.views).filter(
+      (key) => this.views[key].media,
+    );
+    const [first, ...others] = playing;
+
+    const previous = this.taskbarIgnored;
+    this.taskbarIgnored = new Set(others);
+    for (const key of new Set([...previous, ...this.taskbarIgnored]))
+      if (previous.has(key) !== this.taskbarIgnored.has(key))
+        this.postIndicators(key);
+
+    if (!this.tray || this.tray.isDestroyed()) return;
+
+    if (!first) {
+      this.tray.setToolTip(t('tray.tooltip'));
+      return;
+    }
+
+    const media = this.views[first].media;
+    const progress = this.getMediaProgress(media);
+    const lines = [
+      `${media.playing ? '▶' : '⏸'} ${[media.title, media.artist]
+        .filter(Boolean)
+        .join(' – ')}`,
+    ];
+    if (progress !== null) lines.push(`${Math.round(progress * 100)} %`);
+    if (others.length)
+      lines.push(t('tray.ignoredPlayers', { count: others.length }));
+
+    this.tray.setToolTip(lines.join('\n'));
+  }
+
+  // #region Media
+  /**
+   * @param {?{duration: ?number, position: ?number}} media
+   * @returns {?number} Avancée du morceau entre 0 et 1, `null` si inconnue
+   */
+  getMediaProgress(media) {
+    return media?.duration ? media.position / media.duration : null;
+  }
+
+  /**
+   * @param {string} url
+   * @returns {?Object} État affiché par la fenêtre de contrôle du morceau
+   */
+  getMediaPayload(url) {
+    const media = this.views[url]?.media;
+
+    return media ? { url, ...media, muted: this.mutedUrls.has(url) } : null;
+  }
+
+  /**
+   * Envoie un message à la fenêtre média, une fois sa page chargée.
+   */
+  sendToMediaWindow(channel, payload) {
+    const win = this.mediaWindow;
+
+    if (win.webContents.isLoading())
+      win.webContents.once('did-finish-load', () =>
+        win.webContents.postMessage(channel, payload),
+      );
+    else win.webContents.postMessage(channel, payload);
+  }
+
+  /**
+   * Met à jour la fenêtre média si elle est affichée pour cette application.
+   */
+  pushMediaState(url) {
+    if (this.mediaHoverUrl !== url) return;
+
+    const win = this.getWindow('media');
+    if (!win || !win.isVisible()) return;
+
+    const payload = this.getMediaPayload(url);
+
+    if (payload) this.sendToMediaWindow(pageEventList.mediaState, payload);
+    else this.hideMediaPopup();
+  }
+
+  /**
+   * @param {string} url
+   * @param {number} centerY Milieu vertical du bouton dans la toolbar
+   */
+  showMediaPopup(url, centerY) {
+    const payload = this.getMediaPayload(url);
+    if (!payload) return;
+
+    const toolbar = this.toolbarWindow.getBounds();
+    const wa = this.workArea;
+    const y = Math.min(
+      Math.max(toolbar.y + centerY - MEDIA_POPUP_HEIGHT / 2, wa.y),
+      wa.y + wa.height - MEDIA_POPUP_HEIGHT,
+    );
+
+    this.mediaHoverUrl = url;
+    this.mediaWindow.setPosition(
+      Math.round(toolbar.x + toolbar.width + 10),
+      Math.round(y),
+    );
+    this.sendToMediaWindow(pageEventList.mediaState, payload);
+    this.mediaWindow.showInactive();
+  }
+
+  hideMediaPopup() {
+    clearTimeout(this.mediaHideTimer);
+    this.mediaHoverUrl = null;
+
+    const win = this.getWindow('media');
+    if (win && win.isVisible()) win.hide();
+  }
+
+  /**
+   * Reçoit le morceau en cours d'un site (depuis son preload).
+   */
+  event_media_state(event, raw) {
+    if (event.senderFrame !== event.sender.mainFrame) return;
+
+    const url = Object.keys(this.views).find((key) => {
+      const { webContents } = this.views[key].view;
+      return !webContents.isDestroyed() && webContents.id === event.sender.id;
+    });
+
+    if (url) this.updateIndicators(url, { media: sanitizeMediaState(raw) });
+  }
+
+  event_media_hover(_, { url, hovering, y } = {}) {
+    clearTimeout(this.mediaHideTimer);
+
+    if (hovering) {
+      if (typeof url === 'string' && typeof y === 'number')
+        this.showMediaPopup(url, y);
+    } else
+      this.mediaHideTimer = setTimeout(
+        () => this.hideMediaPopup(),
+        MEDIA_POPUP_HIDE_DELAY,
+      );
+  }
+
+  event_media_control(_, { url, action } = {}) {
+    const entry = this.views[url];
+    if (!entry?.media || !MEDIA_ACTIONS.includes(action)) return;
+
+    entry.view.webContents.send('rtb-media-action', action);
+
+    // Retour immédiat : la page confirmera dans la seconde qui suit
+    if (action === 'play' || action === 'pause') {
+      entry.media.playing = action === 'play';
+      this.pushMediaState(url);
+    }
+  }
+
+  event_toggle_mute(_, { url } = {}) {
+    if (!AppMain.IsSafeUrl(url)) return;
+
+    const muted = !this.mutedUrls.has(url);
+    if (muted) this.mutedUrls.add(url);
+    else this.mutedUrls.delete(url);
+
+    this.views[url]?.view.webContents.setAudioMuted(muted);
+    this.sendIndicators(url);
+  }
+  // #endregion
+
   event_open_frame(_, url) {
     if (!AppMain.IsSafeUrl(url)) return;
 
@@ -703,17 +1133,25 @@ class AppMain extends BaseAppObject {
 
     if (!this.views[url]) {
       // Session par défaut (persistante) : on ne vide jamais son stockage
-      const view = new WebContentsView();
+      const view = new WebContentsView({
+        webPreferences: {
+          preload: path.join(__dirname, './src/scripts/media/media-preload.js'),
+        },
+      });
+      view.webContents.setAudioMuted(this.mutedUrls.has(url));
       const bounds = this.appsWindow.getBounds();
       view.setBounds({
         x: 0,
-        y: 20,
+        y: APPS_HEADER_HEIGHT,
         width: bounds.width,
-        height: Math.max(0, bounds.height - 20),
+        height: Math.max(0, bounds.height - APPS_HEADER_HEIGHT),
       });
 
-      this.views[url] = { view };
+      AppMain.HardenWebContents(view.webContents);
+
+      this.views[url] = { view, badge: 0, audible: false };
       this.appsWindow.contentView.addChildView(view);
+      this.bindIndicators(url, view);
 
       view.webContents.loadURL(url);
     } else {
@@ -732,8 +1170,15 @@ class AppMain extends BaseAppObject {
 
   event_app_delete(_, url) {
     if (this.views[url]) {
-      this.appsWindow.contentView.removeChildView(this.views[url].view);
+      /**@type {WebContentsView} */
+      const view = this.views[url].view;
+      view.setVisible(false);
+      this.appsWindow.contentView.removeChildView(view);
+      view.webContents.stop();
+      view.webContents.close();
+      view.webContents?.destroy?.();
       delete this.views[url];
+      this.sendIndicators(url);
     }
 
     this.toolbarWindow.webContents.postMessage(
@@ -798,8 +1243,10 @@ class AppMain extends BaseAppObject {
     if (!this.mainWindow.isAlwaysOnTop()) this.mainWindow.blur();
   }
 
-  event_request_movement(_, args) {
-    const { url, type } = args;
+  event_request_movement(_, rawArgs) {
+    const { url, type } = rawArgs ?? {};
+    if (typeof url !== 'string' || !['up', 'down'].includes(type)) return;
+    const args = { url, type };
 
     const index = this.saves.findIndex((x) => x.url === url);
     if (index < 0) return;
@@ -876,6 +1323,7 @@ class AppMain extends BaseAppObject {
       view.webContents.close();
       view.webContents?.destroy?.();
       delete this.views[url];
+      this.sendIndicators(url);
     }
 
     this.toolbarWindow.webContents.postMessage(
@@ -915,19 +1363,35 @@ class AppMain extends BaseAppObject {
   }
 
   event_settings_updated(_, settings) {
+    if (!settings || typeof settings !== 'object') return;
+
+    const isButtonModeEnabled = settings.isButtonModeEnabled === true;
     let buttonModeUpdated = false;
-    if (this.settingIsButton !== settings.isButtonModeEnabled) {
+    if (this.settingIsButton !== isButtonModeEnabled) {
       buttonModeUpdated = true;
     }
 
+    // Les setters valident les valeurs (thème en liste blanche, écran entier)
     this.settings.theme = settings.theme;
-    this.settings.isButtonModeEnabled = settings.isButtonModeEnabled;
+    this.settings.isButtonModeEnabled = isButtonModeEnabled;
+
+    const previousDisplayId = this.settings.displayId;
+    this.settings.displayId = settings.displayId;
+    const displayUpdated = this.settings.displayId !== previousDisplayId;
 
     this.settings.save();
 
+    if (displayUpdated) this.repositionWindows();
+
     const css = this.update_root_css();
-    this.mainWindow.webContents.insertCSS(css);
-    this.toolbarWindow.webContents.insertCSS(css);
+    for (const win of [this.mainWindow, this.toolbarWindow]) {
+      win.webContents.insertCSS(css);
+      win.webContents
+        .executeJavaScript(
+          `document.documentElement.dataset.appTheme = ${JSON.stringify(this.settings.theme)}`,
+        )
+        .catch(console.error);
+    }
 
     if (buttonModeUpdated) {
       this.removeWindow('toolbar');
@@ -937,7 +1401,7 @@ class AppMain extends BaseAppObject {
 
       if (this.settingIsButton) {
         this.mainWindow.show();
-        clearInterval(this.mouseInterval);
+        this.stopDetectMousePosition();
       } else {
         this.mainWindow.hide();
         this.startDetectMousePosition();
@@ -980,12 +1444,11 @@ class AppMain extends BaseAppObject {
           const showDialogInfos = () => {
             const dialogOpts = {
               type: 'info',
-              buttons: ['Redémarrer', 'Plus tard'],
-              title: 'Application Update',
+              buttons: [t('update.restart'), t('update.later')],
+              title: t('update.title'),
               message:
                 process.platform === 'win32' ? releaseNotes : releaseName,
-              detail:
-                "Une nouvelle version a été téléchargée. Vous pouvez redémarrer l'application pour appliquer les mises à jours.",
+              detail: t('update.downloadedDetail'),
             };
 
             dialog.showMessageBox(dialogOpts).then((returnValue) => {
@@ -1006,8 +1469,8 @@ class AppMain extends BaseAppObject {
 
           if (Notification.isSupported()) {
             let notification = new Notification({
-              title: 'Une nouvelle version a été téléchargée ! !',
-              body: "Une nouvelle version est disponible et a été téléchargé ! Cliquez ici pour plus d'informations !",
+              title: t('update.downloadedNotifTitle'),
+              body: t('update.downloadedNotifBody'),
               icon: path.join(__dirname, '/src/pictures/icon.png'),
               urgency: 'normal',
             });
@@ -1023,8 +1486,8 @@ class AppMain extends BaseAppObject {
       autoUpdater.on('update-available', () => {
         if (Notification.isSupported()) {
           new Notification({
-            title: 'Une nouvelle version est disponible !',
-            body: "Une nouvelle version est disponible et est entrain d'être téléchargée en arrière plan ! Vous serez prévenu quand le téléchargement sera fini.",
+            title: t('update.availableNotifTitle'),
+            body: t('update.availableNotifBody'),
             icon: path.join(__dirname, '/src/pictures/icon.png'),
             urgency: 'normal',
           }).show();
@@ -1048,6 +1511,218 @@ class AppMain extends BaseAppObject {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Valide et nettoie les données d'une application reçues d'une page (IPC).
+   * @param {unknown} data
+   * @returns {{name:string, url:string, picture:?string}|null} null si invalide
+   */
+  static SanitizeAppData(data) {
+    if (!data || typeof data !== 'object') return null;
+
+    const { name, url, picture } = data;
+    if (typeof url !== 'string' || !AppMain.IsSafeUrl(url)) return null;
+
+    let cleanPicture = null;
+    if (typeof picture === 'string' && picture !== '') {
+      const isDataImage =
+        /^data:image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon|bmp);/i.test(
+          picture,
+        ) && picture.length <= MAX_PICTURE_LENGTH;
+      const isFont = /^font:[\w-]{1,64}$/.test(picture);
+
+      if (isDataImage || isFont) cleanPicture = picture;
+    }
+
+    return {
+      name:
+        typeof name === 'string' && name.trim() !== ''
+          ? name.slice(0, 200)
+          : url,
+      url,
+      picture: cleanPicture,
+    };
+  }
+
+  /**
+   * Restreint ce qu'un site tiers peut faire : popups, navigation et permissions.
+   * @param {Electron.WebContents} contents
+   */
+  static HardenWebContents(contents) {
+    // Popups : uniquement http(s) (ex. connexion OAuth), jamais d'autre schéma
+    contents.setWindowOpenHandler(({ url }) => {
+      if (!AppMain.IsSafeUrl(url)) return { action: 'deny' };
+
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: { autoHideMenuBar: true },
+      };
+    });
+
+    // Les popups autorisées héritent des mêmes restrictions de navigation
+    contents.on('did-create-window', (child) => {
+      AppMain.HardenWebContents(child.webContents);
+    });
+
+    // Navigation : on bloque file:, javascript:, data:, etc.
+    const blockUnsafeNavigation = (event, url) => {
+      if (!AppMain.IsSafeUrl(url)) event.preventDefault();
+    };
+    contents.on('will-navigate', blockUnsafeNavigation);
+    contents.on('will-redirect', blockUnsafeNavigation);
+
+    // Pas de <webview> dans les sites tiers
+    contents.on('will-attach-webview', (event) => event.preventDefault());
+  }
+
+  /**
+   * Politique de permissions des sites tiers (session par défaut).
+   * Les permissions sensibles (caméra/micro, localisation) demandent
+   * une confirmation, mémorisée pour la durée de l'exécution.
+   * @param {Electron.Session} ses
+   */
+  static InstallPermissionHandlers(ses) {
+    const ALLOWED = new Set([
+      'notifications',
+      'fullscreen',
+      'pointerLock',
+      'clipboard-sanitized-write',
+      'mediaKeySystem', // DRM (Spotify, Netflix...)
+      'speaker-selection',
+    ]);
+    const ASK = new Set(['media', 'geolocation']);
+    const LABELS = {
+      media: 'permission.media',
+      geolocation: 'permission.geolocation',
+    };
+    /** @type {Map<string, boolean>} */
+    const decisions = new Map();
+
+    const originOf = (url) => {
+      try {
+        return new URL(url).origin;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    ses.setPermissionCheckHandler((_, permission, requestingOrigin) => {
+      if (ALLOWED.has(permission)) return true;
+      if (ASK.has(permission))
+        return decisions.get(`${requestingOrigin}|${permission}`) === true;
+      return false;
+    });
+
+    ses.setPermissionRequestHandler(
+      async (contents, permission, callback, details) => {
+        if (ALLOWED.has(permission)) return callback(true);
+        if (!ASK.has(permission)) return callback(false);
+
+        const origin = originOf(details?.requestingUrl ?? contents?.getURL());
+        if (!origin || !AppMain.IsSafeUrl(origin)) return callback(false);
+
+        const key = `${origin}|${permission}`;
+        if (!decisions.has(key)) {
+          const { response } = await dialog.showMessageBox({
+            type: 'question',
+            buttons: [t('permission.allow'), t('permission.deny')],
+            defaultId: 1,
+            cancelId: 1,
+            title: t('permission.title'),
+            message: t('permission.message', {
+              origin,
+              action: t(LABELS[permission]),
+            }),
+          });
+          decisions.set(key, response === 0);
+        }
+
+        callback(decisions.get(key));
+      },
+    );
+  }
+
+  /**
+   * Compare deux versions `x.y.z`.
+   * @param {string} a
+   * @param {string} b
+   * @returns {number} > 0 si `a` est plus récente que `b`
+   */
+  static CompareVersions(a, b) {
+    const parse = (v) =>
+      String(v)
+        .replace(/^v/i, '')
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0);
+    const left = parse(a);
+    const right = parse(b);
+
+    for (let i = 0; i < Math.max(left.length, right.length); ++i) {
+      const diff = (left[i] ?? 0) - (right[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Squirrel n'existe pas sous Linux : on vérifie la dernière version publiée
+   * sur GitHub et on propose d'ouvrir la page de téléchargement. L'installation
+   * d'un paquet deb ou rpm demande les droits administrateur, elle reste donc
+   * à la charge de l'utilisateur.
+   */
+  static StartManualUpdateCheck() {
+    const repo = require('./configs/appConfig.js').releasesRepo;
+    if (AppMain.IsDev || !app.isPackaged || process.platform !== 'linux' || !repo)
+      return;
+
+    let notifiedVersion = null;
+
+    const check = async () => {
+      try {
+        const response = await net.fetch(
+          `https://api.github.com/repos/${repo}/releases/latest`,
+          { headers: { Accept: 'application/vnd.github+json' } },
+        );
+        if (!response.ok) return;
+
+        const release = await response.json();
+        const version = String(release?.tag_name ?? '').replace(/^v/i, '');
+        const page = String(release?.html_url ?? '');
+
+        // N'ouvrir que la page des versions du dépôt, jamais une URL quelconque
+        if (
+          !/^\d+(\.\d+){0,2}$/.test(version) ||
+          !page.startsWith(`https://github.com/${repo}/`) ||
+          AppMain.CompareVersions(version, app.getVersion()) <= 0 ||
+          notifiedVersion === version
+        )
+          return;
+
+        notifiedVersion = version;
+
+        const { response: choice } = await dialog.showMessageBox({
+          type: 'info',
+          buttons: [t('update.manualDownload'), t('update.later')],
+          defaultId: 0,
+          cancelId: 1,
+          title: t('update.title'),
+          message: t('update.manualMessage', {
+            version,
+            current: app.getVersion(),
+          }),
+          detail: t('update.manualDetail'),
+        });
+
+        if (choice === 0) shell.openExternal(page);
+      } catch (error) {
+        console.error('Manual update check failed', error);
+      }
+    };
+
+    check();
+    setInterval(check, MANUAL_UPDATE_INTERVAL).unref();
   }
 
   static get hasAutoUpdater() {
@@ -1074,7 +1749,10 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
 app.on('before-quit', () => flushSession(session.defaultSession));
-app.on('will-quit', () => flushSession(session.defaultSession));
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  flushSession(session.defaultSession);
+});
 
 app.on('ready', async () => {
   if (!hasSingleInstanceLock) return;
@@ -1083,7 +1761,13 @@ app.on('ready', async () => {
     migrateLegacyData(app, FileData.BasePath);
     restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession);
-    AppMain.InitAutoUpdater().Run();
+    AppMain.InstallPermissionHandlers(session.defaultSession);
+    const instance = AppMain.InitAutoUpdater().Run();
+    AppMain.StartManualUpdateCheck();
+
+    // Raccourci clavier global : afficher ou cacher la barre
+    if (!globalShortcut.register(TOGGLE_SHORTCUT, () => instance.toggleFromOutside()))
+      console.warn(`Raccourci ${TOGGLE_SHORTCUT} indisponible (déjà utilisé ?)`);
   } catch (error) {
     console.error(error);
     const dialogOpts = {

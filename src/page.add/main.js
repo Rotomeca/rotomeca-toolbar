@@ -1,4 +1,4 @@
-import { HTMLPrimaryButton } from '../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
+import '../scripts/ds.js';
 import { EMPTY_STRING } from '../../lib/RotomecaWebComponents/libs/constants.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
@@ -31,7 +31,7 @@ export class Main {
 
   /**
    * Input de l'url
-   * @type {HTMLInputElement}
+   * @type {HTMLElement}
    * @readonly
    */
   get urlInput() {
@@ -40,7 +40,7 @@ export class Main {
 
   /**
    * Input du nom de l'application
-   * @type {HTMLInputElement}
+   * @type {HTMLElement}
    * @readonly
    */
   get nameInput() {
@@ -49,7 +49,7 @@ export class Main {
 
   /**
    * Input de l'image
-   * @type {HTMLInputElement}
+   * @type {HTMLElement}
    * @readonly
    */
   get pictureInput() {
@@ -58,7 +58,7 @@ export class Main {
 
   /**
    * Bouton qui de sauvegarde
-   * @type {HTMLPrimaryButton}
+   * @type {HTMLElement}
    * @readonly
    */
   get saveButton() {
@@ -77,7 +77,7 @@ export class Main {
 
   /**
    * Button qui permet de vider l'image
-   * @type {HTMLPrimaryButton}
+   * @type {HTMLElement}
    * @readonly
    */
   get clearButton() {
@@ -145,33 +145,20 @@ export class Main {
       this._on_clear_picture_click.bind(this),
     );
 
-    if (!(this.urlInput.value || false)) this.saveButton.disable();
-
-    if (this.#_picture) this.clearButton.enable();
-    else this.clearButton.disable();
+    if (!(this.urlInput.value || false)) this.saveButton.disabled = true;
 
     window.api.on(pageEventList.modeEdit, (_, data) => {
       document.querySelector('title').textContent = 'Modifier une application';
 
-      this.saveButton.enable();
+      this.saveButton.disabled = false;
       this.urlInput.value = data.url;
       this.nameInput.value = data.title || data.name;
       this.nameInput.setAttribute('placeholder', this.name);
 
-      try {
-        this.pictureInput.value = data.picture;
-      } catch (error) {}
-
       this.#_picture = data.picture || null;
 
-      this.saveButton.replaceWith(
-        HTMLPrimaryButton.CreateNode({
-          form: 'secondary',
-          content: 'Modifier',
-        }).attr('id', {
-          value: 'save',
-        }),
-      );
+      this.saveButton.textContent = 'Modifier';
+      this.enableOrDisablePicture();
 
       this.saveButton.onclick = () => {
         window.api.invoke(appEventList.requestUpdatedData, {
@@ -181,8 +168,6 @@ export class Main {
           id: data.index,
         });
       };
-
-      this.enableOrDisablePicture();
     });
   }
 
@@ -191,8 +176,7 @@ export class Main {
    * @returns {Main} Chaînage
    */
   enableOrDisablePicture() {
-    if (this.#_picture) this.clearButton.enable();
-    else this.clearButton.disable();
+    this.clearButton.disabled = !this.#_picture;
 
     return this;
   }
@@ -218,8 +202,8 @@ export class Main {
       this.nameInput.value = this.name;
     }
 
-    if (this.url !== EMPTY_STRING) this.saveButton.enable();
-    else this.saveButton.disable();
+    if (this.url !== EMPTY_STRING) this.saveButton.disabled = false;
+    else this.saveButton.disabled = true;
   }
 
   /**
@@ -233,7 +217,15 @@ export class Main {
 
       this.enableOrDisablePicture();
     };
-    reader.readAsDataURL(this.pictureInput.files[0]);
+
+    const file = this.pictureInput.files[0];
+
+    // Fichier retiré de la liste : on oublie l'image
+    if (file) reader.readAsDataURL(file);
+    else {
+      this.#_picture = null;
+      this.enableOrDisablePicture();
+    }
   }
 
   /**
@@ -253,9 +245,9 @@ export class Main {
    * @package
    */
   _on_clear_picture_click() {
-    this.clearButton.disable();
-    this.pictureInput.value = EMPTY_STRING;
+    this.pictureInput.clear();
     this.#_picture = null;
+    this.enableOrDisablePicture();
   }
 
   /**

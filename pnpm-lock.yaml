@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@rotomeca/design-system':
+        specifier: ^1.1.0
+        version: 1.1.0
       electron-squirrel-startup:
         specifier: ^1.0.1
         version: 1.0.1
@@ -289,6 +292,19 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@rotomeca/design-system@1.1.0':
+    resolution: {integrity: sha512-fQeC8WGPw4Y6uPx2WZEMjezI5RasUVWFg0WZ7iWmJP8T+gMnSRgp59kPq5fCYS+hPWhD3sK0sbo7IWrRsYcIrQ==}
+    engines: {node: '>=20'}
+
+  '@rotomeca/event@5.0.0':
+    resolution: {integrity: sha512-E0K3bpHcs0pjWdEjG0kopATBBzwconEhxikUReC5kal7XsRx6uWe3L9OH9Hw8fKp1F4Vc66TuGDVBrmYtjSKzg==}
+
+  '@rotomeca/rop@6.0.0':
+    resolution: {integrity: sha512-Dnk4t0wOl3qLb+1kunLrN+c05e57XBG43mR4bCybkx/ya1NeWtuLuSPbBUM45jWgd8Dr2tIIgZ+5D6jv03n2tg==}
+
+  '@rotomeca/utils@7.0.3':
+    resolution: {integrity: sha512-UboB44v852Syb0stIruRUrJZtFrSaO9/dC2UMKMwBIqlORKCNrgIIJ78pLQDhme1Iq61WIQ2Wb1744tL5KPPVw==}
 
   '@sinclair/typebox@0.34.52':
     resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
@@ -1795,6 +1811,20 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.3
+
+  '@rotomeca/design-system@1.1.0':
+    dependencies:
+      '@rotomeca/event': 5.0.0
+      '@rotomeca/rop': 6.0.0
+      '@rotomeca/utils': 7.0.3
+
+  '@rotomeca/event@5.0.0':
+    dependencies:
+      '@rotomeca/utils': 7.0.3
+
+  '@rotomeca/rop@6.0.0': {}
+
+  '@rotomeca/utils@7.0.3': {}
 
   '@sinclair/typebox@0.34.52': {}
 

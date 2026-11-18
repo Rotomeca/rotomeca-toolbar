@@ -1,14 +1,15 @@
+import '../scripts/ds.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 import { pageEventList } from '../scripts/events/PageEventListModule.js';
 
 /**
  * Bouton qui permet d'afficher la toolbar ou de la cacher
- * @type {HTMLButtonElement}
+ * @type {HTMLElement}
  * @private
  */
 let button = document.querySelector('#main');
 //Lorsque l'état du bouton à changer, appeler côté back, le toggle de la toolbar
-button.addEventListener('event:custom:state.changed', () => {
+button.addEventListener('rds-icon-button:toggle', () => {
   window.api.invoke(appEventList.toggleToolbar);
 });
 //Lorsque l'on fait un clic droit, le bouton arrête d'être en premier temps pendant x temps
@@ -21,9 +22,10 @@ button.onauxclick = (e) => {
     window.api.invoke(appEventList.toggleStopTop);
   }
 };
-button.setAttribute('title', 'Click molette pour passer en arrière');
+button.setAttribute('title', window.api.t('toolbar.sendBack'));
 
 //Simuler le click du bouton pour fermer la toolbar
 window.api.on(pageEventList.toolbarClosed, () => {
-  button.click();
+  button.selected = !button.selected;
+  window.api.invoke(appEventList.toggleToolbar);
 });

@@ -1,4 +1,4 @@
-import { HTMLPrimaryButton } from '../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js';
+import '../scripts/ds.js';
 import { appEventList } from '../scripts/events/AppEventListModule.js';
 
 export { Main };
@@ -23,7 +23,10 @@ class Main {
 
     //Génère les boutons
     for (const element of window?.electron?.menu ?? []) {
-      const node = HTMLPrimaryButton.CreateNode({ content: element.text });
+      const node = document.createElement('rds-button');
+      node.setAttribute('variant', 'primary');
+      node.setAttribute('size', 'sm');
+      node.textContent = element.text;
       node.setAttribute('title', element.title);
       node.addEventListener(
         'click',
@@ -67,7 +70,7 @@ class Main {
         }.bind(this, JSON.stringify(element.data), element.action),
       );
 
-      if (element.disabled) node.disable();
+      if (element.disabled) node.disabled = true;
 
       document.querySelector('#layout').appendChild(node);
     }

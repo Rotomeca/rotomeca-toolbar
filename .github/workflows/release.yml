@@ -3,6 +3,7 @@ name: Release
 # Déclenché par un tag de version (ex: 2.1.0) poussé, typiquement sur main
 # après `git flow release finish`. Le serveur Hazel (Vercel) lit ensuite
 # la dernière release GitHub pour proposer la mise à jour via Squirrel.
+# La release contient Windows (Squirrel) et Linux (deb + rpm).
 on:
   push:
     tags:
@@ -17,11 +18,14 @@ permissions:
   contents: write
 
 jobs:
-  release-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,17 +49,89 @@ jobs:
             exit 1
           fi
 
-      - name: Build (Squirrel)
+      - name: Installer les outils de packaging Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg
+
+      # Signature Authenticode : définir les secrets WINDOWS_CERTIFICATE_BASE64
+      # (certificat .pfx encodé en base64) et WINDOWS_CERTIFICATE_PASSWORD.
+      # Sans eux, l'installeur Windows est produit non signé.
+      - name: Préparer le certificat de signature Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$CERT_BASE64" ]; then
+            echo "::warning::Pas de certificat de signature : installeur Windows non signé"
+            exit 0
+          fi
+          echo "$CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/codesign.pfx"
+          echo "WINDOWS_CERTIFICATE_FILE=$RUNNER_TEMP/codesign.pfx" >> "$GITHUB_ENV"
+          echo "WINDOWS_CERTIFICATE_PASSWORD=$CERT_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build
         run: pnpm run make
 
-      - name: Créer la release et envoyer les fichiers Squirrel
+      - name: Supprimer le certificat de signature
+        if: always() && runner.os == 'Windows'
         shell: bash
+        run: rm -f "$RUNNER_TEMP/codesign.pfx"
+
+      - name: Envoyer les fichiers Windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: make-windows
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/squirrel.windows/x64/*.nupkg
+            out/make/squirrel.windows/x64/RELEASES
+          if-no-files-found: error
+
+      - name: Envoyer les fichiers Linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: make-linux
+          path: |
+            out/make/deb/x64/*.deb
+            out/make/rpm/x64/*.rpm
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0 # git-cliff a besoin de l'historique et des tags
+
+      - name: Générer les notes de release (git-cliff)
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Créer la release et envoyer les fichiers
         run: |
-          DIR="out/make/squirrel.windows/x64"
-          ls "$DIR"
+          ls dist
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES --clobber
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
-            gh release create "$TAG" "$DIR"/*.exe "$DIR"/*.nupkg "$DIR"/RELEASES \
-              --title "$TAG" --generate-notes --verify-tag
+            gh release create "$TAG" dist/* \
+              --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
           fi

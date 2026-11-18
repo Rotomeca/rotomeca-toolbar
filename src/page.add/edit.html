@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -10,7 +10,7 @@
       name="viewport"
       content="width=device-width, height=device-height, initial-scale=1.0"
     />
-    <title>Ajouter une application</title>
+    <title data-i18n="window.add">Ajouter une application</title>
     <style>
       html,
       body {
@@ -27,44 +27,33 @@
         padding: 10px 25px;
       }
 
-      input {
+      rds-input-text,
+      rds-input-file {
         display: block;
-        padding: 5px;
-        border-radius: 15px;
-        border: none;
+        margin-bottom: 20px;
       }
     </style>
     <link rel="stylesheet" href="./add.css" />
-    <!-- <script type="module" src="./before.js"></script> -->
-    <script
-      type="module"
-      src="../../lib/RotomecaWebComponents/component/HTMLTabElement.js"
-    ></script>
-    <script
-      type="module"
-      src="../../lib/RotomecaWebComponents/component/HTMLPrimaryButton.js"
-    ></script>
+    <link
+      rel="stylesheet"
+      href="../../node_modules/@rotomeca/design-system/out/rotomeca-design-system.css"
+    />
+    <link rel="stylesheet" href="../css/ds-bridge.css" />
+    <script type="module" src="../scripts/ds.js"></script>
   </head>
   <body>
     <div id="layout">
-      <label for="urlbox">Url</label>
-      <input id="urlbox" type="text" />
-      <br />
-      <label for="namebox">Nom du site</label>
-      <input id="namebox" type="text" />
-      <br />
-      <label for="picturebox">Icône</label>
-      <div style="display: flex">
-        <input id="picturebox" type="file" />
-        <rotomeca-primary-button data-form="secondary" id="clear"
-          >🗑</rotomeca-primary-button
-        >
-      </div>
-      <br />
-      <div style="text-align: center">
-        <rotomeca-primary-button data-form="secondary" id="save"
-          >Sauvegarder</rotomeca-primary-button
-        >
+      <rds-input-text id="urlbox" placeholder="https://" data-i18n="add.url">Url</rds-input-text>
+      <rds-input-text id="namebox" data-i18n="add.name">Nom du site</rds-input-text>
+      <rds-input-file id="picturebox" accept="image/*">
+        <span data-i18n="add.icon">Icône</span>
+        <span slot="hint" data-i18n="add.iconHint">Optionnelle : le favicon du site est utilisé par défaut</span>
+      </rds-input-file>
+      <rds-button id="clear" variant="tertiary" icon-before="trash-2" disabled>
+        <span data-i18n="add.clearIcon">Retirer l'icône</span>
+      </rds-button>
+      <div style="text-align: center; margin-top: 20px">
+        <rds-primary-button id="save" data-i18n="add.save">Sauvegarder</rds-primary-button>
       </div>
     </div>
   </body>

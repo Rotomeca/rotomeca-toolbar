@@ -1,3 +1,35 @@
+/**
+ * Thèmes autorisés (liste blanche : la valeur sert à construire un chemin de fichier).
+ */
+const THEMES = Object.freeze([
+  'system',
+  'dark',
+  'red',
+  'blue',
+  'green',
+  'white',
+  'black',
+]);
+const DEFAULT_THEME = 'system';
+
+/**
+ * @param {unknown} value
+ * @returns {string} Un thème valide, ou le thème par défaut
+ */
+function sanitizeTheme(value) {
+  return typeof value === 'string' && THEMES.includes(value)
+    ? value
+    : DEFAULT_THEME;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number|null} Un identifiant d'écran valide, ou null
+ */
+function sanitizeDisplayId(value) {
+  return Number.isSafeInteger(value) ? value : null;
+}
+
 class Settings {
   #_settings;
   #_filedata;
@@ -25,12 +57,25 @@ class Settings {
   }
 
   get theme() {
-    return this.#_config.theme ?? 'system';
+    return sanitizeTheme(this.#_config.theme);
   }
 
   set theme(value) {
     this.#_settings ??= this.#_config;
-    this.#_settings.theme = value;
+    this.#_settings.theme = sanitizeTheme(value);
+  }
+
+  /**
+   * Identifiant de l'écran choisi (`null` = écran principal).
+   * @type {number|null}
+   */
+  get displayId() {
+    return sanitizeDisplayId(this.#_config.displayId);
+  }
+
+  set displayId(value) {
+    this.#_settings ??= this.#_config;
+    this.#_settings.displayId = sanitizeDisplayId(value);
   }
 
   /**
@@ -44,6 +89,7 @@ class Settings {
     this.fileData.save({
       isButtonModeEnabled: this.isButtonModeEnabled,
       theme: this.theme,
+      displayId: this.displayId,
     });
   }
 
@@ -75,4 +121,4 @@ Object.defineProperty(Params, 'Instance', {
   },
 });
 
-module.exports = { Params };
+module.exports = { Params, THEMES, sanitizeTheme, sanitizeDisplayId };

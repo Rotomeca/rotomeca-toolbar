@@ -1,6 +1,6 @@
 {
 	"name": "rotomecatoolbar",
-	"version": "2.1.0",
+	"version": "3.0.0",
 	"description": "Application toolbar pour avoir des sites en arrière plan",
 	"main": "main.js",
 	"packageManager": "pnpm@10.33.0",
@@ -16,7 +16,7 @@
 		"url": "git+https://github.com/Rotomeca/rotomeca-toolbar.git"
 	},
 	"author": "Rotomeca",
-	"license": "ISC",
+	"license": "EUPL-1.2",
 	"devDependencies": {
 		"@electron-forge/cli": "^8.0.1",
 		"@electron-forge/maker-deb": "^8.0.1",
@@ -33,6 +33,7 @@
 		"prettier-eslint": "^17.1.3"
 	},
 	"dependencies": {
+		"@rotomeca/design-system": "^1.1.0",
 		"electron-squirrel-startup": "^1.0.1"
 	},
 	"pnpm": {

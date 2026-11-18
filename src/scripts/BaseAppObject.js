@@ -7,6 +7,7 @@ const {
   nativeTheme,
 } = require('electron');
 const path = require('path');
+const { t } = require('./i18n');
 
 class BaseAppObject {
   /**
@@ -33,8 +34,53 @@ class BaseAppObject {
     return this.#_params.Instance;
   }
 
+  /**
+   * Écran choisi dans les paramètres, ou l'écran principal s'il n'existe plus.
+   * L'identifiant enregistré n'est jamais modifié : l'écran est repris dès son retour.
+   * @type {Electron.Display}
+   * @readonly
+   */
   get primaryScreen() {
-    return screen.getPrimaryDisplay();
+    const id = this.settings.displayId;
+    return (
+      (id !== null && screen.getAllDisplays().find((d) => d.id === id)) ||
+      screen.getPrimaryDisplay()
+    );
+  }
+
+  /**
+   * Écrans disponibles, pour la page des paramètres.
+   * Ils sont numérotés de gauche à droite (puis de haut en bas) et nommés par
+   * leur libellé système ; la résolution et l'échelle ne servent qu'à les
+   * distinguer quand plusieurs écrans portent le même nom.
+   * @returns {{id:number, label:string, isPrimary:boolean}[]}
+   */
+  getDisplaysInfo() {
+    const primaryId = screen.getPrimaryDisplay().id;
+    const displays = [...screen.getAllDisplays()].sort(
+      (a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y,
+    );
+
+    const names = displays.map(
+      (d, i) => d.label?.trim() || t('display.fallbackName', { n: i + 1 }),
+    );
+
+    return displays.map((d, i) => {
+      const isDuplicate = names.filter((name) => name === names[i]).length > 1;
+      const details = isDuplicate
+        ? ` (${d.size.width}x${d.size.height}${
+            d.scaleFactor !== 1 ? ` @${Math.round(d.scaleFactor * 100)}%` : ''
+          })`
+        : '';
+
+      return {
+        id: d.id,
+        label:
+          `${i + 1}. ${names[i]}${details}` +
+          (d.id === primaryId ? ` - ${t('display.primary')}` : ''),
+        isPrimary: d.id === primaryId,
+      };
+    });
   }
 
   /**
@@ -68,40 +114,13 @@ class BaseAppObject {
    */
   get rootCSS() {
     if (!this.#_css_root) {
-      if (this.settings.theme === 'system') {
-        const base_color = `#${(
-          systemPreferences?.getAccentColor?.() || 'ffffffff'
-        ).substring(0, 6)}cc`;
-        const primary_color = BaseAppObject.ColorLuminance(base_color, 1.3);
-        const hover_color = BaseAppObject.ColorLuminance(base_color, 2);
-        const active_color = BaseAppObject.ColorLuminance(base_color, 2, 100);
-
-        const base_text_color = this.kGetColor(base_color);
-        const primary_text_color = this.kGetColor(primary_color);
-        const hover_text_color = this.kGetColor(hover_color);
-        const active_text_color = this.kGetColor(active_color);
-
-        this.#_css_root = `
-        :root {
-          --color-scheme: ${base_color};
-          --color-scheme-primary: ${primary_color};
-          --color-scheme-primary-hover: ${hover_color};
-          --color-scheme-primary-active: ${active_color};
-
-          --color-scheme-text: ${base_text_color};
-          --color-scheme-text-primary: ${primary_text_color};
-          --color-scheme-text-hover: ${hover_text_color};
-          --color-scheme-text-active: ${active_text_color};
-        }`;
-      } else {
-        const fs = require('fs');
-        this.#_css_root =
-          fs
-            .readFileSync(
-              path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
-            )
-            ?.toString?.() ?? '';
-      }
+      const fs = require('fs');
+      this.#_css_root =
+        fs
+          .readFileSync(
+            path.join(__dirname, `../css/themes/${this.settings.theme}.css`),
+          )
+          ?.toString?.() ?? '';
     }
 
     return this.#_css_root;
@@ -216,7 +235,9 @@ class BaseAppObject {
         .executeJavaScript(
           `document.querySelector('html').classList.add('dark-mode-${
             nativeTheme.shouldUseDarkColors ? 'enabled' : 'disabled'
-          }')`,
+          }'); document.documentElement.dataset.appTheme = ${JSON.stringify(
+            this.settings.theme,
+          )}`,
         )
         .catch(console.error);
     });

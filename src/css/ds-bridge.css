@@ -1,0 +1,50 @@
+/*
+ * Relie les thèmes de l'application (--color-scheme-*) aux jetons du design system (--ds-*),
+ * pour que les composants `rds-*` suivent le thème choisi dans les réglages.
+ * Actif seulement pour les thèmes de couleur : en « système », le design system garde ses couleurs.
+ */
+:root[data-app-theme]:not([data-app-theme='system']) {
+  --ds-background-action-primary: var(--color-scheme-primary, #323f4b);
+  --ds-background-action-primary-hover: var(--color-scheme-primary-hover, #96845f);
+  --ds-background-action-primary-active: var(--color-scheme-primary-active, #3e4c59);
+  --ds-text-action-primary: var(--color-scheme-text-primary, #c7dfff);
+
+  --ds-background-action-secondary: var(--color-scheme, #1f2933);
+  --ds-background-action-secondary-hover: var(--color-scheme-primary-hover, #96845f);
+  --ds-background-action-secondary-active: var(--color-scheme-primary-active, #3e4c59);
+  --ds-text-action-secondary-button: var(--color-scheme-text, #c7dfff);
+
+  --ds-text-action-tertiary: var(--color-scheme-text, #c7dfff);
+  --ds-background-action-tertiary-hover: var(--color-scheme-primary-hover, #96845f);
+  --ds-background-action-tertiary-active: var(--color-scheme-primary-active, #3e4c59);
+
+  --ds-input-background: var(--color-scheme-primary, #323f4b);
+  --ds-input-text: var(--color-scheme-text-primary, #c7dfff);
+  --ds-input-hint: var(--color-scheme-text, #c7dfff);
+  --ds-input-border: var(--color-scheme-primary-hover, #96845f);
+  --ds-text-link: var(--color-scheme-text-active, #e1c58f);
+  --ds-text-link-hover: var(--color-scheme-text, #c7dfff);
+
+  --ds-background-surface-variant: var(--color-scheme-primary, #323f4b);
+  --ds-background-surface-strong: var(--color-scheme-primary-hover, #96845f);
+  --ds-background-overlay: var(--color-scheme, #1f2933);
+  --ds-background-option-hover: var(--color-scheme-primary-hover, #96845f);
+  --ds-background-option-selected: var(--color-scheme-primary-active, #3e4c59);
+  --ds-border-subtle: var(--color-scheme-primary-hover, #96845f);
+  --ds-border-strong: var(--color-scheme-text-active, #e1c58f);
+  --ds-text-action-secondary: var(--color-scheme-text-active, #e1c58f);
+  --ds-input-ring-1: var(--color-scheme-text-active, #e1c58f);
+  --ds-input-ring-2: var(--color-scheme-text-active, #e1c58f);
+  --ds-input-ring-3: var(--color-scheme-text-active, #e1c58f);
+  --ds-input-ring-4: var(--color-scheme-text-active, #e1c58f);
+
+  --ds-body-background-color: var(--color-scheme, #1f2933);
+  --ds-body-text-color: var(--color-scheme-text, #c7dfff);
+  --ds-background-surface: var(--color-scheme, #1f2933);
+  --ds-text-default: var(--color-scheme-text, #c7dfff);
+  --ds-text-muted: color-mix(in srgb, var(--color-scheme-text, #c7dfff) 75%, transparent);
+}
+
+body {
+  font-family: var(--ds-font-sans);
+}

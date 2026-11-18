@@ -33,12 +33,14 @@ body {
 rotomeca-toolbar-button {
   margin: 5px 0;
 }
-rotomeca-separator {
-  margin-bottom: 15px;
-  margin-top: 15px;
-  height: 0;
-  padding-top: 0.5px;
-  padding-bottom: 0.5px;
+rds-divider {
+  width: calc(100% - 30px);
+  margin: 15px 0;
+}
+
+#add-button {
+  display: block;
+  margin: 15px;
 }
 .blur {
   backdrop-filter: blur(5px);
