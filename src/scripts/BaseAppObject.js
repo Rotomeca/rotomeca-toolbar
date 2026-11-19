@@ -209,6 +209,7 @@ class BaseAppObject {
       webPreferences: {
         nodeIntegration,
         contextIsolation,
+        sandbox: true, // explicite : ne pas dépendre du défaut d'Electron
         enableRemoteModule,
         preload,
       },

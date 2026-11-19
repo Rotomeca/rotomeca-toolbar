@@ -1569,8 +1569,13 @@ class AppMain extends BaseAppObject {
 
     if (!this.views[url]) {
       // Session par défaut (persistante) : on ne vide jamais son stockage
+      // Site tiers : bac à sable et isolation explicites (défauts d'Electron,
+      // mais ici la frontière de sécurité de l'application).
       const view = new WebContentsView({
         webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
           preload: path.join(__dirname, './src/scripts/media/media-preload.js'),
         },
       });
