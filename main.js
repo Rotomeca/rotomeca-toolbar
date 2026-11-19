@@ -4,6 +4,13 @@ if (require('electron-squirrel-startup')) {
   return;
 }
 
+// Mode « fumée » : vérifie que le paquet est sain puis quitte, sans démarrer l'application
+// (ni barre ancrée, ni raccourci global, ni verrou d'instance, ni données de l'utilisateur)
+if (process.argv.includes('--smoke')) {
+  require('./src/scripts/smokeRun.js').run();
+  return;
+}
+
 const {
   app,
   nativeTheme,
