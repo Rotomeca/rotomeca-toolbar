@@ -25,19 +25,19 @@ export interface AppView {
 }
 
 /** La fenêtre qui porte les vues des sites. */
-export interface ViewSurface {
+export interface ViewSurface<V extends AppView = AppView> {
   getBounds(): Rect;
   show(): void;
   hide(): void;
-  addChildView(view: AppView): void;
-  removeChildView(view: AppView): void;
+  addChildView(view: V): void;
+  removeChildView(view: V): void;
   /** Indique à l'en-tête de la fenêtre quel site vient d'être ouvert. */
   announceOpened(url: string): void;
 }
 
 /** Ce qu'une application ouverte expose : sa vue et ce que son site indique (non-lus, son, morceau). */
-export interface ViewEntry {
-  readonly view: AppView;
+export interface ViewEntry<V extends AppView = AppView> {
+  readonly view: V;
   visible: boolean;
   badge: number;
   audible: boolean;
@@ -50,10 +50,10 @@ export interface IndicatorChanges {
   readonly media?: MediaState | null;
 }
 
-export interface AppViewHostDeps {
-  readonly surface: ViewSurface;
+export interface AppViewHostDeps<V extends AppView = AppView> {
+  readonly surface: ViewSurface<V>;
   /** Crée une vue durcie (preload, sandbox, restrictions de navigation) pour un site. */
-  readonly createView: () => AppView;
+  readonly createView: () => V;
   readonly isSafeUrl: (url: unknown) => url is string;
   /** Hauteur de l'en-tête de la fenêtre, au-dessus des vues. */
   readonly headerHeight: number;
@@ -69,19 +69,19 @@ const isMediaAction = (action: unknown): action is MediaAction => (MEDIA_ACTIONS
  * Les sites ouverts en arrière-plan : leurs vues, leur état (non-lus, son, morceau) et le
  * réglage « son coupé », qui survit à la fermeture de la vue tant que l'application tourne.
  */
-export class AppViewHost {
-  private readonly entries = new Map<string, ViewEntry>();
+export class AppViewHost<V extends AppView = AppView> {
+  private readonly entries = new Map<string, ViewEntry<V>>();
   private readonly muted = new Set<string>();
   private lastOpenedUrl: string | null = null;
 
-  constructor(private readonly deps: AppViewHostDeps) {}
+  constructor(private readonly deps: AppViewHostDeps<V>) {}
 
   /** Dernière application ouverte : l'en-tête de la fenêtre la demande quand sa page est prête. */
   get lastOpened(): string | null {
     return this.lastOpenedUrl;
   }
 
-  entry(url: string): ViewEntry | undefined {
+  entry(url: string): ViewEntry<V> | undefined {
     return this.entries.get(url);
   }
 
@@ -194,14 +194,14 @@ export class AppViewHost {
     return true;
   }
 
-  private create(url: string): ViewEntry {
+  private create(url: string): ViewEntry<V> {
     const view = this.deps.createView();
     view.webContents.setAudioMuted(this.muted.has(url));
 
     const bounds = this.deps.surface.getBounds();
     view.setBounds({ x: 0, y: this.deps.headerHeight, width: bounds.width, height: Math.max(0, bounds.height - this.deps.headerHeight) });
 
-    const entry: ViewEntry = { view, visible: false, badge: 0, audible: false, media: undefined };
+    const entry: ViewEntry<V> = { view, visible: false, badge: 0, audible: false, media: undefined };
     this.entries.set(url, entry);
     this.deps.surface.addChildView(view);
     this.followIndicators(url, view);
@@ -211,7 +211,7 @@ export class AppViewHost {
   }
 
   /** Suit le titre (non-lus) et l'état audio de la vue pour les afficher sur son bouton. */
-  private followIndicators(url: string, view: AppView): void {
+  private followIndicators(url: string, view: V): void {
     view.webContents.on('page-title-updated', (_, title) => this.update(url, { badge: parseUnreadCount(title) }));
     view.webContents.on('audio-state-changed', (event) => this.update(url, { audible: event.audible }));
   }

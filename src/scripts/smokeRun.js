@@ -37,6 +37,8 @@ const NOT_MAIN_MODULES = new Set([
   // Lu comme du texte puis injecté dans la page du menu contextuel : du code de page
   'WebContentElecrtonContextMenu.js',
   'smokeRun.js',
+  // Démarre l'application complète : appelé à part par le mode « fumée »
+  'smokeApp.js',
 ]);
 const MAIN_MODULES_OUTSIDE_SCRIPTS = [
   ['configs', 'appConfig.js'],
@@ -58,6 +60,8 @@ const MEDIA_PAGE = `data:text/html,${encodeURIComponent(
  * @property {boolean} ok
  * @property {string} detail
  */
+
+const { checkApplication } = require('./smokeApp.js');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -275,6 +279,7 @@ async function runChecks() {
   const results = [checkMainModules(), checkTranslations(), checkKoffi()];
   for (const page of listPages()) results.push(await checkPage(page));
   results.push(await checkMediaPreload());
+  results.push(await checkApplication({ withTimeout }));
   return results;
 }
 

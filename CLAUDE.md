@@ -33,7 +33,7 @@ Règles générales importées depuis `.claude/claude-config/` (copie locale de 
 | `pnpm typecheck` | Vérification des types, sans rien produire (processus principal et pages) |
 | `pnpm lint` | ESLint sur tout le dépôt (`.js` et `.ts`) |
 | `pnpm test` | Construit puis lance les tests `node:test` (`tests/*.test.js`, qui lisent `dist/`) |
-| `pnpm smoke` | Construit puis démarre l'app en mode « fumée » (pages, preloads, koffi) |
+| `pnpm smoke` | Construit puis démarre l'app en mode « fumée » (pages, preloads, koffi, et sous Windows l'application complète sur des données temporaires) |
 | `pnpm package` / `pnpm make` | Construit puis empaquette / crée les installeurs |
 | `pnpm verify:package` / `pnpm smoke:packaged` | Vérifient le paquet de `out/` (contenu) et le font démarrer en mode fumée |
 | `pnpm pre-release X.Y.Z [--push] [--dry-run]` | Crée une pré-version `X.Y.Z-rcN` |
@@ -44,9 +44,9 @@ Avant de commiter : `pnpm typecheck`, `pnpm lint` et `pnpm test` doivent passer 
 
 - **`dist/` est ce qui s'exécute et ce qui est empaqueté** (`main` de `package.json` = `dist/main.js`) : il reproduit l'arborescence du dépôt, donc les chemins relatifs (`__dirname`, imports des pages) restent valides. Ne jamais l'éditer ni le versionner ; les sources `.ts` n'y sont pas copiées.
 - Les deux preloads (`preload.js`, `src/scripts/media/media-preload.js`) sont **bundlés en un seul fichier** par esbuild : un preload sandboxé ne peut charger aucun autre fichier (seul `electron` est requirable).
-- `main.js` : processus principal (`AppMain`), volumineux (≈2 100 lignes) et à découper progressivement.
+- **Processus principal, par domaine** : `main.ts` (point d'entrée) → `src/main/bootstrap.ts` (démarrage, verrou d'instance, raccourci) → `src/main/App.ts` (assemble les services et route les appels IPC). La logique vit dans `src/main/<domaine>/` : `apps/` (liste, vues des sites), `contextmenu/`, `dock/` (AppBar, disposition), `ipc/`, `media/`, `permissions/`, `persistence/`, `security/`, `settings/`, `theming/`, `toolbar/`, `tooltip/`, `tray/`, `updates/`, `windows/`.
 - `src/scripts/` : classes et modules du processus principal. `preload.js` : liste blanche des canaux IPC. `src/page.*/` : une fenêtre par dossier (HTML + JS). `lib/` : composants partagés. `src/locales/{fr,en}.json` : textes. `configs/appConfig.js` : adresses des serveurs de mises à jour.
-- **Logique testable = module pur, sans `electron`.** Les dépendances (fetch, dialogue, Squirrel…) sont injectées. C'est le principe d'inversion de dépendance du claude-config appliqué ici (exemples : `UpdateManager`, `PermissionStore`, `permissionPolicy`, `versions`, `safeUrl`, `appIcon`). `main.js` ne fait que câbler. **En touchant à `main.js`, extraire plutôt qu'ajouter**, et tester le module extrait.
+- **Logique testable = module pur, sans `electron`.** Les dépendances (fetch, dialogue, Squirrel…) sont injectées. C'est le principe d'inversion de dépendance du claude-config appliqué ici (exemples : `UpdateManager`, `PermissionStore`, `permissionPolicy`, `versions`, `safeUrl`, `appIcon`). `App.ts` ne fait que câbler. **Une nouvelle règle va dans un module de `src/main/<domaine>/`, avec ses tests**, jamais dans `App.ts`. Les adaptateurs Electron (`electronTray`, `electronContextMenu`, `AppWindows`, `createAppBar`…) sont les seuls à importer `electron` / `koffi`.
 - **Nouveau canal IPC** : l'ajouter **une seule fois**, dans `src/shared/ipc/events.ts` (`appEventList` pour un appel de page vers le processus principal, `pageEventList` pour un envoi du principal vers les pages). Le preload en dérive sa liste blanche, les pages et le processus principal importent le même fichier. `src/shared/` est en modules ES (`package.json` voisin) ; le processus principal le charge avec `require()`.
 - **Textes** : toute chaîne visible va dans `fr.json` **et** `en.json`, avec les mêmes clés.
 

@@ -7,7 +7,6 @@ const { build, shouldCopy } = require('../scripts/build.js');
 
 test('shouldCopy : le code, les pages et les ressources sont embarqués', () => {
   for (const file of [
-    'main.js',
     'src/page.settings/settings.html',
     'src/css/app.css',
     'src/pictures/icon.png',
@@ -48,7 +47,6 @@ function fakeRepo(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   const files = {
-    'main.js': '// main',
     'preload.ts':
       'import { ipcRenderer } from \'electron\'; import { shared } from \'./shared.js\'; export const api: string = shared; ipcRenderer.send(\'p\');',
     'shared.ts': 'export const shared: string = \'CONTENU-PARTAGE\';',
@@ -79,7 +77,6 @@ test('build : reproduit l\'arborescence dans dist/, design system compris', (t) 
   const exists = (file) => fs.existsSync(path.join(dist, file));
 
   for (const file of [
-    'main.js',
     'preload.js',
     'src/scripts/media/media-preload.js',
     'index.html',
