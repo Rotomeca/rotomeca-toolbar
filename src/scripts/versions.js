@@ -49,4 +49,12 @@ function compareVersions(a, b) {
   );
 }
 
-module.exports = { compareVersions };
+/**
+ * @param {string} version
+ * @returns {boolean} true pour une pré-version (`3.4.0-rc1`), false pour une release (`3.4.0`)
+ */
+function isPrerelease(version) {
+  return parse(version).pre !== null;
+}
+
+module.exports = { compareVersions, isPrerelease };

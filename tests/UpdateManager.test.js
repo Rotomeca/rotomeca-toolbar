@@ -631,3 +631,16 @@ test('Linux : depuis un rc installé, la version finale est proposée', async ()
 });
 
 // #endregion
+
+test('state.prerelease : vrai pour une pré-version installée, faux pour une release', () => {
+  assert.equal(setup({ version: '3.4.0-rc1' }).manager.state.prerelease, true);
+  assert.equal(setup({ version: '3.4.0' }).manager.state.prerelease, false);
+});
+
+test('state.prerelease : ne change pas au fil des vérifications', async () => {
+  const autoUpdater = fakeAutoUpdater();
+  const { manager } = setup({ version: '3.4.0-rc1', autoUpdater });
+  manager.start();
+  autoUpdater.emit('update-not-available');
+  assert.equal(manager.state.prerelease, true);
+});
