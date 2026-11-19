@@ -18,7 +18,7 @@ permissions:
   contents: write
 
 jobs:
-  # Garde-fou : aucune release n'est construite si le lint échoue.
+  # Garde-fou : aucune release n'est construite si le lint ou les tests échouent.
   lint:
     runs-on: ubuntu-24.04
     env:
@@ -39,6 +39,9 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
+
+      - name: Tests
+        run: pnpm run test
 
   build:
     needs: lint

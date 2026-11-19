@@ -19,6 +19,8 @@ const windowsSign = process.env.WINDOWS_CERTIFICATE_FILE
 module.exports = {
   packagerConfig: {
     asar: true,
+    // Les tests n'ont rien à faire dans l'application livrée
+    ignore: [/^\/tests($|\/)/],
     icon: './src/pictures/icon',
     // Signe l'exécutable, les DLL et les modules natifs de l'application
     ...(windowsSign && { windowsSign }),

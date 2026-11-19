@@ -44,6 +44,8 @@ const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
+const { compareVersions } = require('./src/scripts/versions.js');
+const { isSafeUrl } = require('./src/scripts/safeUrl.js');
 const {
   parseUnreadCount,
   sanitizeMediaState,
@@ -1923,11 +1925,7 @@ class AppMain extends BaseAppObject {
    * @readonly
    */
   static IsSafeUrl(url) {
-    try {
-      return ['http:', 'https:'].includes(new URL(url).protocol);
-    } catch (error) {
-      return false;
-    }
+    return isSafeUrl(url);
   }
 
   /**
@@ -2067,20 +2065,7 @@ class AppMain extends BaseAppObject {
    * @returns {number} > 0 si `a` est plus récente que `b`
    */
   static CompareVersions(a, b) {
-    const parse = (v) =>
-      String(v)
-        .replace(/^v/i, '')
-        .split('.')
-        .map((n) => parseInt(n, 10) || 0);
-    const left = parse(a);
-    const right = parse(b);
-
-    for (let i = 0; i < Math.max(left.length, right.length); ++i) {
-      const diff = (left[i] ?? 0) - (right[i] ?? 0);
-      if (diff !== 0) return diff;
-    }
-
-    return 0;
+    return compareVersions(a, b);
   }
 
   /**
