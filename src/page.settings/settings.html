@@ -131,6 +131,22 @@
         gap: 4px;
       }
 
+      .maj-titre {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      /* Pastille « Pré-version » : la version installée n'est pas encore publiée pour tous */
+      .pastille-pre {
+        padding: 2px 10px;
+        border-radius: var(--ds-radius-full, 999px);
+        font: var(--text-caption);
+        background: var(--ds-background-tone-accent);
+        color: var(--ds-text-tone-accent);
+      }
+
       .maj-texte h2 {
         margin: 0;
         font: var(--text-label);
@@ -533,7 +549,10 @@
       <section id="maj" class="carte-maj" data-etat="uptodate" aria-labelledby="sec-maj" aria-live="polite">
         <div class="maj-pastille" aria-hidden="true"><rds-icon id="maj-icone" name="circle-check"></rds-icon></div>
         <div class="maj-texte">
-          <h2 id="sec-maj" data-i18n="update.card.title">Mises à jour</h2>
+          <div class="maj-titre">
+            <h2 id="sec-maj" data-i18n="update.card.title">Mises à jour</h2>
+            <span id="maj-pre" class="pastille-pre" hidden data-i18n="update.card.prerelease" data-i18n-title="update.card.prereleaseHelp">Pré-version</span>
+          </div>
           <span id="maj-etat" class="maj-etat"></span>
           <rds-progress id="maj-progres" size="sm" show-value hidden></rds-progress>
         </div>

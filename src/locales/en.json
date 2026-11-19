@@ -6,6 +6,7 @@
   "tray.ignoredPlayers": "Only the first player is taken into account (+{count} ignored)",
   "tray.updateAvailable": "Update available ({version})",
   "tray.updateReady": "Update ready: restart to install it",
+  "tray.prerelease": "Pre-release {version}",
   "toolbar.settingsUpdateAvailable": "Settings · update available",
   "toolbar.settingsUpdateReady": "Settings · update ready",
 
@@ -55,6 +56,10 @@
   "update.test.errorUnavailable": "The test server doesn't offer this version yet (its list refreshes every 15 minutes). Try again shortly.",
   "update.card.title": "Updates",
   "update.card.titleUpToDate": "Version {version} · up to date",
+  "update.card.prerelease": "Pre-release",
+  "update.card.prereleaseHelp": "Test version, not yet published to all users",
+  "update.card.titlePrerelease": "Version {version}",
+  "update.card.statusPrerelease": "Test version · the final version will be offered when it is published",
   "update.card.titleAvailable": "Version {version} available",
   "update.card.titleDownloading": "Update in progress…",
   "update.card.titleReady": "Version {version} ready",

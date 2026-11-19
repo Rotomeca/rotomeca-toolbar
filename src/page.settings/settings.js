@@ -524,6 +524,7 @@ export class PageSettings {
     const card = document.querySelector('#maj');
     const icon = document.querySelector('#maj-icone');
     const title = document.querySelector('#sec-maj');
+    const preBadge = document.querySelector('#maj-pre');
     const status = document.querySelector('#maj-etat');
     const progress = document.querySelector('#maj-progres');
     const checkButton = document.querySelector('#maj-rechercher');
@@ -559,8 +560,14 @@ export class PageSettings {
       };
       icon.setAttribute('name', icons[stage]);
 
+      preBadge.hidden = !state.prerelease;
+
+      // Une pré-version est plus récente que la dernière release : « à jour » serait trompeur
       title.textContent = {
-        uptodate: t('update.card.titleUpToDate', { version: current }),
+        uptodate: t(
+          state.prerelease ? 'update.card.titlePrerelease' : 'update.card.titleUpToDate',
+          { version: current },
+        ),
         available: t('update.card.titleAvailable', { version: next }),
         downloading: t('update.card.titleDownloading'),
         ready: t('update.card.titleReady', { version: next ?? '' }),
@@ -582,9 +589,11 @@ export class PageSettings {
       } else {
         setStatus(
           {
-            uptodate: lastCheckLabel()
-              ? t('update.card.statusUpToDate', { last: lastCheckLabel() })
-              : t('update.card.statusNeverChecked'),
+            uptodate: state.prerelease
+              ? t('update.card.statusPrerelease')
+              : lastCheckLabel()
+                ? t('update.card.statusUpToDate', { last: lastCheckLabel() })
+                : t('update.card.statusNeverChecked'),
             available: t('update.card.statusCurrent', { version: current }),
             ready: t('update.card.statusReady'),
           }[stage],

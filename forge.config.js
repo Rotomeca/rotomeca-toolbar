@@ -1,5 +1,14 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const path = require('node:path');
+const { version } = require('./package.json');
+const { iconBaseName } = require('./src/scripts/appIcon.js');
+const { isPrerelease } = require('./src/scripts/versions.js');
+
+// Une pré-version (X.Y.Z-rcN) a sa propre icône (badge « RC ») : exécutable,
+// installeur et paquets Linux compris.
+const icon = iconBaseName(version);
+const prerelease = isPrerelease(version);
 
 // Signature de code Windows (Authenticode) : active uniquement si un certificat
 // .pfx est fourni par l'environnement (WINDOWS_CERTIFICATE_FILE et
@@ -21,7 +30,7 @@ module.exports = {
     asar: true,
     // Les tests n'ont rien à faire dans l'application livrée
     ignore: [/^\/tests($|\/)/],
-    icon: './src/pictures/icon',
+    icon: `./src/pictures/${icon}`,
     // Signe l'exécutable, les DLL et les modules natifs de l'application
     ...(windowsSign && { windowsSign }),
   },
@@ -31,7 +40,13 @@ module.exports = {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
       // Signe Setup.exe et Update.exe
-      config: { ...(windowsSign && { windowsSign }) },
+      config: {
+        ...(windowsSign && { windowsSign }),
+        // Icône de Setup.exe et d'Update.exe (le raccourci prend celle de l'exécutable)
+        ...(prerelease && {
+          setupIcon: path.resolve(__dirname, 'src/pictures/icon-rc.ico'),
+        }),
+      },
     },
     {
       name: '@electron-forge/maker-zip',
@@ -41,7 +56,7 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          icon: './src/pictures/icon.png',
+          icon: `./src/pictures/${icon}.png`,
           maintainer: 'Rotomeca',
           homepage: 'https://github.com/Rotomeca/rotomeca-toolbar',
           categories: ['Utility'],
@@ -52,7 +67,7 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {
         options: {
-          icon: './src/pictures/icon.png',
+          icon: `./src/pictures/${icon}.png`,
           homepage: 'https://github.com/Rotomeca/rotomeca-toolbar',
           categories: ['Utility'],
         },
