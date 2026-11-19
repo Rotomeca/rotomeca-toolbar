@@ -6,6 +6,7 @@ const {
   normalizeAsarPaths,
   missingEntries,
   unexpectedEntries,
+  findLocalRequires,
 } = require('../scripts/verify-package.js');
 
 test('requiredEntries : sans dist/, les fichiers sont attendus à la racine de l archive', () => {
@@ -69,4 +70,18 @@ test('unexpectedEntries : un nom qui commence pareil n\'est pas un faux positif'
 
 test('unexpectedEntries : archive conforme, rien à signaler', () => {
   assert.deepEqual(unexpectedEntries(new Set(['/dist/main.js', '/package.json']), ['/main.js', '/src']), []);
+});
+
+test('findLocalRequires : repère les require relatifs, guillemets simples ou doubles', () => {
+  const source = 'require("./a.js"); const b = require(\'../b.js\'); require( "./c/d.js" )';
+  assert.deepEqual(findLocalRequires(source), ['./a.js', '../b.js', './c/d.js']);
+});
+
+test('findLocalRequires : electron et les modules nommés ne comptent pas', () => {
+  const source = 'require("electron"); require(\'node:path\'); require("events"); const a = x.require("./pas-un-require")';
+  assert.deepEqual(findLocalRequires(source), []);
+});
+
+test('findLocalRequires : un bundle propre ne signale rien', () => {
+  assert.deepEqual(findLocalRequires('var { ipcRenderer } = require("electron"); ipcRenderer.send("x");'), []);
 });

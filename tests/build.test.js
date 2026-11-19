@@ -29,6 +29,13 @@ test('shouldCopy : les sources de styles et fichiers de génération ne le sont 
   }
 });
 
+test('shouldCopy : les preloads ne sont pas copiés tels quels (ils sont bundlés)', () => {
+  assert.equal(shouldCopy('preload.js'), false);
+  assert.equal(shouldCopy('src/scripts/media/media-preload.js'), false);
+  assert.equal(shouldCopy('src\\scripts\\media\\media-preload.js'), false);
+  assert.equal(shouldCopy('src/scripts/media/other.js'), true);
+});
+
 test('shouldCopy : accepte les séparateurs Windows', () => {
   assert.equal(shouldCopy('src\\page.add\\less\\add.less'), false);
   assert.equal(shouldCopy('src\\page.add\\add.html'), true);
@@ -41,7 +48,10 @@ function fakeRepo(t) {
 
   const files = {
     'main.js': '// main',
-    'preload.js': '// preload',
+    'preload.js':
+      'const { shared } = require(\'./shared.js\'); const { ipcRenderer } = require(\'electron\'); module.exports = { shared, ipcRenderer };',
+    'shared.js': 'module.exports = { shared: \'CONTENU-PARTAGE\' };',
+    'src/scripts/media/media-preload.js': 'const { ipcRenderer } = require(\'electron\'); ipcRenderer.send(\'x\');',
     'settings.js': '// settings',
     'index.html': '<html></html>',
     'src/scripts/a.js': '// a',
@@ -71,6 +81,7 @@ test('build : reproduit l\'arborescence dans dist/, design system compris', (t) 
   for (const file of [
     'main.js',
     'preload.js',
+    'src/scripts/media/media-preload.js',
     'settings.js',
     'index.html',
     'src/scripts/a.js',
@@ -114,4 +125,24 @@ test('build : erreur claire quand une source manque', (t) => {
   const root = fakeRepo(t);
   fs.rmSync(path.join(root, 'node_modules'), { recursive: true });
   assert.throws(() => build({ root, dist: path.join(root, 'dist') }), /Introuvable.*design-system/);
+});
+
+test('build : le preload est un bundle unique, qui inclut ses imports et garde electron externe', (t) => {
+  const root = fakeRepo(t);
+  const dist = build({ root, dist: path.join(root, 'dist') });
+  const bundle = fs.readFileSync(path.join(dist, 'preload.js'), 'utf8');
+
+  assert.match(bundle, /CONTENU-PARTAGE/, 'le fichier importé est inclus');
+  assert.doesNotMatch(bundle, /require\(["']\.{1,2}\//, 'aucun require relatif ne reste');
+  assert.match(bundle, /require\("electron"\)/, 'electron reste externe');
+  assert.ok(!fs.existsSync(path.join(dist, 'shared.js')), 'le fichier importé ne doit pas être copié à part');
+});
+
+test('build : le preload des sites est bundlé lui aussi', (t) => {
+  const root = fakeRepo(t);
+  const dist = build({ root, dist: path.join(root, 'dist') });
+  const bundle = fs.readFileSync(path.join(dist, 'src/scripts/media/media-preload.js'), 'utf8');
+
+  assert.match(bundle, /require\("electron"\)/);
+  assert.match(bundle, /ipcRenderer\.send\("x"\)/);
 });

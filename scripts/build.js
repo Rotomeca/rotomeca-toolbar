@@ -1,22 +1,27 @@
 // Construit dist/ : l'application telle qu'elle est embarquée dans le paquet.
 //
 // dist/ reproduit l'arborescence du dépôt : les chemins relatifs du code (`__dirname`,
-// imports relatifs des pages) restent valides. Aujourd'hui le code est copié tel quel ;
-// la compilation TypeScript s'ajoutera ici.
+// imports relatifs des pages) restent valides. Le code est copié tel quel, sauf les deux
+// preloads, bundlés en un seul fichier chacun : un preload sandboxé ne peut charger aucun
+// autre fichier (seul `electron` est requirable). La compilation TypeScript s'ajoutera ici.
 //
 // Usage : pnpm build
 
 const fs = require('node:fs');
 const path = require('node:path');
+const esbuild = require('esbuild');
 
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 
-const ROOT_FILES = ['main.js', 'preload.js', 'settings.js', 'index.html'];
+const ROOT_FILES = ['main.js', 'settings.js', 'index.html'];
 const ROOT_DIRS = ['src', 'lib', 'configs'];
 // Les pages importent le design system par un chemin relatif vers node_modules (voir
 // src/scripts/ds.js) : il doit donc exister aussi dans dist/ à la même profondeur.
 const DESIGN_SYSTEM = path.join('node_modules', '@rotomeca', 'design-system', 'out');
+
+/** Preloads sandboxés : bundlés, jamais copiés tels quels. Chemin dans le dépôt = chemin dans dist/. */
+const PRELOADS = ['preload.js', path.join('src', 'scripts', 'media', 'media-preload.js')];
 
 /** Sources de styles et fichiers de génération, inutiles à l'exécution. */
 const EXCLUDED_DIRECTORIES = new Set(['less']);
@@ -32,6 +37,7 @@ function shouldCopy(relativePath) {
   const name = segments.at(-1) ?? '';
 
   return (
+    !PRELOADS.includes(segments.join(path.sep)) &&
     !segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment)) &&
     !EXCLUDED_NAMES.has(name) &&
     !EXCLUDED_EXTENSIONS.has(path.extname(name))
@@ -55,6 +61,25 @@ function copyEntry(root, dist, relativePath) {
 }
 
 /**
+ * Bundle un preload en un seul fichier CommonJS (seul `electron` reste externe).
+ * @param {string} root
+ * @param {string} dist
+ * @param {string} relativePath
+ */
+function bundlePreload(root, dist, relativePath) {
+  esbuild.buildSync({
+    entryPoints: [path.join(root, relativePath)],
+    outfile: path.join(dist, relativePath),
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    external: ['electron'],
+    target: 'es2022',
+    logLevel: 'warning',
+  });
+}
+
+/**
  * Reconstruit dist/ depuis zéro.
  * @param {{root?: string, dist?: string}} [options]
  * @returns {string} Le dossier produit
@@ -65,6 +90,7 @@ function build({ root = ROOT, dist = DIST } = {}) {
   for (const file of ROOT_FILES) copyEntry(root, dist, file);
   for (const dir of ROOT_DIRS) copyEntry(root, dist, dir);
   copyEntry(root, dist, DESIGN_SYSTEM);
+  for (const preload of PRELOADS) bundlePreload(root, dist, preload);
 
   return dist;
 }

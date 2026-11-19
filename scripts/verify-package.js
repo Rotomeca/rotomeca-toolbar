@@ -13,6 +13,7 @@ const ROOT = path.join(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'out');
 const APP_NAME = 'rotomecatoolbar';
 const KOFFI_BINARY = 'koffi.node';
+const PRELOADS = ['preload.js', 'src/scripts/media/media-preload.js'];
 
 /**
  * Fichiers qui doivent figurer dans l'archive, relativement au dossier du `main`.
@@ -72,6 +73,17 @@ function missingEntries(present, required) {
 }
 
 /**
+ * Un preload sandboxé ne peut charger aucun fichier local : un `require` relatif y échoue
+ * sans bruit. Le bundle ne doit donc en contenir aucun.
+ * @param {string} source Contenu d'un preload
+ * @returns {string[]} Les `require` relatifs trouvés
+ */
+function findLocalRequires(source) {
+  // `(?<![.\w])` : ignore un appel de méthode (`x.require(...)`) ou un nom plus long
+  return [...source.matchAll(/(?<![.\w])require\(\s*["'](\.{1,2}\/[^"']*)["']\s*\)/g)].map((match) => match[1]);
+}
+
+/**
  * @param {Set<string>} present
  * @param {string[]} forbidden
  * @returns {string[]} Les chemins interdits présents (le chemin lui-même ou un de ses enfants)
@@ -104,6 +116,23 @@ function findResourcesDir(entries) {
   return dir ? path.join(OUT_DIR, dir, 'resources') : null;
 }
 
+/**
+ * @param {string} asarFile
+ * @param {string} mainFile
+ * @returns {string[]} Les `require` relatifs des preloads, préfixés du preload concerné
+ */
+function findPreloadLocalRequires(asarFile, mainFile) {
+  const base = path.posix.dirname(mainFile.replaceAll('\\', '/'));
+  const entries = PRELOADS.map((preload) => (base === '.' ? preload : `${base}/${preload}`));
+
+  return entries.flatMap((entry) =>
+    // path.join adapte les séparateurs à la plateforme, ce qu'attend asar
+    findLocalRequires(asar.extractFile(asarFile, path.join(...entry.split('/'))).toString('utf8')).map(
+      (target) => `${entry} -> ${target}`,
+    ),
+  );
+}
+
 function main() {
   const { main: appMain } = require(path.join(ROOT, 'package.json'));
   const resources = fs.existsSync(OUT_DIR) ? findResourcesDir(fs.readdirSync(OUT_DIR)) : null;
@@ -121,18 +150,28 @@ function main() {
     (file) => path.basename(file) === KOFFI_BINARY,
   );
 
+  const localRequires = findPreloadLocalRequires(asarFile, appMain);
+
   for (const entry of missing) console.error(`FAIL absent de l'archive : ${entry}`);
+  for (const entry of localRequires) console.error(`FAIL require relatif dans un preload : ${entry}`);
   for (const entry of unexpected) console.error(`FAIL ne devrait pas être embarqué : ${entry}`);
   if (koffiBinaries.length === 0) console.error(`FAIL ${KOFFI_BINARY} absent de app.asar.unpacked`);
 
-  if (missing.length > 0 || unexpected.length > 0 || koffiBinaries.length === 0) {
+  if (missing.length > 0 || unexpected.length > 0 || localRequires.length > 0 || koffiBinaries.length === 0) {
     process.exitCode = 1;
     return;
   }
   console.log(`OK  paquet conforme (${koffiBinaries.length} binaire(s) koffi décompressé(s))`);
 }
 
-module.exports = { requiredEntries, forbiddenEntries, normalizeAsarPaths, missingEntries, unexpectedEntries };
+module.exports = {
+  requiredEntries,
+  forbiddenEntries,
+  normalizeAsarPaths,
+  missingEntries,
+  unexpectedEntries,
+  findLocalRequires,
+};
 
 if (require.main === module) {
   try {
