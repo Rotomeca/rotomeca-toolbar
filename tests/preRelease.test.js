@@ -23,16 +23,27 @@ test('nextRc : le point de la version n\'est pas un joker', () => {
 });
 
 test('parseArgs : version seule', () => {
-  assert.deepEqual(parseArgs(['3.4.0']), { base: '3.4.0', rc: null, push: false, dryRun: false });
+  assert.deepEqual(parseArgs(['3.4.0']), { base: '3.4.0', rc: null, from: 'develop', push: false, dryRun: false });
 });
 
 test('parseArgs : options dans n\'importe quel ordre', () => {
   assert.deepEqual(parseArgs(['--push', '3.4.0', '--rc', '2', '--dry-run']), {
     base: '3.4.0',
     rc: 2,
+    from: 'develop',
     push: true,
     dryRun: true,
   });
+});
+
+test('parseArgs : --from choisit la branche de départ', () => {
+  assert.equal(parseArgs(['3.4.2', '--from', 'feature/refactor-ts']).from, 'feature/refactor-ts');
+});
+
+test('parseArgs : --from refuse une valeur absente ou suspecte', () => {
+  for (const args of [['3.4.2', '--from'], ['3.4.2', '--from', 'a b'], ['3.4.2', '--from', '$(x)']]) {
+    assert.throws(() => parseArgs(args), undefined, JSON.stringify(args));
+  }
 });
 
 test('parseArgs : refuse une version absente ou mal formée', () => {
