@@ -18,7 +18,30 @@ permissions:
   contents: write
 
 jobs:
+  # Garde-fou : aucune release n'est construite si le lint échoue.
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
   build:
+    needs: lint
     strategy:
       fail-fast: false
       matrix:

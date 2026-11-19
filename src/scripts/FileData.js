@@ -223,9 +223,9 @@ class FileData {
       clearTimeout(loadedModules[`timeout_${app}`]);
 
     loadedModules[`timeout_${app}`] = setTimeout(
-      (app) => {
-        delete loadedModules[app];
-        delete loadedModules[`timeout_${app}`];
+      (name) => {
+        delete loadedModules[name];
+        delete loadedModules[`timeout_${name}`];
       },
       1000 * 60 * 5,
       app,

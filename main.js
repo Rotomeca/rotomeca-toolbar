@@ -309,7 +309,7 @@ class AppMain extends BaseAppObject {
     if (!this.getWindow('add_dialog')) {
       // app.files =
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
-      const win = this.createBrowserWindow('add_dialog', {
+      this.createBrowserWindow('add_dialog', {
         title: t('window.add'),
         ...this.layout.addDialog,
         transparent: false,
@@ -926,8 +926,8 @@ class AppMain extends BaseAppObject {
               }.bind(this, x.id),
             };
           });
-          const menu = Menu.buildFromTemplate(windows);
-          this.tray.popUpContextMenu(menu);
+          const devMenu = Menu.buildFromTemplate(windows);
+          this.tray.popUpContextMenu(devMenu);
         },
       });
     }
@@ -1711,10 +1711,10 @@ class AppMain extends BaseAppObject {
     //On supprime les separator en double
     let tmp = [];
     let corrector = 0;
-    for (let index = 0, len = this.saves.length; index < len; ++index) {
-      const element = this.saves[index];
+    for (let i = 0, len = this.saves.length; i < len; ++i) {
+      const item = this.saves[i];
 
-      if (index === 0 && element === 'separator') {
+      if (i === 0 && item === 'separator') {
         this.toolbarWindow.webContents.postMessage(
           pageEventList.toolbarAppSeparatorDelete,
           0,
@@ -1723,19 +1723,19 @@ class AppMain extends BaseAppObject {
       }
 
       if (
-        index + 1 < len &&
-        element === 'separator' &&
-        this.saves[index + 1] === 'separator'
+        i + 1 < len &&
+        item === 'separator' &&
+        this.saves[i + 1] === 'separator'
       ) {
         this.toolbarWindow.webContents.postMessage(
           pageEventList.toolbarAppSeparatorDelete,
-          this.saves[index - (1 + corrector)].url,
+          this.saves[i - (1 + corrector)].url,
         );
         ++corrector;
         continue;
       } else {
         corrector = 0;
-        tmp.push(element);
+        tmp.push(item);
       }
     }
 
@@ -1895,7 +1895,7 @@ class AppMain extends BaseAppObject {
         }
         runningInstance?.refreshTrayUpdate();
       },
-      notifyReady: (version) => AppMain.NotifyUpdate(version),
+      notifyReady: () => AppMain.NotifyUpdate(),
     });
 
     return this;
@@ -1904,9 +1904,8 @@ class AppMain extends BaseAppObject {
   /**
    * Notification système : une mise à jour est prête (ou disponible sous Linux).
    * Un clic ouvre les Paramètres, où se trouve le bouton.
-   * @param {?string} version
    */
-  static NotifyUpdate(version) {
+  static NotifyUpdate() {
     if (!Notification.isSupported()) return;
 
     const notification = new Notification({
@@ -2142,7 +2141,7 @@ app.on('ready', async () => {
       // detail: error.stack,
     };
 
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {});
+    dialog.showMessageBox(dialogOpts);
   }
 });
 

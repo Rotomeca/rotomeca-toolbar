@@ -1,6 +1,8 @@
 /**
+ * Base concaténée par le build : `appEventList` est utilisée par les variantes.
  * @enum {string}
  */
+// eslint-disable-next-line no-unused-vars
 const appEventList = Object.freeze({
   toggleToolbar: 'toggleToolbar',
   requestAdd: 'requestAdd',
