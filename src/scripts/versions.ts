@@ -1,24 +1,36 @@
-/**
- * Découpe un numéro de version (`1.2.3`, `v1.2`, `1.2.3-rc1`).
- * @param {unknown} value
- * @returns {{core: number[], pre: ?{label: string, number: number}}}
- */
-function parse(value) {
+interface PreReleaseTag {
+  /** Étiquette en minuscules (`rc`). */
+  readonly label: string;
+  /** Numéro de l'étiquette (`1` pour `rc1`, 0 s'il n'y en a pas). */
+  readonly number: number;
+}
+
+interface ParsedVersion {
+  /** Composantes numériques (`[3, 4, 0]`). */
+  readonly core: readonly number[];
+  /** Pré-version (`rc1`), ou null pour une release. */
+  readonly pre: PreReleaseTag | null;
+}
+
+/** Découpe un numéro de version (`1.2.3`, `v1.2`, `1.2.3-rc1`). */
+function parse(value: unknown): ParsedVersion {
   const text = String(value).replace(/^v/i, '');
   const dash = text.indexOf('-');
   const core = (dash < 0 ? text : text.slice(0, dash))
     .split('.')
-    .map((n) => parseInt(n, 10) || 0);
+    .map((part) => parseInt(part, 10) || 0);
 
   if (dash < 0) return { core, pre: null };
 
   // « rc1 » : une étiquette puis un numéro. Tout le reste compte comme étiquette seule.
-  const match = /^([a-z]*)(\d*)$/i.exec(text.slice(dash + 1));
+  const suffix = text.slice(dash + 1);
+  const match = /^([a-z]*)(\d*)$/i.exec(suffix);
+
   return {
     core,
     pre: {
-      label: (match ? match[1] : text.slice(dash + 1)).toLowerCase(),
-      number: match ? parseInt(match[2], 10) || 0 : 0,
+      label: (match?.[1] ?? suffix).toLowerCase(),
+      number: parseInt(match?.[2] ?? '', 10) || 0,
     },
   };
 }
@@ -26,11 +38,9 @@ function parse(value) {
 /**
  * Compare deux numéros de version. Une pré-version (`3.3.0-rc1`) est plus ancienne
  * que sa version finale (`3.3.0`), et plus récente que la précédente (`3.2.0`).
- * @param {string} a
- * @param {string} b
- * @returns {number} > 0 si a est plus récente, < 0 si plus ancienne, 0 si égales
+ * @returns Un nombre > 0 si `a` est plus récente, < 0 si plus ancienne, 0 si égales
  */
-function compareVersions(a, b) {
+export function compareVersions(a: string, b: string): number {
   const left = parse(a);
   const right = parse(b);
 
@@ -49,12 +59,7 @@ function compareVersions(a, b) {
   );
 }
 
-/**
- * @param {string} version
- * @returns {boolean} true pour une pré-version (`3.4.0-rc1`), false pour une release (`3.4.0`)
- */
-function isPrerelease(version) {
+/** @returns true pour une pré-version (`3.4.0-rc1`), false pour une release (`3.4.0`) */
+export function isPrerelease(version: string): boolean {
   return parse(version).pre !== null;
 }
-
-module.exports = { compareVersions, isPrerelease };

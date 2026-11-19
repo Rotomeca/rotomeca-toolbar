@@ -1,14 +1,12 @@
-const { isPrerelease } = require('./versions.js');
+import { isPrerelease } from './versions.js';
+
+export type IconBaseName = 'icon' | 'icon-rc';
 
 /**
  * Nom (sans extension) des fichiers d'icône de `src/pictures` : une pré-version
  * (`X.Y.Z-rcN`) a sa propre icône, avec un badge « RC », pour ne pas la confondre
  * avec la version normale.
- * @param {string} version
- * @returns {'icon'|'icon-rc'}
  */
-function iconBaseName(version) {
+export function iconBaseName(version: string): IconBaseName {
   return isPrerelease(version) ? 'icon-rc' : 'icon';
 }
-
-module.exports = { iconBaseName };
