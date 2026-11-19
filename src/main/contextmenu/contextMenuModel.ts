@@ -1,3 +1,5 @@
+import type { ContextMenuAction, ContextMenuItem } from '../../shared/dto.js';
+
 /** Ce que la page envoie sur l'élément cliqué avec le bouton droit. */
 export interface ContextMenuTarget {
   readonly nodeName: string;
@@ -12,15 +14,7 @@ export interface ContextMenuEvent {
   readonly y: number;
 }
 
-export type ContextMenuAction = 'delete' | 'addseparator' | 'goUp' | 'goDown' | 'toggleMute' | 'edit';
-
-export interface ContextMenuItem {
-  readonly text: string;
-  readonly title: string;
-  readonly action: ContextMenuAction;
-  readonly data: Readonly<Record<string, string | null | undefined>>;
-  readonly disabled?: boolean;
-}
+export type { ContextMenuAction, ContextMenuItem };
 
 /** Un élément enregistré de la barre : une application (avec son adresse) ou un séparateur. */
 export type SavedEntry = 'separator' | { readonly url: string; readonly picture?: string | null };

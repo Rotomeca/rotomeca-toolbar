@@ -6,7 +6,9 @@
  * calendaire. Les dates sont ramenées au jour civil Europe/Paris.
  */
 
-export type SeasonTheme = 'cerisier' | 'printemps' | 'ete' | 'automne' | 'hiver' | 'noel';
+import type { SeasonInfo, SeasonTheme } from '../shared/dto.js';
+
+export type { SeasonInfo, SeasonTheme };
 
 /** 0 équinoxe de mars, 1 solstice de juin, 2 équinoxe de septembre, 3 solstice de décembre. */
 type SeasonIndex = 0 | 1 | 2 | 3;
@@ -17,14 +19,6 @@ export interface SeasonDates {
   readonly juin: string;
   readonly septembre: string;
   readonly decembre: string;
-}
-
-export interface SeasonInfo {
-  /** Thème de saison du jour. */
-  readonly theme: SeasonTheme;
-  readonly nextTheme: SeasonTheme;
-  /** Jour du prochain changement, au format AAAA-MM-JJ. */
-  readonly nextDate: string;
 }
 
 /** Début d'une période de thème : [jour AAAA-MM-JJ, thème]. */

@@ -24,6 +24,7 @@ import {
   findNewestPrerelease,
 } from './githubReleases.js';
 import type { HttpFetch } from './githubReleases.js';
+import type { UpdateChannel, UpdateStage, UpdateState } from '../shared/dto.js';
 import { isPrerelease } from './versions.js';
 
 export const CHECK_INTERVAL = 60 * 60 * 1000;
@@ -33,36 +34,7 @@ const CHECK_ERROR = 'update.card.errorCheck';
 const DOWNLOAD_ERROR = 'update.card.errorDownload';
 
 /** `available` n'existe que sous Linux (mise à jour manuelle). */
-export type UpdateStage = 'uptodate' | 'available' | 'downloading' | 'ready';
-
-/** Serveur de mises à jour interrogé par Squirrel : les versions publiées, ou les pré-versions. */
-export type UpdateChannel = 'stable' | 'test';
-
-export interface UpdateState {
-  readonly etat: UpdateStage;
-  /** Vérification en cours. */
-  readonly verification: boolean;
-  readonly versionActuelle: string;
-  /** La version installée est une pré-version (`X.Y.Z-rcN`). */
-  readonly prerelease: boolean;
-  readonly versionDisponible: string | null;
-  /** `null` : progression inconnue (Squirrel). */
-  readonly pourcentage: number | null;
-  /** Horodatage (ms) de la dernière vérification réussie. */
-  readonly derniereVerification: number | null;
-  /** Clé de traduction du dernier échec. */
-  readonly erreur: string | null;
-  /** Recherche d'une version de test en cours. */
-  readonly verificationTest: boolean;
-  /** Version de test plus récente que l'actuelle. */
-  readonly versionTest: string | null;
-  /** Horodatage (ms) de la dernière recherche de version de test réussie. */
-  readonly derniereVerificationTest: number | null;
-  /** Clé de traduction du dernier échec lié à la version de test. */
-  readonly erreurTest: string | null;
-  /** `installTest()` installe seule (sinon, ouvre la page de la release). */
-  readonly testAuto: boolean;
-}
+export type { UpdateChannel, UpdateStage, UpdateState };
 
 /**
  * Ce que le gestionnaire attend de Squirrel (`Electron.autoUpdater` convient).

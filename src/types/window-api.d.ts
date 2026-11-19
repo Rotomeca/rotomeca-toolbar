@@ -1,3 +1,4 @@
+import type { InvokeArgs, InvokeResult, PushArgs } from '../shared/ipc/contracts.js';
 import type { InvokeChannel, PushChannel } from '../shared/ipc/events.js';
 
 /**
@@ -16,14 +17,14 @@ export interface RotomecaApi {
    * Appelle un canal du processus principal.
    * @returns La réponse du gestionnaire ; la promesse est rejetée si le canal n'est pas autorisé
    */
-  invoke(channel: InvokeChannel, ...data: unknown[]): Promise<unknown>;
+  invoke<C extends InvokeChannel>(channel: C, ...args: InvokeArgs<C>): Promise<InvokeResult<C>>;
 
   /**
    * Écoute un canal envoyé par le processus principal. L'évènement IPC n'est
    * jamais transmis : le premier argument du rappel vaut toujours `null`.
    * @returns La fonction de désabonnement
    */
-  on(channel: PushChannel, callback: (event: null, ...args: unknown[]) => void): () => void;
+  on<C extends PushChannel>(channel: C, callback: (event: null, ...args: PushArgs<C>) => void): () => void;
 }
 
 declare global {

@@ -1,10 +1,6 @@
-import type { MediaState } from '../../scripts/AppIndicators.js';
+import type { MediaPayload, MediaState } from '../../shared/dto.js';
 
-/** État affiché par la fenêtre de contrôle du morceau d'une application. */
-export interface MediaPayload extends MediaState {
-  readonly url: string;
-  readonly muted: boolean;
-}
+export type { MediaPayload };
 
 /** @returns L'avancée du morceau entre 0 et 1, `null` si elle est inconnue */
 export function mediaProgress(media: Pick<MediaState, 'duration' | 'position'> | null | undefined): number | null {

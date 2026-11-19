@@ -1,4 +1,5 @@
 import { isSafeUrl } from '../../scripts/safeUrl.js';
+import type { AppDto } from '../../shared/dto.js';
 
 const MAX_NAME_LENGTH = 200;
 const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
@@ -6,13 +7,7 @@ const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
 const DATA_IMAGE = /^data:image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon|bmp);/i;
 const FONT_ICON = /^font:[\w-]{1,64}$/;
 
-/** Une application de la barre, après validation. */
-export interface AppData {
-  readonly name: string;
-  readonly url: string;
-  /** Image intégrée (`data:image/...`), icône de police (`font:nom`) ou `null`. */
-  readonly picture: string | null;
-}
+export type AppData = AppDto;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

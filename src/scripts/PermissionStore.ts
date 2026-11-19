@@ -10,15 +10,11 @@
 /** Permissions qui demandent une confirmation (et donc qu'on mémorise). */
 export const ASKABLE_PERMISSIONS = ['media', 'geolocation'] as const;
 
-export type AskablePermission = (typeof ASKABLE_PERMISSIONS)[number];
+import type { AskablePermission, PermissionDecision } from '../shared/dto.js';
+
+export type { AskablePermission, PermissionDecision };
 
 const FORMAT_VERSION = 1;
-
-export interface PermissionDecision {
-  readonly origin: string;
-  readonly permission: AskablePermission;
-  readonly allowed: boolean;
-}
 
 /** Contenu du fichier enregistré. */
 export interface PermissionFile {

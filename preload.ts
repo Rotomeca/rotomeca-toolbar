@@ -88,14 +88,17 @@ const api: RotomecaApi = {
 
   invoke: (channel, ...data) => {
     if (!INVOKE_CHANNELS.has(channel)) return Promise.reject(new Error(`Canal IPC non autorisé : ${String(channel)}`));
-    return ipcRenderer.invoke(channel, ...data) as Promise<unknown>;
+    // La réponse est celle que le contrat du canal annonce (src/shared/ipc/contracts.ts)
+    return ipcRenderer.invoke(channel, ...data);
   },
 
   on: (channel, callback) => {
     if (!ON_CHANNELS.has(channel) || typeof callback !== 'function') return () => undefined;
 
     // L'évènement IPC n'est jamais transmis à la page
-    const listener = (_event: unknown, ...args: unknown[]): void => callback(null, ...args);
+    // Les arguments sont ceux que le contrat du canal annonce : le processus principal les construit
+    const deliver = callback as (event: null, ...args: unknown[]) => void;
+    const listener = (_event: unknown, ...args: unknown[]): void => deliver(null, ...args);
     ipcRenderer.on(channel, listener);
 
     return () => {

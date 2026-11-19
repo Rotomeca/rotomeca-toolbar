@@ -1,19 +1,8 @@
-export const MEDIA_ACTIONS = ['play', 'pause', 'previoustrack', 'nexttrack'] as const;
+import type { MediaAction, MediaState } from '../shared/dto.js';
 
-export type MediaAction = (typeof MEDIA_ACTIONS)[number];
+export type { MediaAction, MediaState };
 
-/** État média d'un site, après validation. */
-export interface MediaState {
-  /** Durée en secondes, `null` si inconnue. */
-  readonly duration: number | null;
-  /** Position en secondes, `null` si la durée est inconnue. */
-  readonly position: number | null;
-  readonly title: string;
-  readonly artist: string;
-  readonly artwork: string | null;
-  readonly playing: boolean;
-  readonly actions: readonly MediaAction[];
-}
+export const MEDIA_ACTIONS: readonly MediaAction[] = ['play', 'pause', 'previoustrack', 'nexttrack'];
 
 const MAX_TEXT_LENGTH = 200;
 const MAX_DATA_URL_LENGTH = 500000;

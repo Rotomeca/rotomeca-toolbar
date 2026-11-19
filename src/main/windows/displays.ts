@@ -1,3 +1,5 @@
+import type { DisplayInfo } from '../../shared/dto.js';
+
 /** Ce que ce module lit d'un écran (un sous-ensemble de `Electron.Display`). */
 export interface DisplayLike {
   readonly id: number;
@@ -7,11 +9,7 @@ export interface DisplayLike {
   readonly scaleFactor: number;
 }
 
-export interface DisplayInfo {
-  readonly id: number;
-  readonly label: string;
-  readonly isPrimary: boolean;
-}
+export type { DisplayInfo };
 
 type Translate = (key: string, variables?: Readonly<Record<string, string | number>>) => string;
 
