@@ -317,6 +317,35 @@ export class Main {
       document.querySelector('[aria-pressed="true"]')?.unpress?.();
     });
 
+    // Point sur le bouton Paramètres : orange (version disponible), vert (prête)
+    const settingsButton = document.querySelector('#settings-button');
+    const settingsLabel = settingsButton.getAttribute('label');
+    const showUpdate = ({ etat }) => {
+      const level =
+        etat === 'ready'
+          ? 'ready'
+          : ['downloading', 'available'].includes(etat)
+            ? 'pending'
+            : null;
+      if (level) settingsButton.dataset.maj = level;
+      else delete settingsButton.dataset.maj;
+      settingsButton.setAttribute(
+        'label',
+        level
+          ? window.api.t(
+              level === 'ready'
+                ? 'toolbar.settingsUpdateReady'
+                : 'toolbar.settingsUpdateAvailable',
+            )
+          : settingsLabel,
+      );
+    };
+    window.api.on(pageEventList.updateState, (_, state) => showUpdate(state));
+    window.api
+      .invoke(appEventList.updateGetState)
+      .then(showUpdate)
+      .catch(() => {});
+
     document
       .querySelector('#settings-button')
       .addEventListener('click', () => {

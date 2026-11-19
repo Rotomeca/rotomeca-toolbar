@@ -38,6 +38,9 @@ const INVOKE_CHANNELS = new Set([
   'tooltipHide',
   'getSavedUrls',
   'getSeasonInfo',
+  'updateGetState',
+  'updateCheck',
+  'updateInstall',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */
@@ -58,6 +61,7 @@ const ON_CHANNELS = new Set([
   'appIndicators',
   'mediaState',
   'tooltipState',
+  'updateState',
 ]);
 
 // #region Traductions

@@ -33,4 +33,7 @@ const appEventList = Object.freeze({
   tooltipHide: 'tooltipHide',
   getSavedUrls: 'getSavedUrls',
   getSeasonInfo: 'getSeasonInfo',
+  updateGetState: 'updateGetState',
+  updateCheck: 'updateCheck',
+  updateInstall: 'updateInstall',
 });

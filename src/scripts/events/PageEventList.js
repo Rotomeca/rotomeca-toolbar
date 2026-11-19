@@ -16,5 +16,6 @@ const pageEventList = Object.freeze({
   appIndicators: 'appIndicators',
   mediaState: 'mediaState',
   tooltipState: 'tooltipState',
+  updateState: 'updateState',
 });
  module.exports = { pageEventList };
