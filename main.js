@@ -36,6 +36,7 @@ const {
   restoreFromBackup,
   flushSession,
   keepLoginsAlive,
+  logCookieState,
 } = require('./src/scripts/Persistence.js');
 const { appEventList } = require('./src/scripts/events/AppEventList.js');
 const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
@@ -2122,6 +2123,7 @@ let runningInstance = null;
 app.on('before-quit', () => {
   runningInstance?.detachAppBar();
   flushSession(session.defaultSession);
+  logCookieState(app, session.defaultSession, 'sortie');
 });
 app.on('will-quit', () => {
   runningInstance?.detachAppBar();
@@ -2135,7 +2137,7 @@ app.on('ready', async () => {
     const { FileData } = require('./src/scripts/FileData.js');
     migrateLegacyData(app, FileData.BasePath);
     restoreFromBackup(FileData.BasePath);
-    keepLoginsAlive(session.defaultSession);
+    keepLoginsAlive(session.defaultSession, app);
     AppMain.InstallPermissionHandlers(session.defaultSession);
     const instance = AppMain.InitAutoUpdater().Run();
     runningInstance = instance;
