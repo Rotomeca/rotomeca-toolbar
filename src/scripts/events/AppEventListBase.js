@@ -31,6 +31,7 @@ const appEventList = Object.freeze({
   rotomecaContextMenu: 'rotomeca-context-menu',
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
+  openSettings: 'openSettings',
   tooltipShow: 'tooltipShow',
   tooltipHide: 'tooltipHide',
   getSavedUrls: 'getSavedUrls',
@@ -38,4 +39,7 @@ const appEventList = Object.freeze({
   updateGetState: 'updateGetState',
   updateCheck: 'updateCheck',
   updateInstall: 'updateInstall',
+  permissionsList: 'permissionsList',
+  permissionRevoke: 'permissionRevoke',
+  permissionsClear: 'permissionsClear',
 });
