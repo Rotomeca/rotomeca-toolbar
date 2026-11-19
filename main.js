@@ -1071,7 +1071,7 @@ class AppMain extends BaseAppObject {
       title: t('window.settings'),
       icon: this.appIcon,
       width: 800,
-      height: 730,
+      height: 840,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
