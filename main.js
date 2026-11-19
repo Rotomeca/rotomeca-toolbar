@@ -15,16 +15,12 @@ const {
   app,
   nativeTheme,
   powerMonitor,
-  BrowserWindow,
   session,
   WebContentsView,
-  Tray,
-  Menu,
   shell,
   screen,
   autoUpdater,
   Notification,
-  nativeImage,
   dialog,
   ipcMain,
   globalShortcut,
@@ -62,7 +58,7 @@ const {
 } = require('./src/main/dock/dockGeometry.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
 const { PermissionStore } = require('./src/scripts/PermissionStore.js');
-const { compareVersions, isPrerelease } = require('./src/scripts/versions.js');
+const { compareVersions } = require('./src/scripts/versions.js');
 const { iconBaseName } = require('./src/scripts/appIcon.js');
 const { isSafeUrl } = require('./src/scripts/safeUrl.js');
 const {
@@ -72,12 +68,8 @@ const {
 const {
   showUpdateNotification,
 } = require('./src/main/updates/updateNotification.js');
-const {
-  updateLevelOf,
-  badgeCornerFor,
-  paintUpdateBadge,
-} = require('./src/main/tray/updateBadge.js');
-const { buildTrayTooltip } = require('./src/main/tray/trayTooltip.js');
+const { updateLevelOf } = require('./src/main/tray/updateBadge.js');
+const { createElectronTray } = require('./src/main/tray/electronTray.js');
 const {
   mediaProgress,
   mediaPayload,
@@ -154,7 +146,6 @@ class AppMain extends BaseAppObject {
     super();
     this.saves = [];
     this.started = false;
-    this.tray;
     this.contextMenu;
     /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
     this.taskbarIgnored = new Set();
@@ -909,117 +900,48 @@ class AppMain extends BaseAppObject {
     return this;
   }
 
+  /**
+   * Icône de la zone de notification (menu, infobulle et point de mise à jour).
+   * @type {TrayService}
+   */
+  get trayService() {
+    this._trayService ??= createElectronTray({
+      trayIconPath: this.trayIcon,
+      appIconPath: this.appIcon,
+      updateInfo: () => this.trayUpdateInfo,
+      translate: t,
+      shortcut: TOGGLE_SHORTCUT,
+      isDev: AppMain.IsDev,
+      actions: {
+        toggleToolbar: () => this.toggleFromOutside(),
+        openSettings: () => this.event_tray_on_click(),
+        quit: () => app.quit(),
+      },
+    });
+
+    return this._trayService;
+  }
+
+  /**
+   * Ce que la zone de notification dit de la version et de la mise à jour.
+   * @returns {?import('./src/main/tray/trayTooltip.js').TrayUpdateInfo}
+   */
+  get trayUpdateInfo() {
+    const state = AppMain.updater?.state;
+    if (!state) return null;
+
+    return {
+      prerelease: state.prerelease,
+      versionActuelle: state.versionActuelle,
+      versionDisponible: state.versionDisponible,
+      level: updateLevelOf(state.etat),
+    };
+  }
+
   initTray() {
-    let menu = [
-      {
-        label: t('tray.toggle'),
-        accelerator: TOGGLE_SHORTCUT,
-        registerAccelerator: false, // enregistré globalement par ailleurs
-        click: () => this.toggleFromOutside(),
-      },
-      {
-        label: t('tray.settings'),
-        click: this.event_tray_on_click.bind(this),
-      },
-      {
-        label: t('tray.quit'),
-        click: app.quit.bind(app),
-      },
-    ];
-
-    if (AppMain.IsDev) {
-      menu.splice(0, 0, {
-        label: '[DEBUG]Ouvrir une console',
-        click: () => {
-          const windows = BrowserWindow.getAllWindows().map((x) => {
-            return {
-              label: x.title,
-              click: function (id) {
-                BrowserWindow.fromId(id).webContents.openDevTools();
-              }.bind(this, x.id),
-            };
-          });
-          const devMenu = Menu.buildFromTemplate(windows);
-          this.tray.popUpContextMenu(devMenu);
-        },
-      });
-    }
-
-    const appContextMenu = Menu.buildFromTemplate(menu);
-
-    this.tray = new Tray(this.trayIconFor(this.updateLevel));
-    this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
-    this.tray.setContextMenu(appContextMenu);
-    this.tray.on('click', () => this.toggleFromOutside());
+    this.trayService.start();
 
     return this;
-  }
-
-  /**
-   * Niveau d'alerte de mise à jour : `null` (rien), `pending` (nouvelle version
-   * disponible ou en cours de téléchargement) ou `ready` (prête à installer).
-   * @returns {?('pending'|'ready')}
-   */
-  get updateLevel() {
-    return updateLevelOf(AppMain.updater?.state.etat);
-  }
-
-  /**
-   * Icône de la zone de notification avec un point de couleur en bas à droite :
-   * bleu (version disponible) ou vert (mise à jour prête).
-   * @param {?('pending'|'ready')} level
-   * @returns {Electron.NativeImage|string}
-   */
-  trayIconFor(level) {
-    if (!level) return this.trayIcon;
-
-    this.trayIconCache ??= {};
-    if (this.trayIconCache[level]) return this.trayIconCache[level];
-
-    const size = 32;
-    const base = nativeImage
-      .createFromPath(this.appIcon)
-      .resize({ width: size, height: size });
-    const bitmap = paintUpdateBadge(
-      Buffer.from(base.toBitmap()),
-      size,
-      level,
-      badgeCornerFor(isPrerelease(app.getVersion())),
-    );
-
-    return (this.trayIconCache[level] = nativeImage.createFromBitmap(bitmap, {
-      width: size,
-      height: size,
-    }));
-  }
-
-  /**
-   * @param {string} text Info-bulle de base
-   * @returns {string} L'info-bulle, complétée de l'état de la mise à jour
-   */
-  trayTooltipFor(text) {
-    const state = AppMain.updater?.state;
-
-    return buildTrayTooltip({
-      text,
-      update: state
-        ? {
-            prerelease: state.prerelease,
-            versionActuelle: state.versionActuelle,
-            versionDisponible: state.versionDisponible,
-            level: this.updateLevel,
-          }
-        : null,
-      translate: t,
-    });
-  }
-
-  /** Met à jour l'icône et l'info-bulle de la zone de notification. */
-  refreshTrayUpdate() {
-    if (!this.tray || this.tray.isDestroyed()) return;
-
-    this.tray.setImage(this.trayIconFor(this.updateLevel));
-    this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
   }
 
   async save() {
@@ -1300,17 +1222,10 @@ class AppMain extends BaseAppObject {
     for (const key of changedIgnored(previous, this.taskbarIgnored))
       this.postIndicators(key);
 
-    if (!this.tray || this.tray.isDestroyed()) return;
-
-    if (!first) {
-      this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
-      return;
-    }
-
-    this.tray.setToolTip(
-      this.trayTooltipFor(
-        describeNowPlaying(this.viewHost.entry(first).media, others.length, t),
-      ),
+    this.trayService.showTooltip(
+      first
+        ? describeNowPlaying(this.viewHost.entry(first).media, others.length, t)
+        : t('tray.tooltip'),
     );
   }
 
@@ -1679,7 +1594,7 @@ class AppMain extends BaseAppObject {
           if (win && !win.isDestroyed())
             win.webContents.postMessage(pageEventList.updateState, state);
         }
-        runningInstance?.refreshTrayUpdate();
+        runningInstance?.trayService.refresh();
       },
       notifyReady: () => AppMain.NotifyUpdate(),
     });
