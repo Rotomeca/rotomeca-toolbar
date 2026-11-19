@@ -1,17 +1,29 @@
-// Preload des vues de sites (sandboxé : seul `electron` est requirable).
-// Un script est injecté dans le monde principal de la page, avant les siens,
-// pour capturer les actions de l'API Media Session (previous/next/play/pause)
-// et publier le morceau en cours. Le preload ne sert que de relais IPC.
-// Bundlé par esbuild en un seul fichier (voir scripts/build.js).
+/**
+ * Preload des sites : capture l'API Media Session et relaie le morceau en cours au processus principal.
+ *
+ * Sandboxé (seul `electron` est requirable). Un script est injecté dans le monde
+ * principal de la page, avant les siens, pour capturer les actions
+ * (previous/next/play/pause) et publier le morceau ; le preload ne sert que de relais IPC.
+ * Bundlé par esbuild en un seul fichier (voir `scripts/build.js`).
+ */
 
+// [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { ipcRenderer, webFrame } from 'electron';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { internalChannels } from '../../shared/ipc/events.js';
 
-// Noms des évènements DOM échangés entre le script injecté et ce preload : les mêmes
-// que les canaux IPC correspondants.
+/**
+ * Nom de l'évènement DOM par lequel le script injecté publie l'état média ; le même
+ * que le canal IPC correspondant.
+ */
 const MEDIA_STATE_EVENT = internalChannels.mediaState;
+/** Nom de l'évènement DOM par lequel le preload envoie une commande au script injecté. */
 const MEDIA_ACTION_EVENT = internalChannels.mediaAction;
 
+/**
+ * Code exécuté dans le monde principal de la page : intercepte `mediaSession`
+ * et publie chaque seconde le morceau, sa progression et les commandes disponibles.
+ */
 const PAGE_SCRIPT = `(() => {
   const ms = navigator.mediaSession;
   if (!ms) return;

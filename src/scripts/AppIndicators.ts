@@ -1,16 +1,28 @@
+/**
+ * Indicateurs d'une application : nombre de non-lus du titre et état média validé.
+ *
+ * Utilisé par le processus principal pour afficher les pastilles de la barre et
+ * le mini-lecteur. Les données viennent de sites tiers : tout est revalidé ici.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { MediaAction, MediaState } from '../shared/dto.js';
 
 export type { MediaAction, MediaState };
 
+/** Commandes média qu'un site peut exposer et que la barre sait lui renvoyer. */
 export const MEDIA_ACTIONS: readonly MediaAction[] = ['play', 'pause', 'previoustrack', 'nexttrack'];
 
+/** Longueur maximale du titre et de l'artiste retenus (la page est non fiable). */
 const MAX_TEXT_LENGTH = 200;
+/** Taille maximale d'une pochette intégrée en `data:` (en caractères). */
 const MAX_DATA_URL_LENGTH = 500000;
 
+/** @returns true si la valeur est un objet non nul (donc lisible par clé) */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/** @returns true si la valeur est l'une des commandes de {@link MEDIA_ACTIONS} */
 function isMediaAction(value: unknown): value is MediaAction {
   return MEDIA_ACTIONS.some((action) => action === value);
 }
@@ -28,6 +40,7 @@ export function parseUnreadCount(title: string | null | undefined): number {
   return match?.[1] ? parseInt(match[1], 10) : 0;
 }
 
+/** @returns Le JSON décodé, ou `null` si la valeur n'est pas une chaîne JSON valide */
 function parseJson(raw: unknown): unknown {
   if (typeof raw !== 'string') return null;
 
@@ -38,6 +51,7 @@ function parseJson(raw: unknown): unknown {
   }
 }
 
+/** @returns Le texte tronqué à {@link MAX_TEXT_LENGTH}, ou une chaîne vide si ce n'est pas du texte */
 function limitedText(value: unknown): string {
   return typeof value === 'string' ? value.slice(0, MAX_TEXT_LENGTH) : '';
 }
@@ -51,6 +65,7 @@ function safeArtwork(value: unknown): string | null {
   return isHttps || isSmallDataImage ? value : null;
 }
 
+/** @returns Le nombre s'il est fini, sinon 0 (durée et position viennent de la page) */
 function finiteNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

@@ -1,3 +1,10 @@
+/**
+ * Géométrie de la barre : disposition des fenêtres, bande réservée et masquage automatique.
+ *
+ * Calculs purs (rectangles, délais), sans Electron : `App` fournit l'écran et l'heure, et applique
+ * les résultats. Tous les rectangles sont en pixels indépendants de la densité.
+ */
+
 /** Rectangle en pixels indépendants de la densité (comme toute l'API de fenêtres d'Electron). */
 export interface Rect {
   readonly x: number;
@@ -6,6 +13,7 @@ export interface Rect {
   readonly height: number;
 }
 
+/** Position d'un point à l'écran, en pixels indépendants de la densité. */
 export interface Point {
   readonly x: number;
   readonly y: number;
@@ -15,15 +23,19 @@ export interface Point {
 export interface LayoutSizes {
   /** Largeur de la barre dépliée. */
   readonly toolbarWidth: number;
+  /** Largeur de la fenêtre d'ajout d'une application. */
   readonly addDialogWidth: number;
+  /** Hauteur de la fenêtre d'ajout d'une application. */
   readonly addDialogHeight: number;
   /** Largeur de la zone sensible du bord (mode souris). */
   readonly edgeWidth: number;
 }
 
+/** Données nécessaires au calcul de la disposition des fenêtres. */
 export interface LayoutInput {
   /** Zone de travail de l'écran choisi (hors barre des tâches). */
   readonly workArea: Rect;
+  /** Limites complètes de l'écran choisi. */
   /** Limites complètes de l'écran choisi. */
   readonly bounds: Rect;
   readonly sizes: LayoutSizes;
@@ -37,20 +49,35 @@ export interface LayoutInput {
   readonly buttonMode: boolean;
 }
 
+/** Position de chaque fenêtre de l'interface sur l'écran. */
 export interface Layout {
+  /** Petite fenêtre du bouton principal, en bas à gauche. */
   readonly main: Rect;
+  /** Fenêtre de la barre (rail ou barre dépliée). */
   readonly toolbar: Rect;
+  /** Fenêtre qui porte les sites ouverts, à côté de la barre. */
   readonly apps: Rect;
+  /** Fenêtre d'ajout d'une application. */
   readonly addDialog: Rect;
+  /** Zone sensible du bord gauche (mode souris). */
   readonly edge: Rect;
 }
 
+/** Marge entre les fenêtres et les bords de la zone de travail, en pixels. */
 const MARGIN = 10;
+/** Largeur de la fenêtre du bouton principal. */
 const MAIN_WIDTH = 64;
+/** Hauteur de la fenêtre du bouton principal. */
 const MAIN_HEIGHT = 32;
+/** Espace laissé en bas de la barre flottante en mode bouton, pour le bouton principal. */
 const BUTTON_ROW_HEIGHT = 52;
+/** Espace laissé en bas de la barre flottante hors mode bouton. */
 const FREE_BOTTOM_MARGIN = 20;
 
+/**
+ * Zone de la barre : ancrée, elle reprend la zone accordée par le système (ou le bord de l'écran
+ * en attendant) ; flottante, elle est posée dans la zone de travail avec une marge.
+ */
 function toolbarArea({ workArea, bounds, sizes, docked, dockedWidth, grantedArea, buttonMode }: LayoutInput): Rect {
   if (docked) {
     const base = grantedArea ?? { x: bounds.x, y: workArea.y, width: dockedWidth, height: workArea.height };
@@ -65,7 +92,10 @@ function toolbarArea({ workArea, bounds, sizes, docked, dockedWidth, grantedArea
   };
 }
 
-/** @returns La disposition des fenêtres sur l'écran choisi */
+/**
+ * Calcule la place de chaque fenêtre à partir de la zone de travail et du mode (ancré ou flottant).
+ * @returns La disposition des fenêtres sur l'écran choisi
+ */
 export function computeLayout(input: LayoutInput): Layout {
   const { workArea, bounds, sizes, docked } = input;
   const toolbar = toolbarArea(input);
@@ -89,10 +119,15 @@ export function computeLayout(input: LayoutInput): Layout {
   };
 }
 
+/** Données nécessaires au calcul de la bande à réserver. */
 export interface DockRequestInput {
+  /** Limites complètes de l'écran choisi. */
   readonly bounds: Rect;
+  /** Masquage automatique : la barre se replie en rail quand la souris la quitte. */
   readonly autoHide: boolean;
+  /** Largeur de la barre ancrée dépliée. */
   readonly dockedWidth: number;
+  /** Largeur du rail replié. */
   readonly railWidth: number;
 }
 
@@ -104,12 +139,18 @@ export function dockRequest({ bounds, autoHide, dockedWidth, railWidth }: DockRe
   return { x: bounds.x, y: bounds.y, width: autoHide ? railWidth : dockedWidth, height: bounds.height };
 }
 
-/** @returns Une clé qui change quand la bande demandée change (évite de redemander la même zone en boucle) */
+/**
+ * Résume une demande de bande en une chaîne comparable.
+ * @returns Une clé qui change quand la bande demandée change (évite de redemander la même zone en boucle)
+ */
 export function dockRequestKey(request: Rect): string {
   return JSON.stringify(request);
 }
 
-/** @returns `true` si le point est dans l'un des rectangles (bords haut/gauche inclus, bas/droite exclus) */
+/**
+ * Teste si le point est dans l'interface.
+ * @returns `true` si le point est dans l'un des rectangles (bords haut/gauche inclus, bas/droite exclus)
+ */
 export function isPointInside(point: Point, rects: readonly Rect[]): boolean {
   return rects.some(
     (rect) =>
@@ -117,6 +158,7 @@ export function isPointInside(point: Point, rects: readonly Rect[]): boolean {
   );
 }
 
+/** État du masquage automatique après un pas de calcul. */
 export interface AutoHideState {
   /** Instant où la souris est sortie de l'interface, `null` tant qu'elle est dedans. */
   readonly outsideSince: number | null;

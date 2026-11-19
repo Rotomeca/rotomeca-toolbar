@@ -1,6 +1,16 @@
+/**
+ * Page d'ajout d'une application : sites populaires et recherche dans une iframe sandboxée.
+ *
+ * Chargée par la fenêtre d'ajout (`src/page.add/`). Dépend de `appForm`, de `configs/config.json` pour les
+ * sites populaires et du processus principal ; l'iframe, sans accès à l'IPC, passe par `postMessage`.
+ */
+// [appForm.ts] Fonctions pures du formulaire d'application : adresse, nom proposé, comparaison d'adresses
 import { normalizeUrl } from '../scripts/appForm.js';
+// [dom.ts] Accès sûr aux éléments du DOM pour les scripts de page : un élément manquant lève une erreur claire
 import { requireElement } from '../scripts/dom.js';
+// [window-electron.d.ts] Type de `window.electron`, les données posées sur la fenêtre par le processus principal
 import type { PopularApp } from '../types/window-electron.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../shared/ipc/events.js';
 
 /** Jetons du thème recopiés dans l'iframe de recherche (qui n'hérite pas des --ds-*). */
@@ -28,23 +38,39 @@ const THEME_TOKENS = [
   '--ds-font-sans',
 ] as const;
 
-/** Messages échangés avec l'iframe de recherche. */
+/** Message de l'iframe de recherche : elle est prête à recevoir le thème et la liste des sites ajoutés. */
 const MESSAGE_READY = 'rotomecaSearchReady';
+/** Message vers l'iframe de recherche : thème courant (feuille, jetons, libellés). */
 const MESSAGE_THEME = 'rotomecaTheme';
+/** Message vers l'iframe de recherche : adresses déjà présentes dans la barre. */
 const MESSAGE_SAVED = 'rotomecaSaved';
 
+/** Canal IPC d'une demande d'ajout : directe, ou suivie de la personnalisation du bouton. */
 type AddRequestType = typeof appEventList.requestAddData | typeof appEventList.requestAddDataEdit;
 
+/** Données envoyées au processus principal pour ajouter une application. */
 interface AddRequest {
+  /** Nom du bouton. */
   readonly name: string;
+  /** Adresse du site. */
   readonly url: string;
+  /** Image du bouton (`data:`, `font:nom`) ou `null` pour la déduire du site. */
   readonly picture: string | null;
 }
 
+/**
+ * Vérifie qu'une valeur reçue de l'iframe est l'un des deux canaux d'ajout.
+ * @param type Valeur à contrôler
+ * @returns `true` si c'est un canal d'ajout autorisé
+ */
 const isAddRequestType = (type: unknown): type is AddRequestType =>
   type === appEventList.requestAddData || type === appEventList.requestAddDataEdit;
 
-/** @returns `true` si l'adresse est une adresse http(s) valide */
+/**
+ * Vérifie qu'une adresse reçue de l'iframe est exploitable.
+ * @param url Valeur à contrôler
+ * @returns `true` si l'adresse est une adresse http(s) valide
+ */
 function isWebUrl(url: unknown): url is string {
   try {
     return typeof url === 'string' && ['http:', 'https:'].includes(new URL(url).protocol);
@@ -58,15 +84,19 @@ function isWebUrl(url: unknown): url is string {
 class AddPage {
   /** Adresses déjà dans la barre (formes normalisées). */
   private readonly saved = new Set<string>();
+  /** Feuille de style qui habille le widget de recherche, injectée dans l'iframe. */
   private searchCss = '';
+  /** L'iframe a signalé qu'elle peut recevoir des messages. */
   private frameReady = false;
   /** Icône d'origine d'un bouton populaire marqué « Ajouté » (remplacée par une coche). */
   private readonly previousIcons = new WeakMap<HTMLElement, Node[]>();
 
+  /** L'iframe de recherche. */
   private get frame(): HTMLIFrameElement {
     return requireElement<HTMLIFrameElement>('iframe');
   }
 
+  /** Lance l'iframe, relaie le thème et affiche les sites populaires marqués selon la barre actuelle. */
   async start(): Promise<void> {
     // Attendre que le DOM soit chargé pour lancer la frame
     window.addEventListener('DOMContentLoaded', () => {
@@ -113,6 +143,12 @@ class AddPage {
     }
   }
 
+  /**
+   * Traite un message de l'iframe : signal de disponibilité ou demande d'ajout.
+   * Les données venant de l'iframe sont revérifiées avant tout envoi au processus principal.
+   * @param event Message reçu
+   * @param cssLoaded Promesse du chargement de la feuille de style, attendue avant d'envoyer le thème
+   */
   private async onFrameMessage(event: MessageEvent<unknown>, cssLoaded: Promise<unknown>): Promise<void> {
     if (event.source !== this.frame.contentWindow) return;
 
@@ -156,11 +192,16 @@ class AddPage {
     });
   }
 
+  /** Envoie à l'iframe les adresses déjà dans la barre, pour qu'elle marque les sites ajoutés. */
   private pushSaved(): void {
     if (this.frameReady) this.post({ type: MESSAGE_SAVED, urls: [...this.saved] });
   }
 
-  /** Demande l'ajout (ou l'ajout avec personnalisation) d'un site. */
+  /**
+   * Demande l'ajout (ou l'ajout avec personnalisation) d'un site.
+   * @param type Canal de la demande
+   * @param data Nom, adresse et image du site
+   */
   private async request(type: AddRequestType, data: AddRequest): Promise<void> {
     if (type === appEventList.requestAddDataEdit) {
       await window.api.invoke(type, data);
@@ -175,7 +216,11 @@ class AddPage {
     }
   }
 
-  /** Un bouton « populaire » : icône ronde et nom. */
+  /**
+   * Crée le bouton d'un site populaire : icône ronde et nom.
+   * @param app Site populaire
+   * @returns Le bouton, qui ajoute le site à la barre au clic
+   */
   private createPopular(app: PopularApp): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
@@ -200,7 +245,11 @@ class AddPage {
     return button;
   }
 
-  /** @returns L'icône d'une application populaire : police d'icônes, image, ou sa première lettre */
+  /**
+   * Choisit l'icône d'un site populaire.
+   * @param app Site populaire
+   * @returns L'icône d'une application populaire : police d'icônes, image, ou sa première lettre
+   */
   private createPopularIcon(app: PopularApp): Node {
     if (typeof app.icon === 'string' && app.icon.startsWith('font:')) {
       const glyph = document.createElement('i');

@@ -1,25 +1,52 @@
+/**
+ * Page des paramètres : écran, mode d'activation, thèmes, mises à jour et permissions des sites.
+ *
+ * Chargée par la fenêtre des paramètres (`src/page.settings/`). Dépend de `themeCatalog` et `updateCard`,
+ * de `seasonFx` pour les effets de saison et du processus principal, qui enregistre les réglages.
+ */
+// [ds.ts] Charge le design system `rds-*` : enregistre tous les composants web utilisés par les pages
 import '../scripts/ds.js';
+// [rds.d.ts] Types des composants `rds-*` du design system utilisés par les pages
 import type { RdsLoadingButton, RdsProgress, RdsSegmentedControl, RdsSelect, RdsSwitch } from '../types/rds.js';
+// [dom.ts] Accès sûr aux éléments du DOM pour les scripts de page : un élément manquant lève une erreur claire
 import { requireElement } from '../scripts/dom.js';
+// [seasonFx.ts] Effets de saison : calque décoratif (neige, feuilles, pétales, soleil, cadeaux) posé dans un élément
 import { initSeasonFx } from '../scripts/seasonFx.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { PermissionDecision, SeasonInfo, UpdateState } from '../shared/dto.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, pageEventList } from '../shared/ipc/events.js';
+// [contracts.ts] Contrat typé de chaque canal IPC : arguments et réponse d'un appel, arguments d'un envoi
 import type { SettingsFormDto } from '../shared/ipc/contracts.js';
+// [themeCatalog.ts] Catalogue des thèmes : familles, variantes, aperçus et libellés
 import { THEME_FAMILIES, THEME_LABELS, THEME_PREVIEWS, familyOf, isFamilyKey, themesOf } from './themeCatalog.js';
 import type { FamilyKey, ThemeEntry } from './themeCatalog.js';
+// [updateCard.ts] Contenu des cartes de mise à jour des paramètres : titre, statut, progression et boutons
 import { describeTestChannel, describeUpdateCard } from './updateCard.js';
 
+/**
+ * Traduit une clé dans la langue de l'interface.
+ * @param key Clé de traduction
+ * @param variables Valeurs à insérer dans le texte
+ * @returns Le texte traduit
+ */
 const t = (key: string, variables?: Record<string, string | number>): string => window.api.t(key, variables);
+/**
+ * Journalise une erreur d'appel au processus principal.
+ * @param error Erreur reçue
+ */
 const logError = (error: unknown): void => console.error(error);
 
 /** « La date relative » de la dernière vérification est rafraîchie chaque minute. */
 const REFRESH_INTERVAL_MS = 60_000;
 
+/** Mode d'activation de la barre : bouton, bord de l'écran (souris) ou barre ancrée. */
 type Mode = 'button' | 'mouse' | 'appbar';
 
 /** Réglages tels que la page les modifie (les valeurs absentes sont complétées au chargement). */
 type EditableSettings = { -readonly [K in keyof SettingsFormDto]: SettingsFormDto[K] };
 
+/** Réglages appliqués tant que le fichier enregistré n'en fournit pas. */
 const DEFAULT_SETTINGS: EditableSettings = {
   theme: 'system',
   themeAuto: false,
@@ -31,6 +58,12 @@ const DEFAULT_SETTINGS: EditableSettings = {
   displayId: null,
 };
 
+/**
+ * Crée un élément HTML.
+ * @param tag Nom de la balise
+ * @param className Classes CSS facultatives
+ * @returns L'élément créé
+ */
 function element(tag: string, className?: string): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -44,7 +77,12 @@ function previewBar(): HTMLElement {
   return bar;
 }
 
-/** Affiche un statut texte, avec une icône d'alerte en cas d'erreur. */
+/**
+ * Affiche un statut texte, avec une icône d'alerte en cas d'erreur.
+ * @param target Élément qui reçoit le statut
+ * @param text Texte du statut
+ * @param error `true` pour un message d'erreur
+ */
 function setStatus(target: HTMLElement, text: string, error = false): void {
   target.replaceChildren();
   target.classList.toggle('erreur', error);
@@ -59,7 +97,11 @@ function setStatus(target: HTMLElement, text: string, error = false): void {
   target.append(text);
 }
 
-/** Aperçu d'une vignette : porte son propre data-theme / data-palette. */
+/**
+ * Construit l'aperçu d'une vignette : porte son propre data-theme / data-palette.
+ * @param theme Nom du thème à prévisualiser
+ * @returns L'aperçu, moitié clair moitié sombre pour le thème « system »
+ */
 function createPreview(theme: string): HTMLElement {
   if (theme === 'system') {
     // Moitié claire, moitié sombre
@@ -91,23 +133,36 @@ function createPreview(theme: string): HTMLElement {
   return preview;
 }
 
+/**
+ * Donne le nom affiché d'un thème.
+ * @param theme Nom du thème
+ * @returns Le nom traduit, ou le nom brut si aucune traduction n'existe
+ */
 const themeLabel = (theme: string): string => t(THEME_LABELS[theme] ?? theme);
 
 /** La page des paramètres. */
 export class SettingsPage {
+  /** Réglages en cours de modification, renvoyés en entier au processus principal à chaque changement. */
   private settings: EditableSettings = { ...DEFAULT_SETTINGS };
+  /** Saison en cours et prochain changement, `null` tant qu'elle n'est pas connue. */
   private season: SeasonInfo | null = null;
 
+  /** Installe les effets de saison sur le fond de la page. */
   constructor() {
     initSeasonFx(requireElement('#page'));
   }
 
+  /** Attend les réglages du processus principal, puis initialise toutes les sections. */
   start(): void {
     window.api.on(pageEventList.settingsStart, (_, settingsFile) => {
       this.initialize(settingsFile).catch(logError);
     });
   }
 
+  /**
+   * Charge les réglages enregistrés puis initialise chaque section de la page.
+   * @param settingsFile Adresse du fichier de réglages
+   */
   private async initialize(settingsFile: string): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.readSettings(settingsFile)) };
 
@@ -119,7 +174,11 @@ export class SettingsPage {
     await this.initPermissions();
   }
 
-  /** @returns Les réglages enregistrés (vides si le fichier est illisible : les valeurs par défaut s'appliquent) */
+  /**
+   * Lit le fichier de réglages.
+   * @param settingsFile Adresse du fichier de réglages
+   * @returns Les réglages enregistrés (vides si le fichier est illisible : les valeurs par défaut s'appliquent)
+   */
   private async readSettings(settingsFile: string): Promise<Partial<EditableSettings>> {
     try {
       const response = await fetch(settingsFile);
@@ -137,6 +196,7 @@ export class SettingsPage {
 
   // #region Écran et mode d'activation
 
+  /** Propose le choix de l'écran qui porte la barre, seulement s'il y en a plusieurs. */
   private async initDisplays(): Promise<void> {
     const displays = await window.api.invoke(appEventList.getDisplays);
     if (displays.length < 2) return;
@@ -165,12 +225,16 @@ export class SettingsPage {
     requireElement('#display-setting').hidden = false;
   }
 
-  /** Texte d'aide propre au mode d'activation choisi. */
+  /**
+   * Affiche le texte d'aide propre au mode d'activation choisi.
+   * @param mode Mode d'activation
+   */
   private showModeHelp(mode: Mode): void {
     const keys: Record<Mode, string> = { button: 'settings.helpButton', mouse: 'settings.helpMouse', appbar: 'settings.helpAppBar' };
     requireElement('#mode-help').textContent = t(keys[mode]);
   }
 
+  /** Initialise le choix du mode d'activation et les réglages de la barre ancrée. */
   private async initMode(): Promise<void> {
     const control = requireElement<RdsSegmentedControl>('#mode');
 
@@ -221,7 +285,11 @@ export class SettingsPage {
     return this.settings.themeAuto && this.season ? this.season.theme : this.settings.theme;
   }
 
-  /** Choix manuel d'un thème : appliqué et diffusé tout de suite, et le mode automatique s'éteint. */
+  /**
+   * Applique le choix manuel d'un thème : diffusé tout de suite, et le mode automatique s'éteint.
+   * @param theme Thème final choisi
+   * @param family Famille affichée, à conserver au réaffichage
+   */
   private pick(theme: string, family: FamilyKey): void {
     this.settings.theme = theme;
     this.settings.themeAuto = false;
@@ -231,7 +299,10 @@ export class SettingsPage {
     this.renderThemes(family);
   }
 
-  /** (Re)construit la grille de vignettes, la ligne de variantes et les réglages de saison. */
+  /**
+   * (Re)construit la grille de vignettes, la ligne de variantes et les réglages de saison.
+   * @param family Famille de thèmes à afficher
+   */
   private renderThemes(family: FamilyKey): void {
     const current = this.currentTheme;
     const root = requireElement('#themes');
@@ -259,6 +330,12 @@ export class SettingsPage {
     requireElement('#season-options').hidden = family !== 'seasons';
   }
 
+  /**
+   * Crée le nom d'une vignette : coche si choisie, libellé, et nombre de variantes en plus.
+   * @param entry Thème ou regroupement de la vignette
+   * @param chosen `true` si la vignette est le thème actif
+   * @returns Le nom de la vignette
+   */
   private createTileName(entry: ThemeEntry, chosen: boolean): HTMLElement {
     const name = element('span', 'tile-name');
 
@@ -280,7 +357,12 @@ export class SettingsPage {
     return name;
   }
 
-  /** Ligne « Variante de <parent> » : une pilule par variante, seulement pour un parent à variantes. */
+  /**
+   * Construit la ligne « Variante de <parent> » : une pilule par variante, seulement pour un parent à variantes.
+   * @param family Famille affichée
+   * @param active Entrée active, `null` s'il n'y en a pas
+   * @param current Thème actuellement appliqué
+   */
   private renderVariants(family: FamilyKey, active: ThemeEntry | null, current: string): void {
     const row = requireElement('#variants');
     const pills = requireElement('#variant-pills');
@@ -323,6 +405,7 @@ export class SettingsPage {
     badge.textContent = t('settings.autoBadge', { season: themeLabel(season.theme), next: themeLabel(season.nextTheme), date });
   }
 
+  /** Initialise le choix de famille, la grille de thèmes, le thème automatique et les effets de saison. */
   private async initTheme(): Promise<void> {
     const familyControl = requireElement<RdsSegmentedControl>('#family');
     this.season = await window.api.invoke(appEventList.getSeasonInfo);
@@ -348,7 +431,10 @@ export class SettingsPage {
     this.initSeasonEffects();
   }
 
-  /** Thème automatique : suit les dates officielles des saisons. */
+  /**
+   * Initialise le thème automatique, qui suit les dates officielles des saisons.
+   * @param familyControl Sélecteur de famille, relu quand le mode change
+   */
   private initAutoTheme(familyControl: RdsSegmentedControl): void {
     const auto = requireElement<RdsSwitch>('#auto');
     auto.checked = this.settings.themeAuto;
@@ -359,6 +445,11 @@ export class SettingsPage {
     });
   }
 
+  /**
+   * Active ou désactive le thème automatique et réaffiche la grille.
+   * @param enabled `true` pour activer le mode automatique
+   * @param familyControl Sélecteur de famille dont la valeur est réaffichée
+   */
   private async onAutoThemeChanged(enabled: boolean, familyControl: RdsSegmentedControl): Promise<void> {
     this.season = await window.api.invoke(appEventList.getSeasonInfo);
 
@@ -428,6 +519,13 @@ export class SettingsPage {
     }, REFRESH_INTERVAL_MS);
   }
 
+  /**
+   * Affiche l'état de la mise à jour dans la carte : icône, titre, statut ou progression, boutons.
+   * @param card Carte « Mises à jour »
+   * @param checkButton Bouton de vérification
+   * @param installButton Bouton de téléchargement ou d'installation
+   * @param state État reçu du processus principal
+   */
   private renderUpdateCard(card: HTMLElement, checkButton: RdsLoadingButton, installButton: HTMLElement, state: UpdateState): void {
     const view = describeUpdateCard(state, Date.now(), t);
 
@@ -505,6 +603,12 @@ export class SettingsPage {
     render(await window.api.invoke(appEventList.permissionsList));
   }
 
+  /**
+   * Crée la ligne d'une permission mémorisée : origine, type, décision et bouton de révocation.
+   * @param decision Décision mémorisée
+   * @param render Réaffichage de la liste après une révocation
+   * @returns L'élément de liste
+   */
   private createPermissionItem(
     { origin, permission, allowed }: PermissionDecision,
     render: (decisions: readonly PermissionDecision[]) => void,

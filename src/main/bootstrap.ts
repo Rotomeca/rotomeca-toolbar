@@ -1,4 +1,12 @@
+/**
+ * Démarrage du processus principal : instance unique, données protégées, raccourci global, sortie propre.
+ *
+ * Appelé par `main.ts`. Il crée les services qui doivent exister avant l'application (permissions,
+ * mises à jour), puis instancie `App` et gère le cycle de vie Electron (prêt, avant de quitter, fenêtres fermées).
+ */
+// [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { app, dialog, globalShortcut, session } from 'electron';
+// [Persistence.ts] Données de l'utilisateur : dossier userData figé, migration, sauvegardes et cookies de session
 import {
   flushSession,
   keepLoginsAlive,
@@ -7,19 +15,32 @@ import {
   pinUserData,
   restoreFromBackup,
 } from '../scripts/Persistence.js';
+// [permissionDialog.ts] Boîte de dialogue qui demande à l'utilisateur d'autoriser une permission sensible d'un site
 import { createPermissionDialog } from './permissions/permissionDialog.js';
+// [installPermissionHandlers.ts] Branche la politique de permissions des sites tiers sur une session Electron
 import { installPermissionHandlers } from './permissions/installPermissionHandlers.js';
+// [PermissionStore.ts] Mémoire durable des décisions de permissions (caméra/micro, localisation) des sites tiers
 import { PermissionStore } from '../scripts/PermissionStore.js';
+// [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
 import { isSafeUrl } from '../scripts/safeUrl.js';
+// [i18n.ts] Traductions du processus principal : langue du système, dictionnaire et fonction `t`
 import { t } from '../scripts/i18n.js';
+// [App.ts] Assemblage du processus principal : crée les services de la barre et route les appels des pages
 import { App, TOGGLE_SHORTCUT } from './App.js';
+// [JsonFileStore.ts] Fichier JSON sûr : écriture atomique, sauvegarde `.bak`, mise en quarantaine d'un fichier corrompu
 import { JsonFileStore, dataDirectory } from './persistence/JsonFileStore.js';
+// [createUpdateManager.ts] Construit le gestionnaire de mises à jour en le reliant à Electron (Squirrel, réseau, notifications)
 import { createUpdateManager } from './updates/createUpdateManager.js';
 
 /** Lancé par `npm run debug` : `electron . --dev`. */
 const isDev = process.argv[2] === '--dev';
 
-/** Restaure les données, installe les permissions, puis crée l'application. */
+/**
+ * Restaure les données, installe les permissions, puis crée et démarre l'application.
+ *
+ * @param onInstance Rappel appelé dès que l'instance existe, avant son démarrage, pour que la sortie propre puisse la libérer même si `start()` échoue.
+ * @returns L'application démarrée
+ */
 function createApp(onInstance: (instance: App) => void): App {
   migrateLegacyData(app, dataDirectory());
   restoreFromBackup(dataDirectory());

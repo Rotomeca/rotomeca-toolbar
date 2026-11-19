@@ -1,5 +1,14 @@
+/**
+ * Descriptions (taille, position, style, page) de chaque fenêtre de l'interface.
+ *
+ * Utilisé par `AppWindows` pour créer les fenêtres et par `ToolbarController` pour les dimensions.
+ * Ne contient que des données et des fonctions pures : la disposition vient de `dockGeometry`.
+ */
+// [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
+// [dockGeometry.ts] Géométrie de la barre : disposition des fenêtres, bande réservée et masquage automatique
 import type { Layout, Rect } from '../dock/dockGeometry.js';
+// [windowConfig.ts] Construction des options d'une `BrowserWindow` à partir d'une description sans réglages de sécurité
 import type { WindowOptions } from './windowConfig.js';
 
 // Dimensions fixes de l'interface (px)
@@ -11,31 +20,43 @@ export const APPBAR_WIDTH = 72;
  * de 24 px et laisse les 8 px restants transparents.
  */
 export const RAIL_WIDTH = 24;
-/** Fenêtre « Ajouter une application » (contenu). */
+/** Fenêtre « Ajouter une application » (contenu) : largeur. */
 export const ADD_DIALOG_WIDTH = 640;
+/** Fenêtre « Ajouter une application » (contenu) : hauteur. */
 export const ADD_DIALOG_HEIGHT = 760;
-/** Bandeau d'actions au-dessus des applications. */
+/** Bandeau d'actions au-dessus des applications : hauteur. */
 export const APPS_HEADER_HEIGHT = 32;
+/** Popup de contrôle du morceau en cours : largeur. */
 export const MEDIA_POPUP_WIDTH = 340;
+/** Popup de contrôle du morceau en cours : hauteur. */
 export const MEDIA_POPUP_HEIGHT = 200;
-/** Infobulle : fenêtre transparente sans clic, plus grande que son contenu. */
+/** Infobulle (fenêtre transparente sans clic, plus grande que son contenu) : largeur. */
 export const TOOLTIP_WIDTH = 320;
+/** Infobulle : hauteur. */
 export const TOOLTIP_HEIGHT = 48;
 /** Zone sensible au bord gauche de l'écran (mode souris). */
 export const EDGE_WIDTH = 4;
 
+/** Fenêtre des paramètres : largeur (contenu). */
 const SETTINGS_WIDTH = 800;
+/** Fenêtre des paramètres : hauteur (contenu). */
 const SETTINGS_HEIGHT = 810;
 
+/** Ce dont chaque description de fenêtre a besoin ; relu à chaque création car la disposition change. */
 export interface WindowSpecContext {
   /** Dossier qui contient `index.html` et `src/` (la racine de l'application construite). */
   readonly appRoot: string;
+  /** Chemin du preload des pages locales. */
   readonly preload: string;
+  /** Chemin de l'icône de l'application, affichée par les fenêtres à cadre. */
   readonly appIcon: string;
+  /** Position de chaque fenêtre sur l'écran choisi. */
   readonly layout: Layout;
+  /** Traduit une clé de `locales/*.json` (titres des fenêtres). */
   readonly translate: (key: string) => string;
 }
 
+/** Chemin d'une page locale, depuis la racine de l'application construite. */
 const page = (context: WindowSpecContext, ...segments: string[]): string => path.join(context.appRoot, ...segments);
 
 /** Fenêtre transparente, sans cadre, toujours au-dessus et hors de la barre des tâches. */
@@ -120,6 +141,7 @@ export function edgeWindowSpec(context: WindowSpecContext): WindowOptions {
   };
 }
 
+/** Fenêtre des paramètres : créée cachée, à afficher une fois sa page prête. */
 export function settingsWindowSpec(context: WindowSpecContext): WindowOptions {
   return {
     title: context.translate('window.settings'),

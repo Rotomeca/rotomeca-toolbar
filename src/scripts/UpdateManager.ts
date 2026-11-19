@@ -1,5 +1,8 @@
 /**
- * Mises à jour de l'application, côté processus principal.
+ * Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions.
+ *
+ * Utilisé par le processus principal, qui injecte Squirrel, le réseau et les
+ * notifications (aucune dépendance à `electron`, donc testable).
  *
  * - Windows / macOS : Squirrel (`autoUpdater`). Le téléchargement démarre dès qu'une
  *   version est trouvée ; Squirrel n'expose aucune progression, la barre est donc
@@ -18,19 +21,26 @@
  * ne fait qu'afficher et déclencher « rechercher » / « mettre à jour ».
  */
 
+// [githubReleases.ts] Lecture des releases GitHub : dernière release et pré-version la plus récente
 import {
   fetchLatestRelease,
   fetchRecentReleases,
   findNewestPrerelease,
 } from './githubReleases.js';
 import type { HttpFetch } from './githubReleases.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { UpdateChannel, UpdateStage, UpdateState } from '../shared/dto.js';
+// [versions.ts] Numéros de version : comparaison et détection des pré-versions (`X.Y.Z-rcN`)
 import { isPrerelease } from './versions.js';
 
+/** Intervalle entre deux vérifications automatiques (une heure). */
 export const CHECK_INTERVAL = 60 * 60 * 1000;
 
+/** Clé de texte : le serveur de test ne propose pas encore la pré-version (cache de Hazel). */
 const TEST_FEED_STALE_ERROR = 'update.test.errorUnavailable';
+/** Clé de texte : la vérification a échoué. */
 const CHECK_ERROR = 'update.card.errorCheck';
+/** Clé de texte : le téléchargement ou l'installation a échoué. */
 const DOWNLOAD_ERROR = 'update.card.errorDownload';
 
 /** `available` n'existe que sous Linux (mise à jour manuelle). */
@@ -41,13 +51,19 @@ export type { UpdateChannel, UpdateStage, UpdateState };
  * Signatures de méthodes : les écouteurs d'Electron reçoivent plus d'arguments.
  */
 export interface SquirrelUpdater {
+  /** Écoute la découverte (ou l'absence) d'une version. */
   on(event: 'update-available' | 'update-not-available', listener: () => void): unknown;
+  /** Écoute la fin du téléchargement ; `releaseName` n'est renseigné que sur macOS. */
   on(event: 'update-downloaded', listener: (event: unknown, notes: string, releaseName: string) => void): unknown;
+  /** Écoute les erreurs de vérification ou de téléchargement. */
   on(event: 'error', listener: (error: Error) => void): unknown;
+  /** Interroge le serveur de mises à jour ; le téléchargement démarre seul si une version existe. */
   checkForUpdates(): void;
+  /** Quitte l'application et installe la version téléchargée. */
   quitAndInstall(): void;
 }
 
+/** Tout ce que le gestionnaire reçoit de l'extérieur (Squirrel, réseau, système, fenêtres). */
 export interface UpdateManagerDependencies {
   /** Version courante. */
   readonly version: string;
@@ -59,8 +75,11 @@ export interface UpdateManagerDependencies {
   readonly manual: boolean;
   /** Simule un cycle complet (développement). */
   readonly simulate: boolean;
+  /** Requête HTTP vers l'API GitHub. */
   readonly fetch: HttpFetch;
+  /** Ouvre une adresse dans le navigateur par défaut. */
   readonly openExternal: (url: string) => void;
+  /** Compare deux versions : négatif, nul ou positif comme un tri. */
   readonly compareVersions: (a: string, b: string) => number;
   /** Sauvegardes avant le redémarrage. */
   readonly beforeInstall: () => void;
@@ -68,13 +87,16 @@ export interface UpdateManagerDependencies {
   readonly setFeed?: ((channel: UpdateChannel) => void) | null;
   /** Un serveur de mises à jour pour les pré-versions existe. */
   readonly testFeed?: boolean;
+  /** Appelé à chaque changement d'état (renvoyé à la fenêtre Paramètres). */
   readonly onChange: (state: UpdateState) => void;
   /** Notification système. */
   readonly notifyReady: (version: string | null) => void;
 }
 
+/** États pendant lesquels une nouvelle vérification ne doit pas être lancée. */
 const IN_PROGRESS: readonly UpdateStage[] = ['downloading', 'ready'];
 
+/** Machine d'états des mises à jour : vérifie, télécharge, propose l'installation et publie l'état. */
 export class UpdateManager {
   readonly #deps: UpdateManagerDependencies;
   #state: UpdateState;
@@ -86,6 +108,10 @@ export class UpdateManager {
   /** Serveur actuellement interrogé par Squirrel. */
   #channel: UpdateChannel = 'stable';
 
+  /**
+   * Prépare l'état initial (« à jour ») sans rien lancer ; voir {@link UpdateManager.start}.
+   * @param deps Dépendances injectées
+   */
   constructor(deps: UpdateManagerDependencies) {
     this.#deps = deps;
     this.#state = {
@@ -111,6 +137,7 @@ export class UpdateManager {
     return simulate || Boolean(autoUpdater) || (manual && Boolean(releasesRepo));
   }
 
+  /** Copie de l'état courant, que la fenêtre Paramètres affiche telle quelle. */
   get state(): UpdateState {
     return { ...this.#state };
   }
@@ -219,6 +246,7 @@ export class UpdateManager {
     if (this.#testUrl) this.#deps.openExternal(this.#testUrl);
   }
 
+  /** Lance la vérification adaptée au mode : simulation, GitHub (Linux) ou Squirrel (canal stable). */
   async #runCheck(): Promise<void> {
     const { simulate, manual } = this.#deps;
 
@@ -232,11 +260,16 @@ export class UpdateManager {
     }
   }
 
+  /**
+   * @returns Squirrel
+   * @throws {Error} Si Squirrel n'est pas utilisable dans cet environnement
+   */
   #requireUpdater(): SquirrelUpdater {
     if (!this.#deps.autoUpdater) throw new Error('Squirrel n\'est pas utilisable dans cet environnement');
     return this.#deps.autoUpdater;
   }
 
+  /** Branche les évènements de Squirrel sur l'état ; sans effet sous Linux, en simulation ou sans Squirrel. */
   #bindSquirrel(): void {
     const { autoUpdater, manual, simulate } = this.#deps;
     if (!autoUpdater || manual || simulate) return;
@@ -258,6 +291,7 @@ export class UpdateManager {
     autoUpdater.on('error', (error) => this.#fail(error));
   }
 
+  /** Squirrel ne trouve rien : « à jour », ou erreur dédiée si on cherchait sur le serveur de test. */
   #onNoUpdate(): void {
     if (this.#channel === 'test') {
       // Le serveur de test met sa liste en cache (15 min par défaut) : la
@@ -275,6 +309,10 @@ export class UpdateManager {
     this.#set({ etat: 'uptodate', verification: false, erreur: null, derniereVerification: Date.now() });
   }
 
+  /**
+   * Passe à « prête » et notifie l'utilisateur.
+   * @param releaseName Nom de version fourni par Squirrel (macOS seulement)
+   */
   #onDownloaded(releaseName: string): void {
     // Squirrel ne donne le nom de version que sur macOS
     const version =
@@ -292,6 +330,10 @@ export class UpdateManager {
     this.#deps.notifyReady(version);
   }
 
+  /**
+   * Compare la dernière release GitHub à la version courante (mode manuel, Linux).
+   * @throws {Error} Si aucun dépôt de releases n'est configuré, ou si GitHub répond mal
+   */
   async #checkGithub(): Promise<void> {
     const { releasesRepo, compareVersions, version, fetch } = this.#deps;
     if (!releasesRepo) throw new Error('Aucun dépôt de releases configuré');
@@ -362,6 +404,10 @@ export class UpdateManager {
     this.#channel = channel;
   }
 
+  /**
+   * Fusionne un changement dans l'état et le publie.
+   * @param patch Champs à modifier
+   */
   #set(patch: Partial<UpdateState>): void {
     this.#state = { ...this.#state, ...patch };
     this.#deps.onChange(this.state);

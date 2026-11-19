@@ -1,3 +1,9 @@
+/**
+ * Script injecté dans les sites : transmet le clic droit à la fenêtre du menu contextuel.
+ *
+ * Lu comme texte par le processus principal puis exécuté par `executeJavaScript`. Dépend de `window.api`.
+ */
+
 // Script injecté dans chaque page de l'application (lu comme du texte par le processus principal) :
 // il transmet le clic droit à la fenêtre qui affiche le menu. Ce fichier n'est donc PAS un module
 // (pas d'import ni d'export statiques) ; l'import dynamique est résolu depuis l'adresse de la page.

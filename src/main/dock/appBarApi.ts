@@ -1,3 +1,10 @@
+/**
+ * Appels natifs Windows de la barre ancrée (SHAppBarMessage) chargés via koffi.
+ *
+ * Utilisé par `createAppBar`. Seul fichier qui connaît koffi : hors Windows, ou si koffi
+ * manque, la barre ancrée est simplement indisponible.
+ */
+// [koffi] appels de fonctions natives Windows (barre ancrée)
 import type * as Koffi from 'koffi';
 
 /** Rectangle système, en pixels physiques. */
@@ -28,9 +35,10 @@ export interface AppBarApi {
   registerMessage(name: string): number;
 }
 
+/** Fonction qui charge le module natif koffi. */
 export type KoffiLoader = () => typeof Koffi;
 
-// Chargement paresseux voulu : koffi est un module natif, il ne doit se charger que sous Windows
+/** Chargeur de koffi par défaut, paresseux : koffi est un module natif qui ne doit se charger que sous Windows. */
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const requireKoffi: KoffiLoader = () => require('koffi') as typeof Koffi;
 

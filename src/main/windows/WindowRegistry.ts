@@ -1,14 +1,30 @@
+/**
+ * Registre des fenêtres ouvertes, indexées par nom.
+ *
+ * Utilisé par `AppWindows` pour créer chaque fenêtre une seule fois et oublier celles qui sont
+ * détruites. Ne dépend que d'une interface minimale, ce qui le rend testable sans Electron.
+ */
+
 /** Ce que le registre demande à une fenêtre. */
 export interface RegistrableWindow {
   isDestroyed(): boolean;
   close(): void;
 }
 
-/** Les fenêtres ouvertes de l'application, par nom. */
+/**
+ * Les fenêtres ouvertes de l'application, par nom.
+ * @typeParam W Type de fenêtre suivi (une `BaseWindow` en production)
+ */
 export class WindowRegistry<W extends RegistrableWindow> {
+  /** Fenêtres enregistrées, par nom. */
   private readonly windows = new Map<string, W>();
 
-  /** @throws {Error} Si une fenêtre porte déjà ce nom */
+  /**
+   * Enregistre une fenêtre sous un nom.
+   * @param name Nom d'enregistrement
+   * @param window Fenêtre à suivre
+   * @throws {Error} Si une fenêtre porte déjà ce nom
+   */
   add(name: string, window: W): void {
     if (this.get(name)) throw new Error(`Une fenêtre nommée « ${name} » existe déjà`);
 

@@ -1,35 +1,90 @@
+/**
+ * Assemblage du processus principal : crée les services de la barre et route les appels des pages.
+ *
+ * Créé et démarré par `bootstrap.ts`. Ce fichier ne contient presque aucune logique métier : chaque
+ * comportement vit dans un service testable (injection de dépendances) et `App` ne fait que câbler
+ * les services entre eux et avec Electron (écrans, fenêtres, dialogues, minuteurs).
+ *
+ * Qui fait quoi :
+ * - `AppWindows` : crée et retient les fenêtres (barre, bouton, applications, ajout, paramètres, médias, infobulle).
+ * - `ToolbarController` : état et géométrie de la barre (ouverture, masquage, survol du bord, barre ancrée).
+ * - `ThemeService` : thème clair/sombre/saison, appliqué aux pages et rediffusé quand les paramètres changent.
+ * - `AppViewHost` : vues web des sites lancés (ouverture, cache, son coupé, badges, contrôle des médias).
+ * - `AppListService` : liste des applications de la barre, sauvegardée sur disque (`JsonFileStore`).
+ * - `MediaPopup` et `TooltipPopup` : petites fenêtres flottantes (morceau en cours, infobulle d'un bouton).
+ * - `ContextMenuController` : menu contextuel (clic droit) des boutons de la barre.
+ * - Zone de notification (`createElectronTray`) : icône, menu, infobulle du morceau et badge de mise à jour.
+ * - `IpcRouter` : enregistre les appels des pages (`appEventList`) et valide leurs arguments avant de déléguer.
+ * - `UpdateManager` et `PermissionStore` : fournis par `bootstrap.ts` (mises à jour, permissions des sites).
+ *
+ * Routage IPC : toute page appelle le processus principal via un canal de `shared/ipc/events.ts` ;
+ * `registerIpcRoutes` associe chaque canal à une méthode d'un service. Les arguments venant des pages
+ * sont non fiables (`unknown`) et vérifiés ici. Les envois inverses passent par `pageEventList`.
+ */
+// [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
+// [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { WebContentsView, app, dialog, ipcMain, screen, shell } from 'electron';
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
+// [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { sanitizeMediaState } from '../scripts/AppIndicators.js';
+// [appIcon.ts] Choisit l'icône de l'application selon que la version est une pré-version ou non
 import { iconBaseName } from '../scripts/appIcon.js';
+// [i18n.ts] Traductions du processus principal : langue du système, dictionnaire et fonction `t`
 import { getDictionary, getLocale, t } from '../scripts/i18n.js';
+// [PermissionStore.ts] Mémoire durable des décisions de permissions (caméra/micro, localisation) des sites tiers
 import type { PermissionStore } from '../scripts/PermissionStore.js';
+// [Seasons.ts] Saisons : dates officielles des équinoxes et des solstices, et thème de saison du jour
 import { seasonInfo } from '../scripts/Seasons.js';
+// [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
 import { isSafeUrl } from '../scripts/safeUrl.js';
+// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions
 import type { UpdateManager } from '../scripts/UpdateManager.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, internalChannels, pageEventList } from '../shared/ipc/events.js';
+// [AppListService.ts] Service des applications de la barre : ordre, séparateurs, validation et enregistrement
 import { AppListService } from './apps/AppListService.js';
+// [AppViewHost.ts] Hôte des sites ouverts en arrière-plan : vues, indicateurs (non-lus, son, morceau) et sourdine
 import { AppViewHost } from './apps/AppViewHost.js';
+// [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
 import { ContextMenuController } from './contextmenu/ContextMenuController.js';
+// [electronContextMenu.ts] Menu contextuel Electron : injecte le script de clic droit et ouvre la fenêtre du menu
 import { startContextMenu } from './contextmenu/electronContextMenu.js';
+// [createAppBar.ts] Assemble la barre ancrée : appels natifs Windows et conversions d'écran d'Electron
 import { createAppBar, isAppBarSupported } from './dock/createAppBar.js';
+// [IpcRouter.ts] Routeur des appels IPC des pages vers le processus principal, avec contrôle de l'origine
 import { IpcRouter } from './ipc/IpcRouter.js';
+// [mediaState.ts] Calculs purs autour de l'état média des applications : avancée, contenu du popup, lecteurs ignorés
 import { describeNowPlaying, changedIgnored, mediaPayload, mediaProgress, splitTaskbarPlayers } from './media/mediaState.js';
+// [MediaPopup.ts] Popup de contrôle du morceau en cours, affiché au survol d'un bouton de la barre
 import { MediaPopup } from './media/MediaPopup.js';
+// [JsonFileStore.ts] Fichier JSON sûr : écriture atomique, sauvegarde `.bak`, mise en quarantaine d'un fichier corrompu
 import { JsonFileStore, dataDirectory } from './persistence/JsonFileStore.js';
+// [webContentsHardener.ts] Durcit le contenu web d'un site tiers : popups, navigation et `<webview>` restreints
 import { hardenWebContents } from './security/webContentsHardener.js';
+// [applySettingsUpdate.ts] Applique les réglages envoyés par la page des paramètres et dit ce qui demande une réaction
 import { applySettingsUpdate } from './settings/applySettingsUpdate.js';
+// [defaultSettings.ts] Instance unique des réglages de l'application, lue dans le fichier `settings.rcft`
 import { getSettings } from './settings/defaultSettings.js';
+// [ThemeService.ts] Application du thème de l'utilisateur aux pages locales, et mise à jour quand il change
 import { ThemeService } from './theming/ThemeService.js';
+// [electronThemeEnvironment.ts] Branchement du thème sur Electron (nativeTheme, powerMonitor, webContents)
 import { createElectronThemeEnvironment } from './theming/electronThemeEnvironment.js';
+// [ToolbarController.ts] Contrôleur de la barre : dépliée ou repliée, ancrée ou flottante, modes bouton, souris et masquage automatique
 import { ToolbarController } from './toolbar/ToolbarController.js';
+// [TooltipPopup.ts] Infobulle affichée à droite de la barre, au niveau du bouton survolé
 import { TooltipPopup } from './tooltip/TooltipPopup.js';
+// [electronTray.ts] Branchement de l'icône de la zone de notification sur Electron (Tray, Menu, nativeImage)
 import { createElectronTray } from './tray/electronTray.js';
+// [trayTooltip.ts] Texte de l'infobulle de la zone de notification : texte de base, pré-version et mise à jour
 import type { TrayUpdateInfo } from './tray/trayTooltip.js';
+// [updateBadge.ts] Pastille de couleur dessinée sur l'icône de la zone de notification pour signaler une mise à jour
 import { updateLevelOf } from './tray/updateBadge.js';
+// [AppWindows.ts] Création et suivi des fenêtres de l'application (barre, bouton, infobulles, paramètres, sites)
 import { AppWindows } from './windows/AppWindows.js';
+// [displays.ts] Choix de l'écran de la barre et description des écrans pour la page des paramètres
 import { describeDisplays, pickDisplay } from './windows/displays.js';
+// [windowSpecs.ts] Descriptions (taille, position, style, page) de chaque fenêtre de l'interface
 import { APPS_HEADER_HEIGHT, MEDIA_POPUP_HEIGHT, TOOLTIP_HEIGHT } from './windows/windowSpecs.js';
 
 /** Raccourci clavier global qui affiche ou cache la barre. */
@@ -41,12 +96,17 @@ const MEDIA_POPUP_HIDE_DELAY_MS = 250;
 /** Racine de l'application construite (`dist/`) : ce fichier est dans `dist/src/main/`. */
 const APP_ROOT = path.join(__dirname, '..', '..');
 
+/** Services créés par `bootstrap.ts` avant l'application et qu'elle utilise sans les construire. */
 export interface AppServices {
+  /** Gestionnaire de mises à jour (vérification, installation, état). */
   readonly updater: UpdateManager;
+  /** Magasin des décisions de permission prises pour les sites. */
   readonly permissions: PermissionStore;
+  /** Vrai en mode développement (`--dev`). */
   readonly isDev: boolean;
 }
 
+/** Vrai si la valeur reçue d'une page est un objet, ce qui permet d'en lire les champs avant de les vérifier. */
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 /** L'application : assemble les services (fenêtres, barre, applications, médias, zone de notification) et route les appels des pages. */
@@ -70,6 +130,13 @@ export class App {
   private readonly tooltipPopup: TooltipPopup;
   private readonly tray: ReturnType<typeof createElectronTray>;
 
+  /**
+   * Construit les services et les relie entre eux. Les dépendances croisées (par exemple la barre qui
+   * masque les popups) passent par des fonctions évaluées à l'usage : l'ordre de création n'a donc pas
+   * d'importance tant que rien n'est appelé avant `start()`.
+   *
+   * @param services Services créés en amont par `bootstrap.ts`.
+   */
   constructor(private readonly services: AppServices) {
     this.contextMenu = new ContextMenuController({
       isToolbarWindow: (id) => id === this.windows.getBrowser('toolbar')?.id,
@@ -288,6 +355,12 @@ export class App {
     return pickDisplay(screen.getAllDisplays(), this.settings.displayId, screen.getPrimaryDisplay());
   }
 
+  /**
+   * Envoie un message à la page de la barre.
+   *
+   * @param channel Canal de `pageEventList`.
+   * @param payload Données transmises à la page.
+   */
   private toolbarMessage(channel: string, payload: unknown): void {
     this.windows.toolbar.webContents.postMessage(channel, payload);
   }
@@ -305,6 +378,7 @@ export class App {
     for (const url of this.viewHost.knownUrls()) this.sendIndicators(url);
   }
 
+  /** @returns L'état de la mise à jour tel que l'attend la zone de notification, ou `null` s'il n'y en a pas encore */
   private trayUpdateInfo(): TrayUpdateInfo | null {
     const { state } = this.services.updater;
     if (!state) return null;
@@ -319,12 +393,23 @@ export class App {
 
   // #region Indicateurs et médias
 
+  /**
+   * Propage un changement d'état d'un site (badge, son, morceau) à la barre, à la fenêtre du morceau
+   * et à l'infobulle de la zone de notification.
+   *
+   * @param url Adresse de l'application dont l'état a changé.
+   */
   private sendIndicators(url: string): void {
     this.postIndicators(url);
     this.mediaPopup.refresh(url);
     this.updateTaskbar();
   }
 
+  /**
+   * Envoie à la barre les indicateurs d'un bouton : badge, son, pochette, progression, lecteur ignoré.
+   *
+   * @param url Adresse de l'application concernée.
+   */
   private postIndicators(url: string): void {
     const entry = this.viewHost.entry(url);
 
@@ -352,11 +437,21 @@ export class App {
     this.tray.showTooltip(media ? describeNowPlaying(media, others.length, t) : t('tray.tooltip'));
   }
 
+  /**
+   * @param url Adresse de l'application.
+   * @returns Les données affichées par la fenêtre du morceau pour cette application
+   */
   private mediaPayloadOf(url: string): ReturnType<typeof mediaPayload> {
     return mediaPayload(url, this.viewHost.entry(url)?.media, this.viewHost.isMuted(url));
   }
 
-  /** Reçoit le morceau en cours d'un site (depuis son preload). */
+  /**
+   * Reçoit le morceau en cours d'un site (depuis son preload). Les messages venant d'un sous-cadre
+   * sont ignorés, et les données sont nettoyées avant d'être stockées.
+   *
+   * @param event Évènement IPC, qui permet d'identifier le site émetteur.
+   * @param raw État média brut, non fiable.
+   */
   private onMediaState(event: IpcMainEvent, raw: unknown): void {
     if (event.senderFrame !== event.sender.mainFrame) return;
 
@@ -368,7 +463,12 @@ export class App {
 
   // #region Fenêtres
 
-  /** Ouvre la fenêtre d'ajout, ou d'édition si une application est donnée. */
+  /**
+   * Ouvre la fenêtre d'ajout, ou d'édition si une application est donnée. À sa fermeture, la barre
+   * est réaffichée.
+   *
+   * @param data Application à modifier ; absent pour un ajout.
+   */
   private openAddDialog(data?: { readonly url?: string }): void {
     this.toolbarMessage(pageEventList.windowAppsClosed, true);
 
@@ -396,6 +496,12 @@ export class App {
     dialogWindow.show();
   }
 
+  /**
+   * Arrête un site (sa vue est détruite) et peut l'ouvrir dans le navigateur par défaut.
+   *
+   * @param url Adresse de l'application ; ignorée si ce n'est pas une chaîne.
+   * @param open Si `true`, ouvre l'adresse dans le navigateur (seulement si elle est sûre) et masque la barre.
+   */
   private killApp(url: unknown, open: unknown): void {
     if (typeof url !== 'string') return;
 
@@ -410,11 +516,18 @@ export class App {
     if (isSafeUrl(url)) void shell.openExternal(url);
   }
 
+  /** Masque la zone des applications et prévient la barre pour qu'elle désélectionne le bouton actif. */
   private closeApps(): void {
     this.windows.apps.hide();
     this.toolbarMessage(pageEventList.windowAppsClosed, true);
   }
 
+  /**
+   * Applique des paramètres envoyés par la page des paramètres, puis en répercute les effets
+   * (repositionnement, thème, reconstruction de la barre si le mode d'affichage change).
+   *
+   * @param raw Paramètres bruts, non fiables : validés par `applySettingsUpdate`.
+   */
   private onSettingsUpdated(raw: unknown): void {
     const result = applySettingsUpdate(this.settings, raw);
     if (!result) return;
@@ -430,6 +543,11 @@ export class App {
 
   // #region Appels des pages
 
+  /**
+   * Associe chaque canal de `appEventList` à l'action du service qui le traite. Les arguments sont
+   * vérifiés ici (type, forme) avant d'être transmis. Enregistre aussi les deux canaux internes :
+   * l'état média envoyé par le preload des sites, et les traductions demandées par le preload des pages locales.
+   */
   private registerIpcRoutes(): void {
     const { toolbar, appList, viewHost, windows, services } = this;
     const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain);

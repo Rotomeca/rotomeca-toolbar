@@ -1,3 +1,8 @@
+/**
+ * Type de `window.api`, l'API exposée aux pages par le preload.
+ *
+ * Utilisé par tous les scripts de page. Dépend des contrats IPC de `src/shared/ipc/`.
+ */
 import type { InvokeArgs, InvokeResult, PushArgs } from '../shared/ipc/contracts.js';
 import type { InvokeChannel, PushChannel } from '../shared/ipc/events.js';
 
@@ -27,6 +32,7 @@ export interface RotomecaApi {
   on<C extends PushChannel>(channel: C, callback: (event: null, ...args: PushArgs<C>) => void): () => void;
 }
 
+/** Ajoute `api` à l'objet `window` des pages. */
 declare global {
   interface Window {
     readonly api: RotomecaApi;

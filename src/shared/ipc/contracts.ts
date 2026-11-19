@@ -1,3 +1,11 @@
+/**
+ * Contrat typé de chaque canal IPC : arguments et réponse d'un appel, arguments d'un envoi.
+ *
+ * Utilisé par `src/types/window-api.d.ts` pour typer `window.api` côté pages. Les noms de canaux
+ * viennent de `events.ts` ; une garde de compilation en bas de fichier vérifie qu'aucun canal ne manque.
+ * Les valeurs reçues par le processus principal restent non fiables et sont revalidées à l'arrivée.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type {
   AppDto,
   AskablePermission,
@@ -10,25 +18,38 @@ import type {
   ToolbarEntryDto,
   UpdateState,
 } from '../dto.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import type { InvokeChannel, PushChannel } from './events.js';
 
 /** Réglages envoyés par la page des paramètres. */
 export interface SettingsFormDto {
+  /** Nom du thème choisi à la main. */
   readonly theme: string;
+  /** Thème automatique selon la saison. */
   readonly themeAuto: boolean;
+  /** Effets de saison activés. */
   readonly effetsSaison: boolean;
+  /** Densité des effets de saison. */
   readonly densiteEffets: string;
+  /** Mode bouton (la barre s'ouvre depuis un bouton). */
   readonly isButtonModeEnabled: boolean;
+  /** Barre ancrée au bord de l'écran. */
   readonly appBarEnabled: boolean;
+  /** Barre ancrée qui se replie quand la souris la quitte. */
   readonly appBarAutoHide: boolean;
+  /** Écran choisi, `null` pour l'écran principal. */
   readonly displayId: number | null;
 }
 
 /** Application à modifier, ouverte dans la fenêtre d'édition. */
 export interface EditRequestDto {
+  /** Adresse actuelle de l'application. */
   readonly url: string;
+  /** Titre de la page du site, proposé comme nom. */
   readonly title?: string;
+  /** Nom actuel de l'application. */
   readonly name?: string;
+  /** Icône actuelle. */
   readonly picture?: string | null;
   /** Position de l'application dans la barre. */
   readonly index: number;
@@ -36,14 +57,22 @@ export interface EditRequestDto {
 
 /** Ce que la page envoie quand l'utilisateur clique avec le bouton droit. */
 export interface ContextMenuClickDto {
+  /** Élément cliqué. */
   readonly target: {
+    /** Contenu texte de l'élément. */
     readonly content: string;
+    /** Nom de la balise. */
     readonly nodeName: string;
+    /** Attributs de l'élément. */
     readonly attribs: Readonly<Record<string, string>>;
+    /** Classes CSS de l'élément. */
     readonly classes: readonly string[];
   };
+  /** Bouton de la souris (2 pour le clic droit). */
   readonly button: number;
+  /** Abscisse du clic dans la page. */
   readonly x: number;
+  /** Ordonnée du clic dans la page. */
   readonly y: number;
 }
 
@@ -94,6 +123,7 @@ export interface InvokeContracts {
 
 /** Un envoi du processus principal vers les pages : les arguments reçus par l'écouteur, par canal. */
 export interface PushContracts {
+  // Le nom du champ est la valeur du canal (par exemple `mode_edit`), pas la clé de `pageEventList`
   toolbarClosed: [opened: true];
   mode_edit: [app: EditRequestDto];
   frameOpen: [url: string | null];
@@ -122,8 +152,11 @@ export type InvokeResult<C extends InvokeChannel> = InvokeContracts[C]['result']
 /** Arguments reçus par l'écouteur d'un canal envoyé par le processus principal. */
 export type PushArgs<C extends PushChannel> = PushContracts[C];
 
-// Garde de compilation : les contrats couvrent exactement les canaux de `events.ts`, ni plus, ni moins
+/** Vrai si les deux types sont identiques. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+/** Ne compile que si le type reçu est `true`. */
 type Assert<T extends true> = T;
+/** Garde de compilation : les contrats d'appel couvrent exactement les canaux de `appEventList`, ni plus, ni moins. */
 export type InvokeContractsCoverChannels = Assert<Same<InvokeChannel, keyof InvokeContracts>>;
+/** Garde de compilation : les contrats d'envoi couvrent exactement les canaux de `pageEventList`. */
 export type PushContractsCoverChannels = Assert<Same<PushChannel, keyof PushContracts>>;

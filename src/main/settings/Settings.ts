@@ -1,16 +1,27 @@
+/**
+ * Réglages de l'utilisateur : accesseurs validés au-dessus d'un fichier de réglages.
+ *
+ * Lus par `App.ts`, la barre et le thème ; modifiés depuis la page des paramètres via `applySettingsUpdate`.
+ * Chaque lecture renvoie une valeur valide même si le fichier est absent ou abîmé.
+ */
+// [themes.ts] Thèmes disponibles, leurs attributs (`data-theme`, `data-palette`) et la validation des réglages d'apparence
 import { sanitizeDensity, sanitizeDisplayId, sanitizeTheme } from './themes.js';
 import type { EffectDensity, ThemeName } from './themes.js';
 
 /** Où les réglages sont lus et écrits. */
 export interface SettingsStore {
+  /** Chemin du fichier des réglages (affiché dans la page des paramètres). */
   readonly path: string;
   /** @returns Les réglages enregistrés, ou `false` s'il n'y en a pas */
   load(): unknown;
+  /** Enregistre les réglages. */
   save(data: unknown): void;
 }
 
+/** Réglages tels que lus sur le disque, avant validation. */
 type RawSettings = Record<string, unknown>;
 
+/** Vrai si la valeur lue est un objet. */
 const isRecord = (value: unknown): value is RawSettings => typeof value === 'object' && value !== null;
 
 /**
@@ -29,10 +40,12 @@ export class Settings {
     private readonly seasonTheme: () => ThemeName,
   ) {}
 
+  /** Chemin du fichier où les réglages sont enregistrés. */
   get filePath(): string {
     return this.store.path;
   }
 
+  /** Mode bouton : la barre s'ouvre depuis un bouton plutôt qu'au survol du bord (par défaut oui). */
   get isButtonModeEnabled(): boolean {
     const stored = this.read().isButtonModeEnabled;
     return typeof stored === 'boolean' ? stored : true;
@@ -60,6 +73,7 @@ export class Settings {
     this.read().appBarAutoHide = value === true;
   }
 
+  /** Thème choisi à la main ; le thème par défaut si la valeur est invalide. */
   get theme(): ThemeName {
     return sanitizeTheme(this.read().theme);
   }
@@ -91,6 +105,7 @@ export class Settings {
     this.read().effetsSaison = value !== false;
   }
 
+  /** Densité des effets de saison (animations de neige, pétales, etc.). */
   get densiteEffets(): EffectDensity {
     return sanitizeDensity(this.read().densiteEffets);
   }
@@ -108,6 +123,7 @@ export class Settings {
     this.read().displayId = sanitizeDisplayId(value);
   }
 
+  /** Enregistre l'ensemble des réglages (valeurs déjà validées) dans le fichier. */
   save(): void {
     this.store.save({
       isButtonModeEnabled: this.isButtonModeEnabled,
@@ -131,6 +147,7 @@ export class Settings {
     return this.raw;
   }
 
+  /** @returns Le contenu du fichier, ou `false` (erreur journalisée) s'il ne peut pas être lu */
   private safeLoad(): unknown {
     try {
       return this.store.load();

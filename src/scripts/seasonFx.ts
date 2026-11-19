@@ -1,6 +1,8 @@
 /**
- * Effets de saison : calque décoratif (neige, feuilles, pétales, tournesols, soleil,
- * traîneau et cadeaux, décors) posé dans un élément hôte, au thème de saison courant.
+ * Effets de saison : calque décoratif (neige, feuilles, pétales, soleil, cadeaux) posé dans un élément.
+ *
+ * Utilisé par la page de la barre et celle des paramètres. Dépend des SVG de `src/assets/decors/`
+ * et de `css/saisons.css` pour les animations. Le calque suit le thème de saison courant.
  *
  * L'état vient de <html> : `data-palette` (le thème), `data-fx` (« on » si les effets sont
  * actifs) et `data-fx-density` (discrete | normale | abondante), posés par le processus
@@ -8,10 +10,11 @@
  * les animations. Les valeurs « aléatoires » sont déterministes (algorithme des maquettes).
  */
 
+/** Adresse du dossier des SVG de décor. */
 const DECORS = new URL('../assets/decors/', import.meta.url).href;
+/** Espace de noms des éléments SVG. */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Nombre de particules selon la densité : [barre, fenêtres] */
 /** Nombre de particules par densité : [barre étroite, grande fenêtre]. */
 const COUNTS: Readonly<Record<string, readonly [number, number]>> = {
   discrete: [6, 12],
@@ -19,7 +22,6 @@ const COUNTS: Readonly<Record<string, readonly [number, number]>> = {
   abondante: [20, 34],
 };
 
-/** Saison selon la palette */
 /** Type d'animation de chaque palette de saison. */
 const KINDS: Readonly<Record<string, string>> = {
   hiver: 'neige',
@@ -30,22 +32,29 @@ const KINDS: Readonly<Record<string, string>> = {
   noel: 'noel',
 };
 
+/** Couleurs des feuilles ou pétales qui tombent, par saison. */
 const LEAF_COLORS: Readonly<Record<string, readonly string[]>> = {
   automne: ['#e07a3a', '#c9452c', '#d4a95a', '#8e2a1e'],
   printemps: ['#7fc28f', '#4f9a62', '#a8d8a0', '#3f8a55'],
   cerisier: ['#f7c1d0', '#f2a7bd', '#fbd9e3', '#e88aa8'],
 };
 
+/** Couleurs des paquets cadeaux de la pluie de Noël. */
 const GIFT_BOXES = ['#d62839', '#f2c14e', '#1e8a4c', '#ffffff', '#c0392b', '#2e7d32'];
 
-/** Décor posé en bas à droite, par saison : fichier, [largeur, hauteur] fenêtre, [largeur, hauteur] barre, classe */
+/** Décor posé en bas à droite d'une saison. */
 interface Decoration {
+  /** Nom du fichier SVG, sans extension. */
   readonly file: string;
+  /** Largeur et hauteur dans une grande fenêtre. */
   readonly wide: readonly [number, number];
+  /** Largeur et hauteur dans la barre étroite. */
   readonly narrow: readonly [number, number];
+  /** Classe CSS d'animation du décor, vide s'il n'en a pas. */
   readonly cls: string;
 }
 
+/** Décor de chaque saison. */
 const DECO: Readonly<Record<string, Decoration>> = {
   neige: { file: 'bonhomme-de-neige', wide: [84, 104], narrow: [44, 56], cls: 'fx-wobble' },
   automne: { file: 'renard', wide: [84, 104], narrow: [44, 56], cls: '' },
@@ -57,6 +66,7 @@ const DECO: Readonly<Record<string, Decoration>> = {
 /** Tournesols de l'été : [position gauche, largeur, hauteur, délai] */
 type Sunflower = readonly [left: string, width: number, height: number, delay: string];
 
+/** Emplacement des tournesols de l'été, selon la taille de l'hôte. */
 const SUNFLOWERS: Readonly<Record<'wide' | 'narrow', readonly Sunflower[]>> = {
   wide: [
     ['calc(100% - 170px)', 58, 99, '-1.4s'],
@@ -66,12 +76,13 @@ const SUNFLOWERS: Readonly<Record<'wide' | 'narrow', readonly Sunflower[]>> = {
   narrow: [['16px', 40, 68, '0s']],
 };
 
+/** Textes des SVG déjà demandés, pour ne les charger qu'une fois. */
 const templates = new Map<string, Promise<string>>();
 
 /**
  * Charge (une seule fois) le texte d'un SVG de décor.
  * @param {string} name Nom du fichier, sans extension
- * @returns {Promise<string>}
+ * @returns {Promise<string>} Le texte du SVG, vide si le chargement échoue
  */
 async function loadSvg(name: string): Promise<string> {
   if (!templates.has(name)) {
@@ -91,9 +102,9 @@ async function loadSvg(name: string): Promise<string> {
 
 /**
  * Remplace la balise racine d'un SVG : on garde son viewBox, le reste est posé ici.
- * @param {string} svg
+ * @param {string} svg Texte du SVG d'origine
  * @param {string} attributes Attributs de la nouvelle racine (classe, taille, style)
- * @returns {string}
+ * @returns {string} Le SVG avec sa nouvelle racine
  */
 function withRoot(svg: string, attributes: string): string {
   const root = /<svg[^>]*>/.exec(svg)?.[0] ?? '';
@@ -104,7 +115,8 @@ function withRoot(svg: string, attributes: string): string {
 }
 
 /**
- * @param {number} n
+ * Génère une valeur pseudo-aléatoire stable : le même rang donne toujours le même résultat.
+ * @param {number} n Rang de la particule
  * @returns {number} Valeur pseudo-aléatoire stable entre 0 et 1
  */
 function rnd(n: number): number {
@@ -112,7 +124,11 @@ function rnd(n: number): number {
   return x - Math.floor(x);
 }
 
-/** Variante de rnd() de la pluie de cadeaux */
+/**
+ * Variante de `rnd` pour la pluie de cadeaux, avec d'autres constantes.
+ * @param n Rang du cadeau
+ * @returns Valeur pseudo-aléatoire stable entre 0 et 1
+ */
 function rndGift(n: number): number {
   const x = Math.sin(n * 78.233 + 12.9898) * 43758.5453;
   return x - Math.floor(x);
@@ -120,6 +136,8 @@ function rndGift(n: number): number {
 
 /**
  * Particules qui tombent : neige, feuilles ou pétales.
+ * @param kind Saison ; une saison sans particules donne une chaîne vide
+ * @param count Nombre de particules
  * @returns {string} Balisage
  */
 function particles(kind: string, count: number): string {
@@ -154,6 +172,8 @@ function particles(kind: string, count: number): string {
 
 /**
  * Soleil en haut à gauche et rayons qui pulsent (été).
+ * @param narrow `true` pour l'hôte étroit (la barre)
+ * @returns Balisage
  */
 function sun(narrow: boolean): string {
   const angles = narrow ? [64, 71, 78, 85] : [20, 29, 38, 47, 56];
@@ -176,6 +196,8 @@ function sun(narrow: boolean): string {
 
 /**
  * Pluie de cadeaux : chacun tombe quand la hotte du traîneau passe au-dessus de lui.
+ * @param count Nombre de cadeaux
+ * @returns Balisage
  */
 function gifts(count: number): string {
   let html = '';
@@ -255,6 +277,7 @@ export function initSeasonFx(host: HTMLElement, { narrow = false }: { narrow?: b
   let current = '';
   let version = 0;
 
+  /** Recalcule le calque d'après le thème, l'interrupteur et la densité ; ignore un résultat périmé. */
   const refresh = async () => {
     const palette = root.dataset.palette ?? '';
     const kind = KINDS[palette];

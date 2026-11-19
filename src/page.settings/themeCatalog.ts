@@ -1,20 +1,35 @@
+/**
+ * Catalogue des thèmes : familles, variantes, aperçus et libellés.
+ *
+ * Utilisé par la page des paramètres (`src/page.settings/`) pour construire le sélecteur de thème.
+ * Ne dépend de rien : les libellés sont des clés de traduction.
+ */
+
 /** Une variante d'un thème parent : le thème final qu'elle enregistre, et son libellé. */
 export interface ThemeVariant {
+  /** Clé de traduction du libellé de la variante. */
   readonly label: string;
+  /** Thème final enregistré quand la variante est choisie. */
   readonly theme: string;
 }
 
 /** Un thème, ou un regroupement de variantes (« vert » : classique ou sapin). */
 export interface ThemeEntry {
+  /** Nom du thème, ou du regroupement s'il a des variantes. */
   readonly name: string;
+  /** Variantes du regroupement ; absent pour un thème simple. */
   readonly variants?: readonly ThemeVariant[];
 }
 
+/** Un groupe de thèmes affiché ensemble dans le sélecteur (base, couleurs, saisons). */
 export interface ThemeFamily {
+  /** Clé de traduction du titre de la famille. */
   readonly label: string;
+  /** Thèmes et regroupements de la famille, dans l'ordre d'affichage. */
   readonly entries: readonly ThemeEntry[];
 }
 
+/** Identifiant d'une famille de thèmes. */
 export type FamilyKey = 'base' | 'colors' | 'seasons';
 
 /**
@@ -104,16 +119,30 @@ export const THEME_LABELS: Readonly<Record<string, string>> = {
   noel: 'settings.themeNoel',
 };
 
+/** Identifiants des familles, dans l'ordre d'affichage. */
 const FAMILY_KEYS = Object.keys(THEME_FAMILIES) as FamilyKey[];
 
+/**
+ * Vérifie qu'une valeur est un identifiant de famille.
+ * @param value Valeur à contrôler
+ * @returns `true` si c'est une famille connue
+ */
 export const isFamilyKey = (value: string): value is FamilyKey => (FAMILY_KEYS as string[]).includes(value);
 
-/** @returns Les thèmes finaux que couvre une entrée */
+/**
+ * Liste les thèmes finaux d'une entrée.
+ * @param entry Thème ou regroupement
+ * @returns Les thèmes finaux que couvre une entrée
+ */
 export function themesOf(entry: ThemeEntry): string[] {
   return entry.variants ? entry.variants.map((variant) => variant.theme) : [entry.name];
 }
 
-/** @returns La famille qui contient ce thème final (« base » à défaut) */
+/**
+ * Retrouve la famille d'un thème enregistré.
+ * @param theme Thème final
+ * @returns La famille qui contient ce thème final (« base » à défaut)
+ */
 export function familyOf(theme: string): FamilyKey {
   return FAMILY_KEYS.find((key) => THEME_FAMILIES[key].entries.some((entry) => themesOf(entry).includes(theme))) ?? 'base';
 }

@@ -1,11 +1,22 @@
+/**
+ * Génération du script qui applique le thème sur la racine d'une page locale.
+ *
+ * Fonction pure, utilisée par `ThemeService`. Le script pilote les attributs `data-*` lus par les
+ * feuilles de style des pages.
+ */
+// [themes.ts] Thèmes disponibles, leurs attributs (`data-theme`, `data-palette`) et la validation des réglages d'apparence
 import { SEASON_THEMES, resolveTheme } from '../settings/themes.js';
 import type { EffectDensity } from '../settings/themes.js';
 
+/** Ce dont dépend le script de thème. */
 export interface ThemeScriptInput {
   /** Thème réellement appliqué (saison du jour en mode automatique). */
   readonly effectiveTheme: string;
+  /** Les effets de saison sont activés dans les réglages. */
   readonly effectsEnabled: boolean;
+  /** Densité des effets de saison. */
   readonly effectsDensity: EffectDensity;
+  /** Le système est en mode sombre (utile au thème « Système »). */
   readonly systemIsDark: boolean;
 }
 

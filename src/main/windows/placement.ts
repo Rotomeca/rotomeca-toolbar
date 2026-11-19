@@ -1,3 +1,10 @@
+/**
+ * Calcul de la position verticale des fenêtres flottantes (infobulle, popup média).
+ *
+ * Fonction pure : garder la fenêtre dans la zone de travail est une règle de placement, pas
+ * une affaire d'Electron.
+ */
+
 /** Bande verticale disponible à l'écran (la zone de travail, barre des tâches exclue). */
 export interface VerticalArea {
   readonly y: number;

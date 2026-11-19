@@ -1,3 +1,9 @@
+/**
+ * Calculs purs autour de l'état média des applications : avancée, contenu du popup, lecteurs ignorés.
+ *
+ * Utilisé par `App`, `MediaPopup` et la zone de notification pour décider ce qui s'affiche.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { MediaPayload, MediaState } from '../../shared/dto.js';
 
 export type { MediaPayload };
@@ -8,7 +14,10 @@ export function mediaProgress(media: Pick<MediaState, 'duration' | 'position'> |
 }
 
 /**
+ * Compose ce que montre le popup de contrôle.
+ * @param url Adresse de l'application
  * @param media Le morceau en cours de l'application, s'il y en a un
+ * @param muted L'application est coupée
  * @returns Ce que montre la fenêtre de contrôle, ou null s'il n'y a pas de morceau
  */
 export function mediaPayload(url: string, media: MediaState | null | undefined, muted: boolean): MediaPayload | null {
@@ -17,11 +26,16 @@ export function mediaPayload(url: string, media: MediaState | null | undefined, 
 
 /** Les lecteurs qui jouent un morceau : le premier est affiché, les autres sont ignorés. */
 export interface TaskbarPlayers {
+  /** Adresse du lecteur affiché, `undefined` si aucun ne joue. */
   readonly first: string | undefined;
+  /** Adresses des autres lecteurs, ignorés. */
   readonly others: readonly string[];
 }
 
-/** @param urls Adresses des applications ayant un morceau, dans l'ordre d'ouverture */
+/**
+ * Sépare le lecteur affiché des autres.
+ * @param urls Adresses des applications ayant un morceau, dans l'ordre d'ouverture
+ */
 export function splitTaskbarPlayers(urls: readonly string[]): TaskbarPlayers {
   const [first, ...others] = urls;
   return { first, others };
@@ -33,8 +47,10 @@ export function changedIgnored(previous: ReadonlySet<string>, current: ReadonlyS
 }
 
 /**
+ * Compose l'infobulle de la zone de notification pour le morceau affiché.
  * @param media Le morceau affiché
  * @param ignoredCount Nombre d'autres lecteurs ignorés
+ * @param translate Traduit une clé de `locales/*.json`
  * @returns Le texte de l'infobulle de la zone de notification pour ce morceau
  */
 export function describeNowPlaying(

@@ -6,6 +6,7 @@
  * calendaire. Les dates sont ramenées au jour civil Europe/Paris.
  */
 
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { SeasonInfo, SeasonTheme } from '../shared/dto.js';
 
 export type { SeasonInfo, SeasonTheme };
@@ -24,6 +25,7 @@ export interface SeasonDates {
 /** Début d'une période de thème : [jour AAAA-MM-JJ, thème]. */
 type ThemeBound = readonly [day: string, theme: SeasonTheme];
 
+/** Fuseau qui définit le « jour » du thème : celui des utilisateurs français. */
 const TIME_ZONE = 'Europe/Paris';
 
 /** Écart TT − UT (secondes), approché pour les années courantes */
@@ -65,8 +67,10 @@ const TERMS = [
   [8, 15.45, 16859.074],
 ] as const;
 
+/** Facteur de conversion degrés vers radians. */
 const RAD = Math.PI / 180;
 
+/** Formateur AAAA-MM-JJ (locale `en-CA`) dans le fuseau {@link TIME_ZONE}. */
 const parisDayFormat = new Intl.DateTimeFormat('en-CA', {
   timeZone: TIME_ZONE,
   year: 'numeric',
@@ -74,12 +78,19 @@ const parisDayFormat = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-/** @returns Le jour civil Europe/Paris au format AAAA-MM-JJ (comparable comme texte) */
+/**
+ * @param date Instant à convertir
+ * @returns Le jour civil Europe/Paris au format AAAA-MM-JJ (comparable comme texte)
+ */
 export function parisDay(date: Date): string {
   return parisDayFormat.format(date);
 }
 
-/** @returns L'instant d'un équinoxe ou d'un solstice de l'année */
+/**
+ * @param year Année civile
+ * @param index Équinoxe ou solstice voulu
+ * @returns L'instant d'un équinoxe ou d'un solstice de l'année
+ */
 function seasonInstant(year: number, index: SeasonIndex): Date {
   const y = (year - 2000) / 1000;
   const [a, b, c, d, e] = MEAN[index];
@@ -94,7 +105,10 @@ function seasonInstant(year: number, index: SeasonIndex): Date {
   return new Date((jde - 2440587.5) * 86400000 - DELTA_T * 1000);
 }
 
-/** @returns Les jours civils (Europe/Paris) des équinoxes et solstices d'une année */
+/**
+ * @param year Année civile
+ * @returns Les jours civils (Europe/Paris) des équinoxes et solstices d'une année
+ */
 export function seasonDates(year: number): SeasonDates {
   return {
     mars: parisDay(seasonInstant(year, 0)),
@@ -107,6 +121,8 @@ export function seasonDates(year: number): SeasonDates {
 /**
  * Début de chaque période de thème pour une année.
  * Noël (24 et 25 décembre) est prioritaire, l'hiver reprend le 26.
+ * @param year Année civile
+ * @returns Les débuts de période, non triés
  */
 function boundsOf(year: number): ThemeBound[] {
   const dates = seasonDates(year);
@@ -122,7 +138,7 @@ function boundsOf(year: number): ThemeBound[] {
   ];
 }
 
-/** Les dates AAAA-MM-JJ se comparent comme du texte. */
+/** Comparateur de tri des débuts de période : les dates AAAA-MM-JJ se comparent comme du texte. */
 function byDay(a: ThemeBound, b: ThemeBound): number {
   if (a[0] < b[0]) return -1;
   return a[0] > b[0] ? 1 : 0;
@@ -130,6 +146,8 @@ function byDay(a: ThemeBound, b: ThemeBound): number {
 
 /**
  * Thème de saison d'un jour, et prochain changement.
+ * @param date Instant à évaluer (maintenant par défaut)
+ * @returns Le thème courant, le thème suivant et son jour de début
  * @throws {RangeError} Si le calcul ne trouve pas de période suivante (ne peut pas arriver : trois années sont évaluées)
  */
 export function seasonInfo(date: Date = new Date()): SeasonInfo {
@@ -145,7 +163,10 @@ export function seasonInfo(date: Date = new Date()): SeasonInfo {
   return { theme: current[1], nextTheme: next[1], nextDate: next[0] };
 }
 
-/** @returns Le thème de saison du jour */
+/**
+ * @param date Instant à évaluer (maintenant par défaut)
+ * @returns Le thème de saison du jour
+ */
 export function seasonThemeFor(date: Date = new Date()): SeasonTheme {
   return seasonInfo(date).theme;
 }

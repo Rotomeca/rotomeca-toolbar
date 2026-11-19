@@ -43,6 +43,8 @@ Avant de commiter : `pnpm typecheck`, `pnpm lint` et `pnpm test` doivent passer 
 
 ## Architecture
 
+**Carte du projet : `docs/ARCHITECTURE.md`** (qui fait quoi, parcours, où ajouter quoi). Chaque fichier `.ts` commence par un commentaire de rôle (première ligne = résumé) et chaque `import` est précédé de `// [fichier] ce qu'il fait` ; toute classe, fonction ou méthode a un TSDoc en français. Garder ces conventions pour tout nouveau fichier.
+
 - **`dist/` est ce qui s'exécute et ce qui est empaqueté** (`main` de `package.json` = `dist/main.js`) : il reproduit l'arborescence du dépôt, donc les chemins relatifs (`__dirname`, imports des pages) restent valides. Ne jamais l'éditer ni le versionner ; les sources `.ts` n'y sont pas copiées.
 - Les deux preloads (`preload.js`, `src/scripts/media/media-preload.js`) sont **bundlés en un seul fichier** par esbuild : un preload sandboxé ne peut charger aucun autre fichier (seul `electron` est requirable).
 - **Processus principal, par domaine** : `main.ts` (point d'entrée) → `src/main/bootstrap.ts` (démarrage, verrou d'instance, raccourci) → `src/main/App.ts` (assemble les services et route les appels IPC). La logique vit dans `src/main/<domaine>/` : `apps/` (liste, vues des sites), `contextmenu/`, `dock/` (AppBar, disposition), `ipc/`, `media/`, `permissions/`, `persistence/`, `security/`, `settings/`, `theming/`, `toolbar/`, `tooltip/`, `tray/`, `updates/`, `windows/`.

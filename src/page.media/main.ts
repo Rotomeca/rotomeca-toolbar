@@ -1,7 +1,18 @@
+/**
+ * Lecteur multimédia affiché au survol d'un bouton qui joue un morceau : titre, pochette, commandes.
+ *
+ * Chargé par la fenêtre du lecteur (`src/page.media/`). Dépend de `mediaView` pour le formatage
+ * et du processus principal, qui envoie l'état du média et exécute les commandes.
+ */
+// [ds.ts] Charge le design system `rds-*` : enregistre tous les composants web utilisés par les pages
 import '../scripts/ds.js';
+// [dom.ts] Accès sûr aux éléments du DOM pour les scripts de page : un élément manquant lève une erreur claire
 import { requireElement } from '../scripts/dom.js';
+// [mediaView.ts] Fonctions pures d'affichage du lecteur multimédia : durée et avancement
 import { formatTime, progressPercent } from '../scripts/mediaView.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { MediaAction, MediaPayload } from '../shared/dto.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, pageEventList } from '../shared/ipc/events.js';
 
 /** Petit lecteur affiché au survol d'un bouton qui joue un morceau. */
@@ -9,6 +20,7 @@ class MediaPlayer {
   /** Dernier état reçu. */
   private state: MediaPayload | null = null;
 
+  /** Branche les commandes du lecteur et affiche chaque état reçu du processus principal. */
   start(): void {
     window.api.on(pageEventList.mediaState, (_, state) => this.render(state));
 
@@ -24,19 +36,36 @@ class MediaPlayer {
     });
   }
 
+  /**
+   * Signale au processus principal que la souris entre ou sort, pour garder la fenêtre ouverte.
+   * @param hovering `true` quand la souris est sur le lecteur
+   */
   private hover(hovering: boolean): void {
     if (!this.state) return;
     window.api.invoke(appEventList.mediaHover, { url: this.state.url, hovering }).catch(console.error);
   }
 
+  /**
+   * Relie un bouton du lecteur à une action.
+   * @param id Identifiant du bouton, sans `#`
+   * @param callback Action lancée au clic
+   */
   private onClick(id: string, callback: () => void): void {
     requireElement(`#${id}`).addEventListener('click', callback);
   }
 
+  /**
+   * Envoie une commande de lecture au site qui joue le média.
+   * @param action Commande (lecture, pause, piste précédente ou suivante)
+   */
   private control(action: MediaAction): void {
     if (this.state) window.api.invoke(appEventList.mediaControl, { url: this.state.url, action }).catch(console.error);
   }
 
+  /**
+   * Affiche un nouvel état : titre, artiste, pochette, avancement et état des boutons.
+   * @param state État du média reçu du processus principal
+   */
   private render(state: MediaPayload): void {
     this.state = state;
 
@@ -61,6 +90,10 @@ class MediaPlayer {
     mute.title = muteLabel;
   }
 
+  /**
+   * Affiche la pochette, ou l'image de remplacement quand le média n'en fournit pas.
+   * @param state État du média
+   */
   private renderCover(state: MediaPayload): void {
     const cover = requireElement<HTMLImageElement>('#cover');
     cover.hidden = !state.artwork;

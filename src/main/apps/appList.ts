@@ -1,43 +1,64 @@
+/**
+ * Liste des applications de la barre : ajout, déplacement, suppression, séparateurs.
+ *
+ * Fonctions pures, sans état ni Electron : `AppListService` s'en sert pour modifier la liste
+ * et renvoyer à la page de la barre de quoi rester à jour (séparateurs retirés, décalages).
+ */
+// [sanitizeAppData.ts] Validation et nettoyage des données d'une application reçues d'une page (nom, adresse, icône)
 import type { AppData } from '../security/sanitizeAppData.js';
 
 /** Un élément de la barre : une application ou un séparateur. */
 export type AppEntry = AppData | 'separator';
 
+/** Sens d'un déplacement dans la barre : vers le haut ou vers le bas. */
 export type MoveDirection = 'up' | 'down';
 
 /** Référence donnée à la page pour retrouver un séparateur à supprimer (adresse, position 0 ou inconnue). */
 export type SeparatorRef = string | number | undefined;
 
+/** Résultat d'un nettoyage de la liste : la liste corrigée et les séparateurs retirés. */
 export interface CollapsedList {
   readonly list: readonly AppEntry[];
   /** Séparateurs retirés, dans l'ordre : la page les supprime de son côté avec ces références. */
   readonly removedSeparators: readonly SeparatorRef[];
 }
 
+/** Résultat d'un déplacement : comme un nettoyage, avec le nombre de séparateurs enjambés. */
 export interface MovedList extends CollapsedList {
   /** Nombre de séparateurs enjambés par le déplacement. */
   readonly modifier: number;
 }
 
+/** Résultat de l'ajout d'un séparateur : en fin de liste, ou inséré à une position (avec son indice). */
 export type SeparatorInsertion =
   | { readonly kind: 'appended'; readonly list: readonly AppEntry[] }
   | { readonly kind: 'inserted'; readonly list: readonly AppEntry[]; readonly index: number };
 
+/** Valeur qui représente un séparateur dans la liste enregistrée. */
 const SEPARATOR = 'separator';
 
+/** Indique si l'élément est une application (et non un séparateur ou une valeur absente). */
 const isApp = (entry: AppEntry | undefined): entry is AppData => typeof entry === 'object' && entry !== null;
 
+/** @returns L'adresse de l'application à cet indice, `undefined` pour un séparateur ou un indice hors liste */
 const urlAt = (list: readonly AppEntry[], index: number): string | undefined => {
   const entry = list[index];
   return isApp(entry) ? entry.url : undefined;
 };
 
-/** @returns L'indice de l'application ayant cette adresse, -1 si absente */
+/**
+ * Cherche une application par son adresse.
+ * @returns L'indice de l'application ayant cette adresse, -1 si absente
+ */
 export function indexOfApp(list: readonly AppEntry[], url: string): number {
   return list.findIndex((entry) => isApp(entry) && entry.url === url);
 }
 
-/** @returns Les adresses des applications de la liste (les séparateurs et les entrées invalides sont ignorés) */
+/**
+ * Extrait les adresses des applications d'une liste lue sur le disque.
+ * @param list Liste non fiable : les séparateurs et les entrées invalides sont ignorés
+ * @returns Les adresses des applications
+ */
 export function savedUrls(list: readonly unknown[]): string[] {
   return list.filter((entry): entry is AppData => typeof entry === 'object' && entry !== null).map((entry) => entry.url);
 }
@@ -71,7 +92,10 @@ export function collapseSeparators(list: readonly AppEntry[], options: { dropLea
   return { list: kept, removedSeparators };
 }
 
-/** @returns La liste sans l'application, les séparateurs devenus consécutifs étant fusionnés */
+/**
+ * Retire une application de la liste.
+ * @returns La liste sans l'application, les séparateurs devenus consécutifs étant fusionnés
+ */
 export function removeApp(list: readonly AppEntry[], url: string): CollapsedList {
   const remaining = list.filter((entry) => !(isApp(entry) && entry.url === url));
   return collapseSeparators(remaining, { dropLeading: false });
@@ -98,7 +122,10 @@ export function moveApp(list: readonly AppEntry[], url: string, direction: MoveD
   return { ...collapseSeparators(rest, { dropLeading: true }), modifier };
 }
 
-/** @returns La liste avec un séparateur après l'application, `null` si elle est absente */
+/**
+ * Place un séparateur juste après une application.
+ * @returns La liste avec un séparateur après l'application, `null` si elle est absente
+ */
 export function insertSeparatorAfter(list: readonly AppEntry[], url: string): SeparatorInsertion | null {
   const index = indexOfApp(list, url);
   if (index < 0) return null;

@@ -1,3 +1,10 @@
+/**
+ * Adresses des serveurs de mises à jour et dépôt des versions.
+ *
+ * Lu par `src/main/updates/createUpdateManager.ts`. Ce sont les seules valeurs à changer pour
+ * pointer l'application vers un autre serveur.
+ */
+
 /** Serveur de mises à jour des versions publiées (Hazel sur Vercel). */
 export const feedUrl = 'https://rotomeca-toolbar-deployement.vercel.app';
 

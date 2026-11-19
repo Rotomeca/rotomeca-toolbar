@@ -1,3 +1,10 @@
+/**
+ * Choix de l'écran de la barre et description des écrans pour la page des paramètres.
+ *
+ * Fonctions pures, sans `electron` : les écrans sont lus à travers `DisplayLike`. Utilisé par
+ * `App` pour placer la barre et par les paramètres pour lister les écrans disponibles.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { DisplayInfo } from '../../shared/dto.js';
 
 /** Ce que ce module lit d'un écran (un sous-ensemble de `Electron.Display`). */
@@ -11,9 +18,11 @@ export interface DisplayLike {
 
 export type { DisplayInfo };
 
+/** Fonction de traduction d'une clé de `locales/*.json`, avec variables optionnelles. */
 type Translate = (key: string, variables?: Readonly<Record<string, string | number>>) => string;
 
 /**
+ * Choisit l'écran sur lequel afficher la barre.
  * @param displays Écrans connectés
  * @param chosenId Écran choisi dans les paramètres (`null` = écran principal)
  * @param primary Écran principal du système

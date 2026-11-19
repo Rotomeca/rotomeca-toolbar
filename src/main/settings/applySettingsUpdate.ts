@@ -1,3 +1,10 @@
+/**
+ * Applique les réglages envoyés par la page des paramètres et dit ce qui demande une réaction.
+ *
+ * Appelé par `App.ts` quand la page des paramètres envoie une mise à jour. Les valeurs reçues sont
+ * non fiables : les réglages les valident, et seuls les changements d'écran ou de mode d'affichage sont signalés.
+ */
+// [Settings.ts] Réglages de l'utilisateur : accesseurs validés au-dessus d'un fichier de réglages
 import type { Settings } from './Settings.js';
 
 /** Ce qui a changé et demande une réaction de l'application. */
@@ -11,6 +18,7 @@ export interface SettingsUpdateResult {
 /**
  * Applique les réglages reçus de la page des paramètres, puis les enregistre.
  * Les réglages valident leurs valeurs (thème en liste blanche, identifiant d'écran entier).
+ * @param settings Réglages de l'application, modifiés puis enregistrés.
  * @param raw Donnée non fiable reçue d'une page
  * @returns Ce qui a changé, ou `null` si la donnée n'est pas un objet (rien n'est modifié)
  */

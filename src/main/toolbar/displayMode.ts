@@ -1,3 +1,10 @@
+/**
+ * Déduction du mode d'affichage de la barre (ancrée, bouton, souris, masquage automatique).
+ *
+ * Fonction pure, utilisée par `ToolbarController` à chaque décision d'affichage : les modes
+ * s'excluent, la barre ancrée l'emportant sur les autres.
+ */
+
 /** Les réglages qui décident comment la barre s'affiche. */
 export interface DisplayModeSettings {
   readonly isButtonModeEnabled: boolean;

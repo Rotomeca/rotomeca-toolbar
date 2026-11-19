@@ -1,7 +1,18 @@
+/**
+ * Page d'ajout ou de modification d'une application : adresse, nom et image du bouton.
+ *
+ * Chargée par la fenêtre de modification (`src/page.add/`). S'appuie sur `appForm` pour les noms et adresses
+ * et sur le processus principal pour enregistrer ; le mode édition est activé par l'évènement `modeEdit`.
+ */
+// [ds.ts] Charge le design system `rds-*` : enregistre tous les composants web utilisés par les pages
 import '../scripts/ds.js';
+// [rds.d.ts] Types des composants `rds-*` du design system utilisés par les pages
 import type { RdsButton, RdsFileInput, RdsInput } from '../types/rds.js';
+// [appForm.ts] Fonctions pures du formulaire d'application : adresse, nom proposé, comparaison d'adresses
 import { chosenName, suggestedName, withProtocol } from '../scripts/appForm.js';
+// [dom.ts] Accès sûr aux éléments du DOM pour les scripts de page : un élément manquant lève une erreur claire
 import { requireElement } from '../scripts/dom.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, pageEventList } from '../shared/ipc/events.js';
 
 /** La page de modification d'une application de la barre. */
@@ -24,6 +35,7 @@ class EditPage {
     return chosenName(this.nameInput.value, this.url);
   }
 
+  /** Branche les champs et les boutons, et passe en mode édition quand le processus principal le demande. */
   start(): void {
     this.urlInput.addEventListener('change', () => this.onUrlChange());
     this.pictureInput.addEventListener('change', () => this.onPictureChange());
@@ -52,6 +64,7 @@ class EditPage {
     });
   }
 
+  /** Le bouton qui vide l'image n'est utilisable que si une image est gardée. */
   private updateClearButton(): void {
     this.clearButton.disabled = !this.picture;
   }
@@ -91,6 +104,7 @@ class EditPage {
     this.updateClearButton();
   }
 
+  /** Demande au processus principal d'ajouter une nouvelle application à la barre. */
   private saveNew(): void {
     window.api.invoke(appEventList.requestAddData, { name: this.name, url: this.url, picture: this.picture }).catch(console.error);
   }

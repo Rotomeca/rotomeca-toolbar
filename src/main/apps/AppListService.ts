@@ -1,5 +1,13 @@
+/**
+ * Service des applications de la barre : ordre, séparateurs, validation et enregistrement.
+ *
+ * Utilisé par `App` (processus principal) pour répondre aux demandes des pages. Il valide les
+ * données reçues, délègue les calculs à `appList` et prévient la page de la barre message par message.
+ */
+// [sanitizeAppData.ts] Validation et nettoyage des données d'une application reçues d'une page (nom, adresse, icône)
 import { sanitizeAppData } from '../security/sanitizeAppData.js';
 import type { AppData } from '../security/sanitizeAppData.js';
+// [appList.ts] Liste des applications de la barre : ajout, déplacement, suppression, séparateurs
 import { indexOfApp, insertSeparatorAfter, moveApp, removeApp, replaceApp, savedUrls } from './appList.js';
 import type { AppEntry, MoveDirection, SeparatorRef } from './appList.js';
 
@@ -7,19 +15,27 @@ import type { AppEntry, MoveDirection, SeparatorRef } from './appList.js';
 export interface AppListRepository {
   /** @returns La liste enregistrée, ou `false` s'il n'y en a pas */
   loadAsync(): Promise<unknown>;
+  /** Enregistre la liste ; peut lever une erreur si l'écriture échoue. */
   save(data: unknown): void;
 }
 
 /** Ce que la page de la barre doit savoir pour rester à jour, message par message. */
 export interface ToolbarMessages {
+  /** Une application ou un séparateur a été ajouté en fin de barre. */
   appAdded(entry: AppData | 'separator'): void;
+  /** Un séparateur a été inséré au milieu de la barre, après l'application `url`. */
   appInserted(args: { readonly url: string; readonly index: number; readonly data: 'separator' }): void;
+  /** Une application a été modifiée ; `oldLink` est son ancienne adresse. */
   appUpdated(args: AppData & { readonly id: number; readonly oldLink: string }): void;
+  /** Une application a été retirée de la barre. */
   appDeleted(url: string): void;
+  /** Un séparateur est devenu inutile et a été retiré ; `reference` permet à la page de le retrouver. */
   separatorDeleted(reference: SeparatorRef): void;
+  /** Une application a été déplacée ; `modifier` est le nombre de séparateurs enjambés. */
   appMoved(args: { readonly url: string; readonly type: MoveDirection; readonly modifier: number }): void;
 }
 
+/** Collaborateurs de `AppListService`, injectés pour le garder indépendant d'Electron. */
 export interface AppListDeps {
   readonly repository: AppListRepository;
   readonly toolbar: ToolbarMessages;
@@ -27,12 +43,15 @@ export interface AppListDeps {
   readonly onSaveError: (error: Error) => void;
 }
 
+/** Indique si la valeur reçue d'une page est un sens de déplacement valide. */
 const isMoveDirection = (value: unknown): value is MoveDirection => value === 'up' || value === 'down';
 
 /** Les applications de la barre : leur ordre, leurs séparateurs et leur enregistrement. */
 export class AppListService {
+  /** Éléments de la barre ; remplacée à chaque modification plutôt que modifiée sur place. */
   private list: readonly AppEntry[] = [];
 
+  /** @param deps Dépôt d'enregistrement, messages vers la page et gestion d'erreur */
   constructor(private readonly deps: AppListDeps) {}
 
   /** @returns Les éléments de la barre, dans l'ordre */
@@ -45,11 +64,15 @@ export class AppListService {
     return savedUrls(this.list);
   }
 
+  /** @returns La position de l'application dans la barre, -1 si elle est absente */
   indexOf(url: string): number {
     return indexOfApp(this.list, url);
   }
 
-  /** @returns `true` si une liste enregistrée a été chargée */
+  /**
+   * Charge la liste enregistrée ; une donnée qui n'est pas un tableau donne une barre vide.
+   * @returns `true` si une liste enregistrée a été chargée
+   */
   async load(): Promise<boolean> {
     const data = await this.deps.repository.loadAsync();
     if (data === false) return false;
@@ -146,12 +169,14 @@ export class AppListService {
     return true;
   }
 
+  /** Ajoute l'application en fin de barre, prévient la page puis enregistre. */
   private append(app: AppData): void {
     this.deps.toolbar.appAdded(app);
     this.list = [...this.list, app];
     this.persist();
   }
 
+  /** Enregistre la liste ; en cas d'échec elle reste en mémoire et `onSaveError` est appelé. */
   private persist(): void {
     try {
       this.deps.repository.save(this.list);

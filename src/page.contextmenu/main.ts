@@ -1,9 +1,21 @@
+/**
+ * Page du menu contextuel d'un bouton de la barre : une liste de boutons d'actions.
+ *
+ * Chargée par la fenêtre du menu contextuel (`src/page.contextmenu/`). Dépend du processus principal,
+ * qui pose la liste des entrées sur `window.electron.menu` et exécute l'action choisie.
+ */
+// [ds.ts] Charge le design system `rds-*` : enregistre tous les composants web utilisés par les pages
 import '../scripts/ds.js';
+// [rds.d.ts] Types des composants `rds-*` du design system utilisés par les pages
 import type { RdsButton } from '../types/rds.js';
+// [dom.ts] Accès sûr aux éléments du DOM pour les scripts de page : un élément manquant lève une erreur claire
 import { requireElement } from '../scripts/dom.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { ContextMenuItem } from '../shared/dto.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../shared/ipc/events.js';
 
+/** Délai entre deux vérifications de la présence du menu, en millisecondes. */
 const POLL_INTERVAL_MS = 10;
 
 /** Attend que le processus principal ait posé la liste des boutons. */
@@ -39,6 +51,11 @@ async function runAction({ action, data }: Pick<ContextMenuItem, 'action' | 'dat
   }
 }
 
+/**
+ * Crée le bouton d'une entrée du menu.
+ * @param item Entrée du menu
+ * @returns Le bouton, qui lance l'action de l'entrée au clic
+ */
 function createButton(item: ContextMenuItem): RdsButton {
   const button = document.createElement('rds-button') as RdsButton;
   button.setAttribute('variant', 'primary');
@@ -54,5 +71,6 @@ function createButton(item: ContextMenuItem): RdsButton {
   return button;
 }
 
+/** Conteneur dans lequel sont ajoutés les boutons du menu. */
 const layout = requireElement('#layout');
 for (const item of await waitForMenu()) layout.appendChild(createButton(item));

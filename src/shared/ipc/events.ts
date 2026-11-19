@@ -1,7 +1,9 @@
 /**
- * Source unique des noms de canaux IPC. Importée par le processus principal, le preload
- * (qui en dérive sa liste blanche) et les pages : un canal ajouté ici est immédiatement
- * connu des trois, sans copie à synchroniser.
+ * Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes.
+ *
+ * Source unique, importée par le processus principal, le preload (qui en dérive sa liste blanche)
+ * et les pages : un canal ajouté ici est immédiatement connu des trois, sans copie à synchroniser.
+ * Chaque canal doit aussi avoir son contrat dans `contracts.ts` (une erreur de compilation le rappelle).
  *
  * Ce dossier est un module ES (voir `package.json`) : les pages l'importent nativement
  * et le processus principal, en CommonJS, le charge avec `require()`.

@@ -1,3 +1,10 @@
+/**
+ * Pastille de couleur dessinée sur l'icône de la zone de notification pour signaler une mise à jour.
+ *
+ * Fonctions pures sur un bitmap BGRA, utilisées par `electronTray` ; ré-exporte `UpdateLevel`
+ * et `updateLevelOf` pour que le dossier `tray` ne dépende pas du détail de `shared/`.
+ */
+// [updateLevel.ts] Niveau d'alerte d'une mise à jour (en attente ou prête), partagé entre le processus principal et les pages
 import type { UpdateLevel } from '../../shared/updateLevel.js';
 
 export { updateLevelOf } from '../../shared/updateLevel.js';
@@ -11,11 +18,14 @@ const BADGE_COLORS: Readonly<Record<UpdateLevel, readonly [blue: number, green: 
   pending: [255, 152, 0],
   ready: [76, 175, 80],
 };
+/** Couleur du liseré (blanc, dans l'ordre BGR). */
 const WHITE = [255, 255, 255] as const;
 
+/** Rayon (px) de la pastille. */
 const BADGE_RADIUS = 8;
 /** Épaisseur (px) du liseré blanc autour de la pastille. */
 const BADGE_OUTLINE = 1.5;
+/** Octets par pixel d'un bitmap BGRA. */
 const BYTES_PER_PIXEL = 4;
 
 /**

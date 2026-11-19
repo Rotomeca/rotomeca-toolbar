@@ -1,16 +1,24 @@
-/** Les parties des composants `rds-*` (design system) que les pages utilisent. */
+/**
+ * Types des composants `rds-*` du design system utilisés par les pages.
+ *
+ * Importé par les scripts des pages ; ne décrit que les propriétés réellement utilisées.
+ */
 
 /** `<rds-icon-button>` : bouton d'icône, à bascule s'il est sélectionnable. */
 export interface RdsIconButton extends HTMLElement {
+  /** État de bascule : `true` quand le bouton est enfoncé. */
   selected: boolean;
+  /** Bloque les interactions. */
   disabled: boolean;
 }
 
 /** `<rds-button>`. */
 export interface RdsButton extends HTMLElement {
+  /** Bloque les interactions. */
   disabled: boolean;
 }
 
+/** Évènement du bouton d'icône ajouté à la carte des évènements du DOM. */
 declare global {
   interface HTMLElementEventMap {
     'rds-icon-button:toggle': CustomEvent<{ selected: boolean }>;
@@ -19,6 +27,7 @@ declare global {
 
 /** Champ de saisie (`<rds-input>`). */
 export interface RdsInput extends HTMLElement {
+  /** Texte saisi. */
   value: string;
 }
 
@@ -32,31 +41,39 @@ export interface RdsFileInput extends HTMLElement {
 
 /** `<rds-select>` : liste déroulante. */
 export interface RdsSelect extends HTMLElement {
+  /** Valeur de l'option choisie. */
   value: string;
 }
 
 /** `<rds-segmented-control>` : choix parmi quelques options visibles. */
 export interface RdsSegmentedControl extends HTMLElement {
+  /** Valeur de l'option choisie. */
   value: string;
 }
 
 /** `<rds-switch>` : interrupteur. */
 export interface RdsSwitch extends HTMLElement {
+  /** `true` quand l'interrupteur est activé. */
   checked: boolean;
 }
 
 /** `<rds-progress>` : barre de progression (indéterminée sans valeur). */
 export interface RdsProgress extends HTMLElement {
+  /** Avancement en pourcentage. */
   value: number;
+  /** Texte affiché avec la barre. */
   label: string;
 }
 
-/** Bouton avec indicateur de chargement. */
+/** `<rds-loading-button>` : bouton avec indicateur de chargement. */
 export interface RdsLoadingButton extends HTMLElement {
+  /** Affiche l'indicateur de chargement. */
   loading: boolean;
+  /** Bloque les interactions. */
   disabled: boolean;
 }
 
+/** Évènements de changement des champs ajoutés à la carte des évènements du DOM. */
 declare global {
   interface HTMLElementEventMap {
     'rds-select:change': CustomEvent<{ value: string }>;

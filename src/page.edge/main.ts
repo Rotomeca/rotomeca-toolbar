@@ -1,3 +1,10 @@
+/**
+ * Zone sensible du bord gauche de l'écran : l'entrée de la souris demande l'ouverture de la barre.
+ *
+ * Chargé par la fenêtre du bord (`src/page.edge/`), invisible et fine. Dépend du processus principal,
+ * qui ouvre la barre et masque cette fenêtre tant que la barre est ouverte.
+ */
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../shared/ipc/events.js';
 
 // L'entrée de la souris dans la zone du bord gauche ouvre la barre. Le

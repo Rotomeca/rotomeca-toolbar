@@ -1,4 +1,12 @@
+/**
+ * Application du thème de l'utilisateur aux pages locales, et mise à jour quand il change.
+ *
+ * Utilisé par `App` au démarrage et après un changement de réglage. Dépend de `Settings` et
+ * d'un `ThemeEnvironment` injecté (branché sur Electron par `electronThemeEnvironment`).
+ */
+// [Settings.ts] Réglages de l'utilisateur : accesseurs validés au-dessus d'un fichier de réglages
 import type { Settings } from '../settings/Settings.js';
+// [themeScript.ts] Génération du script qui applique le thème sur la racine d'une page locale
 import { buildThemeScript } from './themeScript.js';
 
 /** Une page de l'application (un sous-ensemble de `WebContents`). */
@@ -22,13 +30,20 @@ export interface ThemeEnvironment {
   every(intervalMs: number, callback: () => void): void;
 }
 
+/** Préfixe des pages locales : les sites tiers ne reçoivent jamais le script de thème. */
 const LOCAL_PAGE_PREFIX = 'file://';
+/** Période (ms) de la vérification du changement de saison en thème automatique. */
 const SEASON_CHECK_INTERVAL_MS = 60 * 1000;
 
 /** Applique le thème de l'utilisateur aux pages locales, et le met à jour quand il change. */
 export class ThemeService {
+  /** Dernier thème appliqué, pour ne rediffuser que s'il change. */
   private lastEffectiveTheme: string | null = null;
 
+  /**
+   * @param settings Réglages qui fournissent le thème et les effets
+   * @param environment Accès au système (mode sombre, pages, horloge)
+   */
   constructor(
     private readonly settings: Settings,
     private readonly environment: ThemeEnvironment,

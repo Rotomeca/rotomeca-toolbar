@@ -1,4 +1,11 @@
+/**
+ * Branchement du thème sur Electron (nativeTheme, powerMonitor, webContents).
+ *
+ * Utilisé par `App` pour construire `ThemeService`, qui ne dépend que de `ThemeEnvironment`.
+ */
+// [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { app, nativeTheme, powerMonitor, webContents } from 'electron';
+// [ThemeService.ts] Application du thème de l'utilisateur aux pages locales, et mise à jour quand il change
 import type { ThemeEnvironment } from './ThemeService.js';
 
 /** @returns L'environnement du thème branché sur Electron */

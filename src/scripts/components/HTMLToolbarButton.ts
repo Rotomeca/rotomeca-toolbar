@@ -1,12 +1,26 @@
+/**
+ * Composant web du bouton d'une application dans la barre : icône, non-lus, son, pochette, avancement.
+ *
+ * Utilisé par la page de la barre (`src/page.taskbar/`). Dépend de `lib/RotomecaWebComponents`
+ * (bouton à bascule) et de `ToolbarAppData` ; les indicateurs sont poussés par le processus principal.
+ */
+// [HTMLPrimaryPressedButton.d.ts] bouton à bascule de la bibliothèque Rotomeca (composant web)
 import { HTMLPrimaryPressedButton } from '../../../lib/RotomecaWebComponents/component/HTMLPrimaryPressedButton.js';
+// [CustomWebComponentCustomEvent.d.ts] Évènement émis par un composant : `caller` est le composant qui l'a émis
 import type { CustomWebComponentCustomEvent } from '../../../lib/RotomecaWebComponents/events/CustomWebComponentCustomEvent.js';
+// [config.d.ts] Préfixe des balises des composants de la bibliothèque (`rotomeca-...`)
 import { TAG_PREFIX } from '../../../lib/RotomecaWebComponents/libs/config.js';
+// [constants.d.ts] Chaîne vide : améliore la lisibilité du code
 import { EMPTY_STRING } from '../../../lib/RotomecaWebComponents/libs/constants.js';
+// [StyleComponent.d.ts] Une règle CSS produite par `StyleComponent.RuleClass.Write`
 import { StyleComponent } from '../../../lib/RotomecaWebComponents/libs/StyleComponent.js';
 import type { Rule } from '../../../lib/RotomecaWebComponents/libs/StyleComponent.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { IndicatorsDto } from '../../shared/dto.js';
+// [ToolbarAppData.ts] Données d'une application affichée sur un bouton de la barre : adresse, titre, image
 import { ToolbarAppData } from '../ToolbarAppData.js';
 
+/** Déclare les évènements de bascule du bouton et sa balise dans les cartes de types du DOM. */
 declare global {
   interface HTMLElementEventMap {
     'event:custom:state.pressed': CustomWebComponentCustomEvent<HTMLToolbarButton>;
@@ -21,7 +35,12 @@ declare global {
 /** Indicateurs affichés sur un bouton : l'adresse de l'application n'en fait pas partie. */
 export type ButtonIndicators = Partial<Omit<IndicatorsDto, 'url'>>;
 
-/** Traduit une clé (le preload expose `window.api.t`). */
+/**
+ * Traduit une clé (le preload expose `window.api.t`).
+ * @param key Clé de traduction
+ * @param variables Valeurs à insérer dans le texte
+ * @returns Le texte traduit, ou la clé elle-même si l'API n'est pas disponible
+ */
 const translate = (key: string, variables?: Record<string, string | number>): string => window.api?.t?.(key, variables) ?? key;
 
 /** Le plus grand nombre de messages non lus affiché tel quel. */
@@ -29,20 +48,34 @@ const MAX_BADGE = 99;
 
 /** Bouton d'une application dans la barre : son icône, et ses indicateurs (non-lus, son, morceau). */
 export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
+  /** Données de l'application, lues une fois depuis les attributs de données. */
   #itemData: ToolbarAppData | null = null;
+  /** Nombre de messages non lus. */
   #badge = 0;
+  /** L'application émet du son. */
   #audible = false;
+  /** L'application est mise en sourdine. */
   #muted = false;
+  /** Adresse de la pochette du morceau en cours. */
   #cover: string | null = null;
+  /** L'application joue un morceau. */
   #hasMedia = false;
+  /** Avancement du morceau entre 0 et 1, `null` s'il est inconnu. */
   #progress: number | null = null;
+  /** Les notifications de l'application sont ignorées. */
   #ignored = false;
+  /** Anneau d'avancement. */
   #progressNode: HTMLSpanElement | null = null;
+  /** Pochette ronde. */
   #coverNode: HTMLImageElement | null = null;
+  /** Pastille des non-lus. */
   #badgeNode: HTMLSpanElement | null = null;
+  /** Pastille du son. */
   #audioNode: HTMLSpanElement | null = null;
+  /** Icône de la pastille du son (haut-parleur, ou barré en sourdine). */
   #audioIcon: HTMLElement | null = null;
 
+  /** Données de l'application (adresse, titre, image) portées par le bouton. */
   get itemData(): ToolbarAppData {
     this.#itemData ??= new ToolbarAppData(
       this._p_get_data('url') ?? EMPTY_STRING,
@@ -53,6 +86,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return this.#itemData;
   }
 
+  /** Le bouton est en mode édition : un clic ne doit pas ouvrir l'application. */
   get isOnEditMode(): boolean {
     return this.classList.contains('edit');
   }
@@ -62,6 +96,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return this.#hasMedia;
   }
 
+  /** Construit le contenu du bouton : icône, indicateurs et styles (dont l'animation du mode édition). */
   protected override _p_main(): void {
     super._p_main();
     this.setAttribute('id', this.getAttribute('id') || this._p_generate_id());
@@ -114,7 +149,11 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     }
   }
 
-  /** Met à jour les indicateurs (non-lus, son, morceau) et les affiche. */
+  /**
+   * Met à jour les indicateurs (non-lus, son, morceau) et les affiche.
+   * @param indicators Nouvel état ; une valeur absente revient à sa valeur neutre
+   * @returns Le bouton, pour enchaîner les appels
+   */
   setIndicators({
     badge = 0,
     audible = false,
@@ -136,7 +175,10 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return this;
   }
 
-  /** @returns L'icône de l'application : sa police d'icônes, son image, ou son favicon (puis sa première lettre) */
+  /**
+   * Crée l'icône de l'application.
+   * @returns L'icône de l'application : sa police d'icônes, son image, ou son favicon (puis sa première lettre)
+   */
   #createIcon(): HTMLElement {
     const { picture, path, title } = this.itemData;
 
@@ -169,6 +211,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return image;
   }
 
+  /** Crée les éléments des indicateurs (pochette, anneau, pastilles) et garde leurs références. */
   #createIndicatorNodes(): void {
     const badgeNode = document.createElement('span');
     badgeNode.classList.add('badge');
@@ -200,6 +243,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     this.#progressNode = progressNode;
   }
 
+  /** Reporte l'état des indicateurs dans le DOM, ainsi que dans le libellé accessible et l'infobulle. */
   #renderIndicators(): void {
     const nodes = { badge: this.#badgeNode, audio: this.#audioNode, icon: this.#audioIcon, cover: this.#coverNode, progress: this.#progressNode };
     if (!nodes.badge || !nodes.audio || !nodes.icon || !nodes.cover || !nodes.progress) return;
@@ -227,7 +271,10 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     else delete this.dataset.tooltipBadge;
   }
 
-  /** @returns Les états du bouton, en toutes lettres (pour les lecteurs d'écran) */
+  /**
+   * Décrit les états du bouton pour les lecteurs d'écran.
+   * @returns Les états du bouton, en toutes lettres
+   */
   #describeStates(): string {
     const states: string[] = [];
     if (this.#badge > 0) states.push(translate('button.unread', { count: this.#badge }));
@@ -238,6 +285,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return states.join(', ');
   }
 
+  /** Règles CSS du bouton : tuile ronde, état enfoncé, mode édition et indicateurs. */
   static override get CssRules(): Rule[] {
     return StyleComponent.RuleClass.Write({
       ':host': {
@@ -379,7 +427,13 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     });
   }
 
-  /** Crée le bouton d'une application. */
+  /**
+   * Crée le bouton d'une application.
+   * @param url Adresse de l'application
+   * @param title Titre affiché
+   * @param options Image du bouton (`data:` ou `font:nom`), sinon le favicon du site
+   * @returns Le bouton, pas encore ajouté à la page
+   */
   static CreateNode(url: string, title: string, { picture = null }: { picture?: string | null } = {}): HTMLToolbarButton {
     const node = document.createElement(this.TAG) as HTMLToolbarButton;
 
@@ -388,11 +442,16 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     return node.setData('url', url).setData('title', title);
   }
 
+  /** Nom de la balise du composant. */
   static override get TAG(): string {
     return `${TAG_PREFIX}-toolbar-button`;
   }
 
-  /** @returns Le bouton de cette application, `null` si elle n'est pas dans la barre */
+  /**
+   * Cherche le bouton d'une application dans la page.
+   * @param url Adresse de l'application
+   * @returns Le bouton de cette application, `null` si elle n'est pas dans la barre
+   */
   static Select(url: string): HTMLToolbarButton | null {
     for (const element of document.querySelectorAll<HTMLToolbarButton>(this.TAG)) {
       if (element.itemData.link === url) return element;

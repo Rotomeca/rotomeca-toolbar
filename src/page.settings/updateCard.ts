@@ -1,8 +1,18 @@
+/**
+ * Contenu des cartes de mise à jour des paramètres : titre, statut, progression et boutons.
+ *
+ * Utilisé par la page des paramètres (`src/page.settings/`). Fonctions pures qui transforment l'état
+ * envoyé par le processus principal ; le texte passe par une fonction de traduction injectée.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { UpdateStage, UpdateState } from '../shared/dto.js';
 
+/** Fonction de traduction : clé et variables optionnelles vers texte. */
 export type Translate = (key: string, variables?: Readonly<Record<string, string | number>>) => string;
 
+/** Nombre de millisecondes dans une minute. */
 const MS_PER_MINUTE = 60_000;
+/** Nombre de minutes dans une heure. */
 const MINUTES_PER_HOUR = 60;
 
 /** Icône de la carte, selon l'étape de la mise à jour. */
@@ -15,25 +25,43 @@ const STAGE_ICONS: Readonly<Record<UpdateStage, string>> = {
 
 /** Ce que la carte « Mises à jour » affiche pour un état donné. */
 export interface UpdateCardView {
+  /** Étape de la mise à jour. */
   readonly stage: UpdateStage;
+  /** Nom de l'icône de la carte. */
   readonly icon: string;
+  /** Titre de la carte. */
   readonly title: string;
   /** La version installée est une pré-version. */
   readonly showPrereleaseBadge: boolean;
+  /** Un téléchargement est en cours : la barre de progression remplace le statut. */
   readonly downloading: boolean;
   /** Pourcentage de progression, `null` : barre indéterminée. */
   readonly progress: number | null;
+  /** Texte accessible de la barre de progression. */
   readonly progressLabel: string;
+  /** Texte de statut sous le titre ; vide pendant un téléchargement. */
   readonly status: string;
+  /** Le statut est un message d'erreur. */
   readonly statusIsError: boolean;
+  /** Le bouton « Vérifier » est proposé. */
   readonly showCheckButton: boolean;
+  /** Une vérification est en cours (bouton en chargement). */
   readonly checking: boolean;
+  /** Le bouton principal (télécharger ou installer) est proposé. */
   readonly showInstallButton: boolean;
+  /** Libellé du bouton principal. */
   readonly installLabel: string;
+  /** Icône du bouton principal. */
   readonly installIcon: string;
 }
 
-/** @returns « il y a N min/h » pour la dernière vérification, `null` si elle n'a jamais eu lieu */
+/**
+ * Décrit en langage courant l'ancienneté de la dernière vérification.
+ * @param lastCheck Heure de la dernière vérification (ms), `null` si jamais
+ * @param now Heure actuelle (ms)
+ * @param t Fonction de traduction
+ * @returns « il y a N min/h » pour la dernière vérification, `null` si elle n'a jamais eu lieu
+ */
 export function describeLastCheck(lastCheck: number | null, now: number, t: Translate): string | null {
   if (!lastCheck) return null;
 
@@ -43,6 +71,12 @@ export function describeLastCheck(lastCheck: number | null, now: number, t: Tran
   return t('update.card.lastHours', { n: Math.floor(minutes / MINUTES_PER_HOUR) });
 }
 
+/**
+ * Choisit le titre de la carte selon l'étape de la mise à jour.
+ * @param state État de la mise à jour
+ * @param t Fonction de traduction
+ * @returns Le titre à afficher
+ */
 function titleOf(state: UpdateState, t: Translate): string {
   const next = state.versionDisponible;
 
@@ -59,6 +93,13 @@ function titleOf(state: UpdateState, t: Translate): string {
   }
 }
 
+/**
+ * Choisit le texte de statut de la carte ; une erreur a priorité sur tout le reste.
+ * @param state État de la mise à jour
+ * @param now Heure actuelle (ms)
+ * @param t Fonction de traduction
+ * @returns Le texte et son caractère d'erreur
+ */
 function statusOf(state: UpdateState, now: number, t: Translate): { text: string; isError: boolean } {
   if (state.erreur) return { text: t(state.erreur), isError: true };
 
@@ -81,6 +122,7 @@ function statusOf(state: UpdateState, now: number, t: Translate): { text: string
 /**
  * @param state État envoyé par le processus principal
  * @param now Heure actuelle (ms)
+ * @param t Fonction de traduction
  * @returns Ce que la carte affiche : titre, statut, progression et boutons (une seule action primaire à la fois)
  */
 export function describeUpdateCard(state: UpdateState, now: number, t: Translate): UpdateCardView {
@@ -111,14 +153,24 @@ export function describeUpdateCard(state: UpdateState, now: number, t: Translate
 
 /** Ce que le bloc « Version de test » affiche. */
 export interface TestChannelView {
+  /** Une recherche de version de test est en cours. */
   readonly checking: boolean;
+  /** Le bouton d'ouverture ou d'installation de la version de test est proposé. */
   readonly showOpenButton: boolean;
+  /** Libellé de ce bouton. */
   readonly openLabel: string;
+  /** Texte de statut du bloc. */
   readonly status: string;
+  /** Le statut est un message d'erreur. */
   readonly statusIsError: boolean;
 }
 
-/** @returns Ce que le bloc « Version de test » affiche (la carte de mises à jour prend le relais pendant un téléchargement) */
+/**
+ * Décrit le bloc « Version de test ».
+ * @param state État de la mise à jour
+ * @param t Fonction de traduction
+ * @returns Ce que le bloc « Version de test » affiche (la carte de mises à jour prend le relais pendant un téléchargement)
+ */
 export function describeTestChannel(state: UpdateState, t: Translate): TestChannelView {
   const found = state.versionTest;
   const busy = state.etat === 'downloading' || state.etat === 'ready';

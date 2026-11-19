@@ -1,3 +1,9 @@
+/**
+ * Contrôle de l'origine d'un appel IPC : seule la page principale d'une fenêtre locale est de confiance.
+ *
+ * Utilisé par `IpcRouter` ; garde les sites tiers et les sous-cadres hors de l'IPC.
+ */
+
 /** Ce que le contrôle lit d'un évènement IPC (un sous-ensemble de `IpcMainInvokeEvent`). */
 export interface IpcOrigin {
   readonly senderFrame: { readonly url: string } | null;

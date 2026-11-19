@@ -1,10 +1,19 @@
+/**
+ * Hôte des sites ouverts en arrière-plan : vues, indicateurs (non-lus, son, morceau) et sourdine.
+ *
+ * Utilisé par `App` (processus principal). La fenêtre et les vues sont injectées (sous-ensembles
+ * d'Electron) pour que la logique reste testable sans lancer l'application.
+ */
+// [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { MEDIA_ACTIONS, parseUnreadCount } from '../../scripts/AppIndicators.js';
 import type { MediaAction, MediaState } from '../../scripts/AppIndicators.js';
+// [dockGeometry.ts] Géométrie de la barre : disposition des fenêtres, bande réservée et masquage automatique
 import type { Rect } from '../dock/dockGeometry.js';
 
 /** Ce que l'hôte demande à la page d'un site (un sous-ensemble de `WebContents`). */
 export interface AppWebContents {
   readonly id: number;
+  /** Indique si la page est déjà détruite (elle ne doit alors plus être utilisée). */
   isDestroyed(): boolean;
   stop(): void;
   close(): void;
@@ -19,7 +28,9 @@ export interface AppWebContents {
 
 /** Une vue qui affiche un site (un sous-ensemble de `WebContentsView`). */
 export interface AppView {
+  /** Affiche ou cache la vue. */
   setVisible(visible: boolean): void;
+  /** Place et dimensionne la vue dans la fenêtre. */
   setBounds(bounds: Rect): void;
   readonly webContents: AppWebContents;
 }
@@ -44,12 +55,14 @@ export interface ViewEntry<V extends AppView = AppView> {
   media: MediaState | undefined;
 }
 
+/** Changements d'indicateurs à enregistrer ; `media: null` efface le morceau en cours. */
 export interface IndicatorChanges {
   readonly badge?: number;
   readonly audible?: boolean;
   readonly media?: MediaState | null;
 }
 
+/** Collaborateurs de `AppViewHost`, injectés pour le garder indépendant d'Electron. */
 export interface AppViewHostDeps<V extends AppView = AppView> {
   readonly surface: ViewSurface<V>;
   /** Crée une vue durcie (preload, sandbox, restrictions de navigation) pour un site. */
@@ -63,6 +76,7 @@ export interface AppViewHostDeps<V extends AppView = AppView> {
   readonly mediaActionChannel: string;
 }
 
+/** Indique si la valeur reçue d'une page est une commande de lecteur connue. */
 const isMediaAction = (action: unknown): action is MediaAction => (MEDIA_ACTIONS as readonly unknown[]).includes(action);
 
 /**
@@ -70,10 +84,14 @@ const isMediaAction = (action: unknown): action is MediaAction => (MEDIA_ACTIONS
  * réglage « son coupé », qui survit à la fermeture de la vue tant que l'application tourne.
  */
 export class AppViewHost<V extends AppView = AppView> {
+  /** Applications ouvertes, par adresse. */
   private readonly entries = new Map<string, ViewEntry<V>>();
+  /** Adresses dont le son est coupé, même si leur vue est fermée. */
   private readonly muted = new Set<string>();
+  /** Adresse de la dernière application ouverte. */
   private lastOpenedUrl: string | null = null;
 
+  /** @param deps Fenêtre porteuse, fabrique de vues et rappels */
   constructor(private readonly deps: AppViewHostDeps<V>) {}
 
   /** Dernière application ouverte : l'en-tête de la fenêtre la demande quand sa page est prête. */
@@ -81,10 +99,12 @@ export class AppViewHost<V extends AppView = AppView> {
     return this.lastOpenedUrl;
   }
 
+  /** @returns L'application ouverte à cette adresse, `undefined` si elle n'a pas de vue */
   entry(url: string): ViewEntry<V> | undefined {
     return this.entries.get(url);
   }
 
+  /** @returns `true` si le son de l'application est coupé */
   isMuted(url: string): boolean {
     return this.muted.has(url);
   }
@@ -147,6 +167,7 @@ export class AppViewHost<V extends AppView = AppView> {
     this.deps.onChange(url);
   }
 
+  /** Recharge la page de l'application, si elle est ouverte. */
   reload(url: string): void {
     this.entries.get(url)?.view.webContents.reload();
   }
@@ -194,6 +215,7 @@ export class AppViewHost<V extends AppView = AppView> {
     return true;
   }
 
+  /** Crée la vue de l'application, la dimensionne sous l'en-tête, la rattache à la fenêtre et charge le site. */
   private create(url: string): ViewEntry<V> {
     const view = this.deps.createView();
     view.webContents.setAudioMuted(this.muted.has(url));

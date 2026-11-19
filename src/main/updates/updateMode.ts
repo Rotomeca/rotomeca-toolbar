@@ -1,3 +1,9 @@
+/**
+ * Choix du mode de mise à jour (simulé, Squirrel, manuel) et de l'adresse du serveur interrogé.
+ *
+ * Utilisé par `createUpdateManager.ts`. Pur, sans Electron : testable avec n'importe quelle plateforme.
+ */
+// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions
 import type { UpdateChannel } from '../../scripts/UpdateManager.js';
 
 /** Ce qui détermine comment l'application se met à jour. */
@@ -6,11 +12,13 @@ export interface UpdateEnvironment {
   readonly isDev: boolean;
   /** Application empaquetée (pas lancée depuis les sources). */
   readonly isPackaged: boolean;
+  /** Plateforme d'exécution. */
   readonly platform: NodeJS.Platform;
   /** La simulation d'un cycle de mise à jour est demandée (développement seulement). */
   readonly simulateRequested: boolean;
 }
 
+/** Façon dont l'application se met à jour dans un environnement donné. */
 export interface UpdateMode {
   /** Simule un cycle complet, sans réseau (développement). */
   readonly simulate: boolean;
@@ -23,7 +31,10 @@ export interface UpdateMode {
 /** Plateformes où Squirrel installe les mises à jour. */
 const SQUIRREL_PLATFORMS: readonly NodeJS.Platform[] = ['win32', 'darwin'];
 
-/** @returns Le mode de mise à jour de cet environnement */
+/**
+ * @param environment Contexte de lancement (développement, paquet, plateforme).
+ * @returns Le mode de mise à jour de cet environnement
+ */
 export function resolveUpdateMode({ isDev, isPackaged, platform, simulateRequested }: UpdateEnvironment): UpdateMode {
   const packaged = !isDev && isPackaged;
 
@@ -34,18 +45,25 @@ export function resolveUpdateMode({ isDev, isPackaged, platform, simulateRequest
   };
 }
 
+/** Paramètres de `createFeedSwitcher`. */
 export interface FeedSwitcherOptions {
   /** Serveur des versions publiées. */
   readonly stableUrl: string;
   /** Serveur des pré-versions, `null` s'il n'existe pas. */
   readonly testUrl: string | null;
+  /** Plateforme, incluse dans l'adresse interrogée. */
   readonly platform: NodeJS.Platform;
+  /** Version actuelle de l'application, incluse dans l'adresse interrogée. */
   readonly version: string;
   /** Donne à Squirrel l'adresse à interroger. */
   readonly apply: (url: string) => void;
 }
 
-/** @returns L'adresse interrogée par Squirrel : `<serveur>/update/<plateforme>/<version>` */
+/**
+ * @param baseUrl Adresse du serveur.
+ * @param platform Plateforme de l'application.
+ * @param version Version actuelle de l'application.
+ * @returns L'adresse interrogée par Squirrel : `<serveur>/update/<plateforme>/<version>` */
 export function feedUrlFor(baseUrl: string, platform: NodeJS.Platform, version: string): string {
   return `${baseUrl}/update/${platform}/${version}`;
 }
@@ -53,6 +71,8 @@ export function feedUrlFor(baseUrl: string, platform: NodeJS.Platform, version: 
 /**
  * Crée la fonction qui oriente Squirrel vers le serveur des versions publiées ou celui des
  * pré-versions.
+ *
+ * @param options Adresses des serveurs, plateforme, version et fonction qui transmet l'adresse à Squirrel.
  * @returns Une fonction qui change de serveur ; elle ne fait rien pour `test` sans serveur de test
  */
 export function createFeedSwitcher({

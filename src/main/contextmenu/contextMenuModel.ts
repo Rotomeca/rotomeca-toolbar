@@ -1,3 +1,10 @@
+/**
+ * Contenu du menu contextuel des boutons de la barre (mode normal et mode édition).
+ *
+ * Logique pure, sans Electron : `ContextMenuController` l'appelle avec les boutons enregistrés.
+ * Les actions produites sont celles que la page du menu renvoie au processus principal.
+ */
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { ContextMenuAction, ContextMenuItem } from '../../shared/dto.js';
 
 /** Ce que la page envoie sur l'élément cliqué avec le bouton droit. */
@@ -7,6 +14,7 @@ export interface ContextMenuTarget {
   readonly classes: readonly string[];
 }
 
+/** Clic droit reçu de la page : élément visé, bouton de souris et position dans la fenêtre. */
 export interface ContextMenuEvent {
   readonly target: ContextMenuTarget;
   readonly button: number;
@@ -19,21 +27,26 @@ export type { ContextMenuAction, ContextMenuItem };
 /** Un élément enregistré de la barre : une application (avec son adresse) ou un séparateur. */
 export type SavedEntry = 'separator' | { readonly url: string; readonly picture?: string | null };
 
+/** Fonction de traduction : clé de `fr.json` / `en.json` et variables à insérer dans le texte. */
 export type Translate = (key: string, variables?: Readonly<Record<string, string | number>>) => string;
 
+/** Ce dont la construction du menu a besoin : boutons connus, état du son et traduction. */
 export interface MenuContext {
   readonly saves: readonly SavedEntry[];
   readonly isMuted: (url: string) => boolean;
   readonly translate: Translate;
 }
 
+/** Indique si l'élément enregistré est un séparateur. */
 const isSeparator = (entry: SavedEntry | undefined): boolean => entry === 'separator';
 
+/** @returns L'image enregistrée de l'application, `undefined` si elle est inconnue */
 function pictureOf(saves: readonly SavedEntry[], url: string): string | null | undefined {
   for (const entry of saves) if (typeof entry === 'object' && entry.url === url) return entry.picture;
   return undefined;
 }
 
+/** @returns L'adresse de l'application, `undefined` pour un séparateur ou une entrée absente */
 function urlOf(entry: SavedEntry | undefined): string | undefined {
   return typeof entry === 'object' ? entry.url : undefined;
 }
@@ -72,6 +85,11 @@ export function buildContextMenu(event: ContextMenuEvent, { saves, isMuted, tran
   ];
 }
 
+/**
+ * Menu du mode édition. Les actions de déplacement et de séparateur sont désactivées quand elles
+ * n'auraient aucun effet (déjà en bout de liste, séparateur déjà présent).
+ * @returns Les boutons, vide si l'application n'est pas dans la liste
+ */
 function buildEditMenu(remove: ContextMenuItem, url: string, saves: readonly SavedEntry[], t: Translate): ContextMenuItem[] {
   const index = saves.findIndex((entry) => urlOf(entry) === url);
   if (index < 0) return [];
