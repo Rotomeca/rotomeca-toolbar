@@ -2,7 +2,7 @@
  * Mode « fumée » (`--smoke`) : vérifie que l'application est saine sans la lancer.
  *
  * Contrôle les pages locales (chemins, design system, `window.api`), le preload des
- * sites (sandboxé), les traductions et koffi. N'utilise ni le dossier de données de
+ * sites (sandboxé), le chargement des modules du processus principal, les traductions et koffi. N'utilise ni le dossier de données de
  * l'utilisateur, ni le verrou d'instance, ni la barre ancrée, ni le raccourci global.
  *
  * Écrit un rapport JSON dans le fichier donné par `--smoke-out=<fichier>` puis quitte
@@ -24,6 +24,20 @@ const MEDIA_TIMEOUT_MS = 8000;
 const TOTAL_TIMEOUT_MS = 90000;
 const SETTLE_DELAY_MS = 300;
 const ERR_ABORTED = -3;
+
+/**
+ * Fichiers de src/scripts qui ne sont pas des modules CommonJS du processus principal :
+ * modules ES des pages, et ce fichier lui-même.
+ */
+const NOT_MAIN_MODULES = new Set([
+  'seasonFx.js',
+  'ds.js',
+  'ToolbarAppData.js',
+  // Lu comme du texte puis injecté dans la page du menu contextuel : du code de page
+  'WebContentElecrtonContextMenu.js',
+  'smokeRun.js',
+]);
+const MAIN_MODULES_OUTSIDE_SCRIPTS = [['settings.js'], ['configs', 'appConfig.js']];
 
 /** Pages qui dépendent du réseau (recherche Google) : hors du périmètre. */
 const SKIPPED_PAGES = new Set(['search.html']);
@@ -175,6 +189,42 @@ async function checkMediaPreload() {
   return { name, ok: problems.length === 0, detail: problems.join(' ; ') || 'ok' };
 }
 
+/** @returns {string[]} Chemins absolus des modules CommonJS du processus principal */
+function listMainModules() {
+  const scriptsDir = path.join(ROOT, 'src', 'scripts');
+  const scripts = fs
+    .readdirSync(scriptsDir)
+    .filter((file) => file.endsWith('.js') && !NOT_MAIN_MODULES.has(file))
+    .map((file) => path.join(scriptsDir, file));
+
+  return [...scripts, ...MAIN_MODULES_OUTSIDE_SCRIPTS.map((segments) => path.join(ROOT, ...segments))];
+}
+
+/**
+ * Charge chaque module du processus principal : détecte un module qui ne se charge plus
+ * (mauvais format, import cassé) avant même de lancer l'application.
+ * @returns {CheckResult}
+ */
+function checkMainModules() {
+  const name = 'modules du processus principal';
+  const modules = listMainModules();
+  const failures = [];
+
+  for (const file of modules) {
+    try {
+      require(file);
+    } catch (error) {
+      failures.push(`${path.relative(ROOT, file)} : ${error.message}`);
+    }
+  }
+
+  return {
+    name,
+    ok: failures.length === 0,
+    detail: failures.join(' ; ') || `${modules.length} modules chargés`,
+  };
+}
+
 /** @returns {CheckResult} */
 function checkTranslations() {
   const count = Object.keys(getDictionary()).length;
@@ -200,7 +250,7 @@ function checkKoffi() {
 
 /** @returns {Promise<CheckResult[]>} */
 async function runChecks() {
-  const results = [checkTranslations(), checkKoffi()];
+  const results = [checkMainModules(), checkTranslations(), checkKoffi()];
   for (const page of listPages()) results.push(await checkPage(page));
   results.push(await checkMediaPreload());
   return results;
