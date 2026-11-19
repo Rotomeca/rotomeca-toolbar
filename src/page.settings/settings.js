@@ -573,6 +573,65 @@ export class PageSettings {
     setInterval(() => state && !state.erreur && render(), 60000);
   }
 
+  /**
+   * Section « Permissions des sites » : liste des décisions mémorisées, avec
+   * révocation une à une ou en bloc. Les origines viennent de sites tiers :
+   * elles ne sont insérées que via `textContent`.
+   */
+  async #initPermissions() {
+    const t = window.api.t;
+    const list = document.querySelector('#perm-list');
+    const empty = document.querySelector('#perm-empty');
+    const clearButton = document.querySelector('#perm-clear');
+
+    const render = (decisions) => {
+      list.replaceChildren();
+
+      for (const { origin, permission, allowed } of decisions) {
+        const kind = t(`permissions.kind.${permission}`);
+
+        const item = document.createElement('li');
+
+        const info = document.createElement('div');
+        info.className = 'perm-info';
+        const originLabel = document.createElement('span');
+        originLabel.className = 'perm-origin';
+        originLabel.textContent = origin;
+        originLabel.title = origin;
+        const kindLabel = document.createElement('span');
+        kindLabel.className = 'perm-kind';
+        kindLabel.textContent = kind;
+        info.append(originLabel, kindLabel);
+
+        const state = document.createElement('span');
+        state.className = 'perm-state';
+        state.dataset.allowed = String(allowed);
+        state.textContent = t(allowed ? 'permissions.allowed' : 'permissions.denied');
+
+        const revoke = document.createElement('rds-button');
+        revoke.setAttribute('variant', 'tertiary');
+        revoke.setAttribute('icon-before', 'trash-2');
+        revoke.setAttribute('aria-label', t('permissions.revokeLabel', { kind, origin }));
+        revoke.textContent = t('permissions.revoke');
+        revoke.addEventListener('click', async () =>
+          render(await window.api.invoke(appEventList.permissionRevoke, { origin, permission })),
+        );
+
+        item.append(info, state, revoke);
+        list.append(item);
+      }
+
+      empty.hidden = decisions.length > 0;
+      clearButton.hidden = decisions.length === 0;
+    };
+
+    clearButton.addEventListener('click', async () =>
+      render(await window.api.invoke(appEventList.permissionsClear)),
+    );
+
+    render(await window.api.invoke(appEventList.permissionsList));
+  }
+
   async main() {
     window.api.on(pageEventList.settingsStart, async (_, path) => {
       console.log('path', path);
@@ -600,6 +659,7 @@ export class PageSettings {
       await this.#initMode();
       await this.#initTheme();
       await this.#initUpdates();
+      await this.#initPermissions();
     });
   }
 }

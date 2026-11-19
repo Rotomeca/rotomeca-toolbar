@@ -44,6 +44,10 @@ const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
+const { PermissionStore } = require('./src/scripts/PermissionStore.js');
+const {
+  createPermissionPolicy,
+} = require('./src/scripts/permissionPolicy.js');
 const { compareVersions } = require('./src/scripts/versions.js');
 const { isSafeUrl } = require('./src/scripts/safeUrl.js');
 const {
@@ -550,6 +554,17 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.updateGetState, () => AppMain.updater.state)
       .addEventListener(appEventList.updateCheck, () => AppMain.updater.check())
+      .addEventListener(appEventList.permissionsList, () =>
+        AppMain.permissions.list(),
+      )
+      .addEventListener(appEventList.permissionRevoke, (_, decision) => {
+        AppMain.permissions.revoke(decision?.origin, decision?.permission);
+        return AppMain.permissions.list();
+      })
+      .addEventListener(appEventList.permissionsClear, () => {
+        AppMain.permissions.clear();
+        return AppMain.permissions.list();
+      })
       .addEventListener(appEventList.updateInstall, () => AppMain.updater.install())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -1999,68 +2014,39 @@ class AppMain extends BaseAppObject {
   /**
    * Politique de permissions des sites tiers (session par défaut).
    * Les permissions sensibles (caméra/micro, localisation) demandent
-   * une confirmation, mémorisée pour la durée de l'exécution.
+   * une confirmation ; la réponse est mémorisée durablement et révocable
+   * depuis les Paramètres.
    * @param {Electron.Session} ses
+   * @param {PermissionStore} store
    */
-  static InstallPermissionHandlers(ses) {
-    const ALLOWED = new Set([
-      'notifications',
-      'fullscreen',
-      'pointerLock',
-      'clipboard-sanitized-write',
-      'mediaKeySystem', // DRM (Spotify, Netflix...)
-      'speaker-selection',
-    ]);
-    const ASK = new Set(['media', 'geolocation']);
+  static InstallPermissionHandlers(ses, store) {
     const LABELS = {
       media: 'permission.media',
       geolocation: 'permission.geolocation',
     };
-    /** @type {Map<string, boolean>} */
-    const decisions = new Map();
 
-    const originOf = (url) => {
-      try {
-        return new URL(url).origin;
-      } catch (error) {
-        return null;
-      }
-    };
-
-    ses.setPermissionCheckHandler((_, permission, requestingOrigin) => {
-      if (ALLOWED.has(permission)) return true;
-      if (ASK.has(permission))
-        return decisions.get(`${requestingOrigin}|${permission}`) === true;
-      return false;
+    const policy = createPermissionPolicy({
+      store,
+      isSafeUrl: AppMain.IsSafeUrl,
+      ask: async (origin, permission) => {
+        const { response } = await dialog.showMessageBox({
+          type: 'question',
+          buttons: [t('permission.allow'), t('permission.deny')],
+          defaultId: 1,
+          cancelId: 1,
+          title: t('permission.title'),
+          message: t('permission.message', {
+            origin,
+            action: t(LABELS[permission]),
+          }),
+          detail: t('permission.remembered'),
+        });
+        return response === 0;
+      },
     });
 
-    ses.setPermissionRequestHandler(
-      async (contents, permission, callback, details) => {
-        if (ALLOWED.has(permission)) return callback(true);
-        if (!ASK.has(permission)) return callback(false);
-
-        const origin = originOf(details?.requestingUrl ?? contents?.getURL());
-        if (!origin || !AppMain.IsSafeUrl(origin)) return callback(false);
-
-        const key = `${origin}|${permission}`;
-        if (!decisions.has(key)) {
-          const { response } = await dialog.showMessageBox({
-            type: 'question',
-            buttons: [t('permission.allow'), t('permission.deny')],
-            defaultId: 1,
-            cancelId: 1,
-            title: t('permission.title'),
-            message: t('permission.message', {
-              origin,
-              action: t(LABELS[permission]),
-            }),
-          });
-          decisions.set(key, response === 0);
-        }
-
-        callback(decisions.get(key));
-      },
-    );
+    ses.setPermissionCheckHandler(policy.check);
+    ses.setPermissionRequestHandler(policy.request);
   }
 
   /**
@@ -2114,7 +2100,15 @@ app.on('ready', async () => {
     migrateLegacyData(app, FileData.BasePath);
     restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession, app);
-    AppMain.InstallPermissionHandlers(session.defaultSession);
+    const permissionFile = new FileData('permissions.rcft');
+    AppMain.permissions = new PermissionStore({
+      load: () => permissionFile.load(),
+      save: (data) => permissionFile.save(data),
+    });
+    AppMain.InstallPermissionHandlers(
+      session.defaultSession,
+      AppMain.permissions,
+    );
     const instance = AppMain.InitAutoUpdater().Run();
     runningInstance = instance;
 

@@ -171,6 +171,60 @@
         gap: 16px;
       }
 
+      /* Permissions des sites */
+      .perm-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .perm-list li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: var(--ds-input-radius);
+        border: 1px solid var(--ds-border-subtle);
+        background: var(--ds-background-surface);
+      }
+
+      .perm-info {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .perm-origin {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font: var(--text-label);
+      }
+
+      .perm-kind {
+        font: var(--text-helper);
+        color: var(--ds-text-muted);
+      }
+
+      .perm-state {
+        flex: none;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font: var(--text-helper);
+        background: var(--ds-background-tone-success);
+        color: var(--ds-text-tone-success);
+      }
+
+      .perm-state[data-allowed='false'] {
+        background: var(--ds-background-tone-neutral);
+        color: var(--ds-text-tone-neutral);
+      }
+
       /* Vignettes de thème */
       #themes {
         display: grid;
@@ -516,6 +570,16 @@
           </div>
           <span class="helper" data-i18n="settings.effectsHelp">Neige, feuilles, pétales, tournesols ou traîneau selon la saison. Coupés si Windows réduit les animations.</span>
         </div>
+      </section>
+
+      <section aria-labelledby="sec-permissions">
+        <div class="card-head">
+          <h2 id="sec-permissions" data-i18n="permissions.title">Permissions des sites</h2>
+          <rds-button id="perm-clear" variant="tertiary" icon-before="trash-2" hidden data-i18n="permissions.revokeAll">Tout révoquer</rds-button>
+        </div>
+        <p class="helper" data-i18n="permissions.help">Choix mémorisés pour la caméra, le micro et la position.</p>
+        <ul id="perm-list" class="perm-list"></ul>
+        <p id="perm-empty" class="helper" data-i18n="permissions.empty">Aucune décision enregistrée.</p>
       </section>
     </div>
   </body>
