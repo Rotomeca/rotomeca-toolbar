@@ -20,7 +20,7 @@ const TSC = path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 /** Une configuration par cible : processus principal (CommonJS) et pages (modules ES). */
 const TS_CONFIGS = ['tsconfig.json', 'tsconfig.renderer.json'];
 
-const ROOT_FILES = ['main.js', 'settings.js', 'index.html'];
+const ROOT_FILES = ['main.js', 'index.html'];
 const ROOT_DIRS = ['src', 'lib', 'configs'];
 // Les pages importent le design system par un chemin relatif vers node_modules (voir
 // src/scripts/ds.js) : il doit donc exister aussi dans dist/ à la même profondeur.

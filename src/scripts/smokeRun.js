@@ -39,7 +39,6 @@ const NOT_MAIN_MODULES = new Set([
   'smokeRun.js',
 ]);
 const MAIN_MODULES_OUTSIDE_SCRIPTS = [
-  ['settings.js'],
   ['configs', 'appConfig.js'],
   // Module ES partagé, chargé par `require` depuis le processus principal
   ['src', 'shared', 'ipc', 'events.js'],

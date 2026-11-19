@@ -81,6 +81,10 @@ const {
 const { centeredTop } = require('./src/main/windows/placement.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const {
+  JsonFileStore,
+  dataDirectory,
+} = require('./src/main/persistence/JsonFileStore.js');
+const {
   savedUrls,
   removeApp,
   moveApp,
@@ -231,16 +235,24 @@ class AppMain extends BaseAppObject {
   }
 
   /**
-   * @type {FileData}
+   * @type {{save: (data: any) => void, loadAsync: () => Promise<any | false>}}
    * @readonly
    */
   get userFileData() {
     if (!this.main.userFileData) {
-      const { FileData } = require('./src/scripts/FileData.js');
-      let fd = new FileData('data.rsft');
-      fd.onsave.push((data) => this.onsave.call(data));
-      fd.onload.push((data) => this.onload.call(data || {}));
-      this.main.userFileData = fd;
+      const store = new JsonFileStore(dataDirectory(), 'data.rsft');
+      // Le menu contextuel suit ce qui est enregistré et chargé
+      this.main.userFileData = {
+        save: (data) => {
+          store.save(data);
+          this.onsave.call(data);
+        },
+        loadAsync: async () => {
+          const data = await store.loadAsync();
+          if (data !== false) this.onload.call(data || {});
+          return data;
+        },
+      };
     }
 
     return this.main.userFileData;
@@ -1874,8 +1886,7 @@ class AppMain extends BaseAppObject {
       compareVersions,
       beforeInstall: () => {
         // Copie de sécurité des données avant l'installation
-        const { FileData } = require('./src/scripts/FileData.js');
-        backupUserData(app, FileData.BasePath);
+        backupUserData(app, dataDirectory());
         // Sauvegarde des sessions (logins) avant que l'app soit tuée
         flushSession(session.defaultSession);
       },
@@ -1946,11 +1957,10 @@ app.on('will-quit', () => {
 app.on('ready', async () => {
   if (!hasSingleInstanceLock) return;
   try {
-    const { FileData } = require('./src/scripts/FileData.js');
-    migrateLegacyData(app, FileData.BasePath);
-    restoreFromBackup(FileData.BasePath);
+    migrateLegacyData(app, dataDirectory());
+    restoreFromBackup(dataDirectory());
     keepLoginsAlive(session.defaultSession, app);
-    const permissionFile = new FileData('permissions.rcft');
+    const permissionFile = new JsonFileStore(dataDirectory(), 'permissions.rcft');
     AppMain.permissions = new PermissionStore({
       load: () => permissionFile.load(),
       save: (data) => permissionFile.save(data),

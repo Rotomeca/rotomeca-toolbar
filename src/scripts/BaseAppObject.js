@@ -15,7 +15,7 @@ class BaseAppObject {
    */
   #_windows = {};
   #_base_css = null;
-  #_params = null;
+  #_settings = null;
   constructor() {
     this.init();
     this.main();
@@ -25,12 +25,9 @@ class BaseAppObject {
    * @returns {Settings}
    */
   get settings() {
-    if (!this.#_params) {
-      const { Params } = require('../../settings.js');
-      this.#_params = Params;
-    }
+    this.#_settings ??= require('../main/settings/defaultSettings.js').getSettings();
 
-    return this.#_params.Instance;
+    return this.#_settings;
   }
 
   /**
@@ -120,15 +117,14 @@ class BaseAppObject {
    * @returns {string}
    */
   get themeScript() {
-    const { resolveTheme, SEASON_THEMES } = require('../../settings.js');
-    const attrs = resolveTheme(
-      this.settings.effectiveTheme,
-      nativeTheme.shouldUseDarkColors,
-    );
-    // Effets de saison : seulement sur un thème de saison, interrupteur actif
-    const fx =
-      this.settings.effetsSaison && SEASON_THEMES.includes(attrs.palette);
-    return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; h.dataset.fx = ${JSON.stringify(fx ? 'on' : 'off')}; h.dataset.fxDensity = ${JSON.stringify(this.settings.densiteEffets)}; }`;
+    const { buildThemeScript } = require('../main/theming/themeScript.js');
+
+    return buildThemeScript({
+      effectiveTheme: this.settings.effectiveTheme,
+      effectsEnabled: this.settings.effetsSaison,
+      effectsDensity: this.settings.densiteEffets,
+      systemIsDark: nativeTheme.shouldUseDarkColors,
+    });
   }
 
   /**
