@@ -46,9 +46,12 @@ const {
   keepLoginsAlive,
   logCookieState,
 } = require('./src/scripts/Persistence.js');
-const { appEventList } = require('./src/scripts/events/AppEventList.js');
+const {
+  appEventList,
+  pageEventList,
+  internalChannels,
+} = require('./src/shared/ipc/events.js');
 const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
-const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
 const { PermissionStore } = require('./src/scripts/PermissionStore.js');
@@ -593,10 +596,10 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.mediaHover, this.event_media_hover.bind(this));
 
     // Envoyé par le preload des sites (pas par nos pages locales)
-    ipcMain.on('rtb-media-state', this.event_media_state.bind(this));
+    ipcMain.on(internalChannels.mediaState, this.event_media_state.bind(this));
 
     // Traductions demandées (de façon synchrone) par le preload de nos pages
-    ipcMain.on('rtb-i18n', (event) => {
+    ipcMain.on(internalChannels.i18n, (event) => {
       const frame = event.senderFrame;
       event.returnValue =
         frame && frame === event.sender.mainFrame && frame.url.startsWith('file://')
@@ -1581,7 +1584,7 @@ class AppMain extends BaseAppObject {
     const entry = this.views[url];
     if (!entry?.media || !MEDIA_ACTIONS.includes(action)) return;
 
-    entry.view.webContents.send('rtb-media-action', action);
+    entry.view.webContents.send(internalChannels.mediaAction, action);
 
     // Retour immédiat : la page confirmera dans la seconde qui suit
     if (action === 'play' || action === 'pause') {

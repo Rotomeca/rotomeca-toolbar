@@ -1,8 +1,11 @@
+import type { InvokeChannel, PushChannel } from '../shared/ipc/events.js';
+
 /**
  * `window.api` : l'API exposée aux pages par le preload (`contextBridge`).
- * Les canaux sont filtrés par une liste blanche côté preload.
+ * Les canaux sont ceux de `src/shared/ipc/events.ts` : un autre nom est une erreur de type,
+ * et le preload refuse de toute façon un canal qui n'y figure pas.
  */
-interface RotomecaApi {
+export interface RotomecaApi {
   /** Langue de l'interface (`fr`, `en`). */
   readonly locale: string;
 
@@ -11,18 +14,20 @@ interface RotomecaApi {
 
   /**
    * Appelle un canal du processus principal.
-   * @returns `undefined` (et non une promesse) si le canal n'est pas autorisé
+   * @returns La réponse du gestionnaire ; la promesse est rejetée si le canal n'est pas autorisé
    */
-  invoke(channel: string, ...data: unknown[]): Promise<unknown> | undefined;
+  invoke(channel: InvokeChannel, ...data: unknown[]): Promise<unknown>;
 
   /**
    * Écoute un canal envoyé par le processus principal. L'évènement IPC n'est
    * jamais transmis : le premier argument du rappel vaut toujours `null`.
    * @returns La fonction de désabonnement
    */
-  on(channel: string, callback: (event: null, ...args: unknown[]) => void): () => void;
+  on(channel: PushChannel, callback: (event: null, ...args: unknown[]) => void): () => void;
 }
 
-interface Window {
-  readonly api: RotomecaApi;
+declare global {
+  interface Window {
+    readonly api: RotomecaApi;
+  }
 }

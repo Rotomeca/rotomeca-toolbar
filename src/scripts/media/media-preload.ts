@@ -2,7 +2,15 @@
 // Un script est injecté dans le monde principal de la page, avant les siens,
 // pour capturer les actions de l'API Media Session (previous/next/play/pause)
 // et publier le morceau en cours. Le preload ne sert que de relais IPC.
-const { ipcRenderer, webFrame } = require('electron');
+// Bundlé par esbuild en un seul fichier (voir scripts/build.js).
+
+import { ipcRenderer, webFrame } from 'electron';
+import { internalChannels } from '../../shared/ipc/events.js';
+
+// Noms des évènements DOM échangés entre le script injecté et ce preload : les mêmes
+// que les canaux IPC correspondants.
+const MEDIA_STATE_EVENT = internalChannels.mediaState;
+const MEDIA_ACTION_EVENT = internalChannels.mediaAction;
 
 const PAGE_SCRIPT = `(() => {
   const ms = navigator.mediaSession;
@@ -101,10 +109,10 @@ const PAGE_SCRIPT = `(() => {
     const json = JSON.stringify(state);
     if (json === last) return;
     last = json;
-    window.dispatchEvent(new CustomEvent('rtb-media-state', { detail: json }));
+    window.dispatchEvent(new CustomEvent('${MEDIA_STATE_EVENT}', { detail: json }));
   };
 
-  window.addEventListener('rtb-media-action', (event) => {
+  window.addEventListener('${MEDIA_ACTION_EVENT}', (event) => {
     const action = event.detail;
     if (handlers[action]) return handlers[action]({ action });
 
@@ -117,12 +125,14 @@ const PAGE_SCRIPT = `(() => {
   setInterval(publish, 1000);
 })();`;
 
-webFrame.executeJavaScript(PAGE_SCRIPT).catch(() => {});
-
-window.addEventListener('rtb-media-state', event => {
-	ipcRenderer.send('rtb-media-state', event.detail);
+webFrame.executeJavaScript(PAGE_SCRIPT).catch((error: unknown) => {
+  console.warn('Injection du script média impossible', error);
 });
 
-ipcRenderer.on('rtb-media-action', (_event, action) => {
-	window.dispatchEvent(new CustomEvent('rtb-media-action', { detail: action }));
+window.addEventListener(MEDIA_STATE_EVENT, (event) => {
+  ipcRenderer.send(internalChannels.mediaState, (event as CustomEvent<string>).detail);
+});
+
+ipcRenderer.on(internalChannels.mediaAction, (_event, action: unknown) => {
+  window.dispatchEvent(new CustomEvent(MEDIA_ACTION_EVENT, { detail: action }));
 });

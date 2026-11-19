@@ -29,10 +29,11 @@ test('shouldCopy : les sources de styles et fichiers de génération ne le sont 
   }
 });
 
-test('shouldCopy : les preloads ne sont pas copiés tels quels (ils sont bundlés)', () => {
-  assert.equal(shouldCopy('preload.js'), false);
-  assert.equal(shouldCopy('src/scripts/media/media-preload.js'), false);
-  assert.equal(shouldCopy('src\\scripts\\media\\media-preload.js'), false);
+test('shouldCopy : les sources TypeScript ne sont jamais copiées (tsc et esbuild les compilent)', () => {
+  assert.equal(shouldCopy('preload.ts'), false);
+  assert.equal(shouldCopy('src/scripts/media/media-preload.ts'), false);
+  assert.equal(shouldCopy('src\\scripts\\versions.ts'), false);
+  assert.equal(shouldCopy('src/types/window-api.d.ts'), false);
   assert.equal(shouldCopy('src/scripts/media/other.js'), true);
 });
 
@@ -48,10 +49,10 @@ function fakeRepo(t) {
 
   const files = {
     'main.js': '// main',
-    'preload.js':
-      'const { shared } = require(\'./shared.js\'); const { ipcRenderer } = require(\'electron\'); module.exports = { shared, ipcRenderer };',
-    'shared.js': 'module.exports = { shared: \'CONTENU-PARTAGE\' };',
-    'src/scripts/media/media-preload.js': 'const { ipcRenderer } = require(\'electron\'); ipcRenderer.send(\'x\');',
+    'preload.ts':
+      'import { ipcRenderer } from \'electron\'; import { shared } from \'./shared.js\'; export const api: string = shared; ipcRenderer.send(\'p\');',
+    'shared.ts': 'export const shared: string = \'CONTENU-PARTAGE\';',
+    'src/scripts/media/media-preload.ts': 'import { ipcRenderer } from \'electron\'; ipcRenderer.send(\'x\');',
     'settings.js': '// settings',
     'index.html': '<html></html>',
     'src/scripts/a.js': '// a',
@@ -135,7 +136,9 @@ test('build : le preload est un bundle unique, qui inclut ses imports et garde e
   assert.match(bundle, /CONTENU-PARTAGE/, 'le fichier importé est inclus');
   assert.doesNotMatch(bundle, /require\(["']\.{1,2}\//, 'aucun require relatif ne reste');
   assert.match(bundle, /require\("electron"\)/, 'electron reste externe');
+  assert.doesNotMatch(bundle, /: string/, 'les types TypeScript sont retirés');
   assert.ok(!fs.existsSync(path.join(dist, 'shared.js')), 'le fichier importé ne doit pas être copié à part');
+  assert.ok(!fs.existsSync(path.join(dist, 'preload.ts')), 'la source TypeScript n\'est pas copiée');
 });
 
 test('build : le preload des sites est bundlé lui aussi', (t) => {
@@ -145,4 +148,5 @@ test('build : le preload des sites est bundlé lui aussi', (t) => {
 
   assert.match(bundle, /require\("electron"\)/);
   assert.match(bundle, /ipcRenderer\.send\("x"\)/);
+  assert.ok(!fs.existsSync(path.join(dist, 'src/scripts/media/media-preload.ts')));
 });

@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { appEventList } = require('./events/AppEventList');
+const { appEventList } = require('../shared/ipc/events.js');
 
 const DEFAULT_MENU = Symbol();
 const ALWAYS_SHOW = Symbol();

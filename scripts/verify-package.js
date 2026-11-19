@@ -28,6 +28,8 @@ const REQUIRED_FROM_BASE = [
   'src/locales/fr.json',
   'src/locales/en.json',
   'src/pictures/icon.png',
+  'src/shared/package.json',
+  'src/shared/ipc/events.js',
   'node_modules/@rotomeca/design-system/out/rotomeca-design-system.js',
 ];
 

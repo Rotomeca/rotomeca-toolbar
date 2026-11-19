@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { interpolate } from '../shared/i18n/interpolate.js';
+import type { Variables } from '../shared/i18n/interpolate.js';
 
 export type Dictionary = Readonly<Record<string, string>>;
-
-/** Valeurs des `{nom}` d'un texte traduit. */
-export type Variables = Readonly<Record<string, string | number>>;
 
 /** Langue utilisée quand celle du système n'est pas gérée */
 const DEFAULT_LOCALE = 'en';
@@ -64,10 +63,5 @@ export function getDictionary(): Dictionary {
  * @returns Le texte traduit, ou la clé si elle est inconnue
  */
 export function t(key: string, variables: Variables = {}): string {
-  const text = getDictionary()[key] ?? key;
-
-  return text.replace(/\{(\w+)\}/g, (placeholder, name: string) => {
-    const value = Object.hasOwn(variables, name) ? variables[name] : undefined;
-    return value === undefined ? placeholder : String(value);
-  });
+  return interpolate(getDictionary()[key] ?? key, variables);
 }

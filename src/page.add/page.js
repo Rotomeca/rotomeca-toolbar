@@ -1,4 +1,4 @@
-import { appEventList } from '../scripts/events/AppEventListModule.js';
+import { appEventList } from '../shared/ipc/events.js';
 
 /**
  * Jetons du thème recopiés dans l'iframe de recherche (qui n'hérite pas des --ds-*).

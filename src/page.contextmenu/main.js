@@ -1,5 +1,5 @@
 import '../scripts/ds.js';
-import { appEventList } from '../scripts/events/AppEventListModule.js';
+import { appEventList } from '../shared/ipc/events.js';
 
 export { Main };
 

@@ -1,7 +1,7 @@
 import '../scripts/ds.js';
 import { HTMLToolbarButton } from '../scripts/components/HTMLToolbarButton.js';
-import { appEventList } from '../scripts/events/AppEventListModule.js';
-import { pageEventList } from '../scripts/events/PageEventListModule.js';
+import { appEventList } from '../shared/ipc/events.js';
+import { pageEventList } from '../shared/ipc/events.js';
 import { initSeasonFx } from '../scripts/seasonFx.js';
 
 /**

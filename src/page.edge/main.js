@@ -1,4 +1,4 @@
-import { appEventList } from '../scripts/events/AppEventListModule.js';
+import { appEventList } from '../shared/ipc/events.js';
 
 // L'entrée de la souris dans la zone du bord gauche ouvre la barre. Le
 // processus principal cache cette fenêtre dès que la barre est ouverte.

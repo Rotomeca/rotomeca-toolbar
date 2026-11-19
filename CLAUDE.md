@@ -47,7 +47,7 @@ Avant de commiter : `pnpm typecheck`, `pnpm lint` et `pnpm test` doivent passer 
 - `main.js` : processus principal (`AppMain`), volumineux (≈2 100 lignes) et à découper progressivement.
 - `src/scripts/` : classes et modules du processus principal. `preload.js` : liste blanche des canaux IPC. `src/page.*/` : une fenêtre par dossier (HTML + JS). `lib/` : composants partagés. `src/locales/{fr,en}.json` : textes. `configs/appConfig.js` : adresses des serveurs de mises à jour.
 - **Logique testable = module pur, sans `electron`.** Les dépendances (fetch, dialogue, Squirrel…) sont injectées. C'est le principe d'inversion de dépendance du claude-config appliqué ici (exemples : `UpdateManager`, `PermissionStore`, `permissionPolicy`, `versions`, `safeUrl`, `appIcon`). `main.js` ne fait que câbler. **En touchant à `main.js`, extraire plutôt qu'ajouter**, et tester le module extrait.
-- **Nouveau canal IPC** : l'ajouter aux trois listes `src/scripts/events/AppEventList.js`, `AppEventListBase.js` et `AppEventListModule.js` (les garder identiques) **et** à `INVOKE_CHANNELS` / `ON_CHANNELS` de `preload.js`, sinon le renderer ne le voit pas.
+- **Nouveau canal IPC** : l'ajouter **une seule fois**, dans `src/shared/ipc/events.ts` (`appEventList` pour un appel de page vers le processus principal, `pageEventList` pour un envoi du principal vers les pages). Le preload en dérive sa liste blanche, les pages et le processus principal importent le même fichier. `src/shared/` est en modules ES (`package.json` voisin) ; le processus principal le charge avec `require()`.
 - **Textes** : toute chaîne visible va dans `fr.json` **et** `en.json`, avec les mêmes clés.
 
 ## Sécurité (en plus de `security.md`)

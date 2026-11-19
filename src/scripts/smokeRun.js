@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { getLocale, getDictionary } = require('./i18n.js');
+const { internalChannels } = require('../shared/ipc/events.js');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PRELOAD = path.join(ROOT, 'preload.js');
@@ -37,7 +38,12 @@ const NOT_MAIN_MODULES = new Set([
   'WebContentElecrtonContextMenu.js',
   'smokeRun.js',
 ]);
-const MAIN_MODULES_OUTSIDE_SCRIPTS = [['settings.js'], ['configs', 'appConfig.js']];
+const MAIN_MODULES_OUTSIDE_SCRIPTS = [
+  ['settings.js'],
+  ['configs', 'appConfig.js'],
+  // Module ES partagé, chargé par `require` depuis le processus principal
+  ['src', 'shared', 'ipc', 'events.js'],
+];
 
 /** Pages qui dépendent du réseau (recherche Google) : hors du périmètre. */
 const SKIPPED_PAGES = new Set(['search.html']);
@@ -174,7 +180,7 @@ async function checkMediaPreload() {
   const name = 'preload des sites (media-preload.js)';
   const win = createHiddenWindow(MEDIA_PRELOAD);
   const problems = watchProblems(win.webContents);
-  const published = new Promise((resolve) => ipcMain.once('rtb-media-state', (_event, raw) => resolve(raw)));
+  const published = new Promise((resolve) => ipcMain.once(internalChannels.mediaState, (_event, raw) => resolve(raw)));
 
   try {
     await win.loadURL(MEDIA_PAGE);
@@ -279,7 +285,7 @@ function finish(results) {
 async function run() {
   app.setPath('userData', optionValue('--smoke-user-data') ?? fs.mkdtempSync(path.join(os.tmpdir(), 'rtb-smoke-')));
   // Le preload demande les traductions de façon synchrone : sans réponse, il resterait bloqué
-  ipcMain.on('rtb-i18n', (event) => {
+  ipcMain.on(internalChannels.i18n, (event) => {
     event.returnValue = { locale: getLocale(), dict: getDictionary() };
   });
 

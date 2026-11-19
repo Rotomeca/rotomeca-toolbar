@@ -1,7 +1,5 @@
 document.addEventListener('contextmenu', async (e) => {
-  const { appEventList } = await import(
-    '../scripts/events/AppEventListModule.js'
-  );
+  const { appEventList } = await import('../shared/ipc/events.js');
 
   const node = e.target;
   let target = { content: node.outerHTML, nodeName: node.nodeName };

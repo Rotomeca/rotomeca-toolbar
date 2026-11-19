@@ -1,7 +1,7 @@
 import '../scripts/ds.js';
 import { EMPTY_STRING } from '../../lib/RotomecaWebComponents/libs/constants.js';
-import { appEventList } from '../scripts/events/AppEventListModule.js';
-import { pageEventList } from '../scripts/events/PageEventListModule.js';
+import { appEventList } from '../shared/ipc/events.js';
+import { pageEventList } from '../shared/ipc/events.js';
 
 const SELECTOR_INPUT_URL = '#urlbox';
 const SELECTOR_INPUT_NAME = '#namebox';
