@@ -292,9 +292,10 @@ export class App {
     startContextMenu(this.contextMenu);
     this.tray.start();
 
-    if (this.toolbar.mode.button) this.windows.main.focus();
-
+    // Les routes IPC existent avant la première page : le preload demande les traductions dès son chargement
     this.registerIpcRoutes();
+
+    if (this.toolbar.mode.button) this.windows.main.focus();
 
     const reposition = (): void => this.toolbar.repositionWindows();
     screen.on('display-metrics-changed', reposition);
