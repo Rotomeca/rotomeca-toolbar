@@ -52,7 +52,17 @@ const {
   internalChannels,
 } = require('./src/shared/ipc/events.js');
 const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
-const { AppBar } = require('./src/scripts/AppBar.js');
+const {
+  createAppBar,
+  isAppBarSupported,
+} = require('./src/main/dock/createAppBar.js');
+const {
+  computeLayout,
+  dockRequest,
+  dockRequestKey,
+  isPointInside,
+  stepAutoHide,
+} = require('./src/main/dock/dockGeometry.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
 const { PermissionStore } = require('./src/scripts/PermissionStore.js');
 const { compareVersions, isPrerelease } = require('./src/scripts/versions.js');
@@ -172,7 +182,7 @@ class AppMain extends BaseAppObject {
    * Barre ancrée au bord gauche (AppBar Windows), si disponible.
    */
   get settingIsAppBar() {
-    return this.settings.appBarEnabled && AppBar.isSupported;
+    return this.settings.appBarEnabled && isAppBarSupported();
   }
 
   /**
@@ -619,7 +629,7 @@ class AppMain extends BaseAppObject {
         return AppMain.permissions.list();
       })
       .addEventListener(appEventList.updateInstall, () => AppMain.updater.install())
-      .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
+      .addEventListener(appEventList.isAppBarSupported, () => isAppBarSupported())
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
       .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
       .addEventListener(
@@ -737,28 +747,15 @@ class AppMain extends BaseAppObject {
     let outsideSince = null;
 
     this.autoHideTimer = setInterval(() => {
-      const point = screen.getCursorScreenPoint();
-      const inside = ['toolbar', 'apps', 'add_dialog'].some((name) => {
-        const win = this.getWindow(name);
-        if (!win || win.isDestroyed() || !win.isVisible()) return false;
+      const visibleBounds = ['toolbar', 'apps', 'add_dialog']
+        .map((name) => this.getWindow(name))
+        .filter((win) => win && !win.isDestroyed() && win.isVisible())
+        .map((win) => win.getBounds());
+      const inside = isPointInside(screen.getCursorScreenPoint(), visibleBounds);
 
-        const b = win.getBounds();
-        return (
-          point.x >= b.x &&
-          point.x < b.x + b.width &&
-          point.y >= b.y &&
-          point.y < b.y + b.height
-        );
-      });
-
-      if (inside) {
-        outsideSince = null;
-      } else if (outsideSince === null) {
-        outsideSince = Date.now();
-      } else if (Date.now() - outsideSince >= AUTOHIDE_DELAY) {
-        outsideSince = null;
-        if (this.state) this.event_main_click();
-      }
+      const step = stepAutoHide(outsideSince, inside, Date.now(), AUTOHIDE_DELAY);
+      outsideSince = step.outsideSince;
+      if (step.collapse && this.state) this.event_main_click();
     }, AUTOHIDE_POLL);
   }
 
@@ -774,16 +771,13 @@ class AppMain extends BaseAppObject {
   dockToolbar(force = false) {
     if (!this.appBar?.registered) return;
 
-    const { bounds } = this.primaryScreen;
-    const wanted = {
-      x: bounds.x,
-      y: bounds.y,
-      // En masquage automatique, seul le rail réserve de la place : la barre
-      // dépliée flotte par-dessus les fenêtres sans les déplacer
-      width: this.settingIsAutoHide ? RAIL_WIDTH : this.dockedWidth,
-      height: bounds.height,
-    };
-    const key = JSON.stringify(wanted);
+    const wanted = dockRequest({
+      bounds: this.primaryScreen.bounds,
+      autoHide: this.settingIsAutoHide,
+      dockedWidth: this.dockedWidth,
+      railWidth: RAIL_WIDTH,
+    });
+    const key = dockRequestKey(wanted);
 
     // Évite de boucler : réserver l'espace modifie la zone de travail, ce qui
     // redéclenche repositionWindows
@@ -797,7 +791,7 @@ class AppMain extends BaseAppObject {
    * Enregistre la barre comme AppBar et la place.
    */
   attachAppBar() {
-    this.appBar ??= new AppBar({
+    this.appBar ??= createAppBar({
       onFullscreen: (isFullscreen) =>
         this.getWindow('toolbar')?.setAlwaysOnTop(!isFullscreen),
       onPosChanged: () => {
@@ -843,50 +837,20 @@ class AppMain extends BaseAppObject {
    * @readonly
    */
   get layout() {
-    const wa = this.workArea;
-    const { bounds } = this.primaryScreen;
-    const docked = this.settingIsAppBar;
-    const toolbar = docked
-      ? {
-          ...(this.appBarRect ?? { x: bounds.x, y: wa.y, height: wa.height }),
-          width: this.dockedWidth,
-        }
-      : {
-          x: wa.x + 10,
-          y: wa.y + 10,
-          width: APPBAR_WIDTH,
-          height: wa.height - (this.settingIsButton ? 52 : 20),
-        };
-
-    return {
-      main: {
-        x: wa.x + 10,
-        y: wa.y + wa.height - 32,
-        width: 64,
-        height: 32,
+    return computeLayout({
+      workArea: this.workArea,
+      bounds: this.primaryScreen.bounds,
+      sizes: {
+        toolbarWidth: APPBAR_WIDTH,
+        addDialogWidth: ADD_DIALOG_WIDTH,
+        addDialogHeight: ADD_DIALOG_HEIGHT,
+        edgeWidth: EDGE_WIDTH,
       },
-      toolbar,
-      apps: {
-        x: docked
-          ? toolbar.x + toolbar.width + 10
-          : wa.x + 64 + 20,
-        y: docked ? toolbar.y + 10 : wa.y + 10,
-        width: Math.round(wa.width / 4),
-        height: docked ? toolbar.height - 20 : toolbar.height,
-      },
-      addDialog: {
-        x: toolbar.x + toolbar.width + 10,
-        y: toolbar.y,
-        width: Math.min(ADD_DIALOG_WIDTH, wa.width),
-        height: Math.min(ADD_DIALOG_HEIGHT, wa.height),
-      },
-      edge: {
-        x: bounds.x,
-        y: bounds.y,
-        width: EDGE_WIDTH,
-        height: bounds.height,
-      },
-    };
+      docked: this.settingIsAppBar,
+      dockedWidth: this.dockedWidth,
+      grantedArea: this.appBarRect,
+      buttonMode: this.settingIsButton,
+    });
   }
 
   /**
