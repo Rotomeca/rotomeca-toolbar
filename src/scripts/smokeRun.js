@@ -195,6 +195,18 @@ async function checkMediaPreload() {
   return { name, ok: problems.length === 0, detail: problems.join(' ; ') || 'ok' };
 }
 
+/**
+ * @param {string} dir
+ * @returns {string[]} Les fichiers .js de ce dossier et de ses sous-dossiers
+ */
+function listJsFiles(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return listJsFiles(full);
+    return entry.name.endsWith('.js') ? [full] : [];
+  });
+}
+
 /** @returns {string[]} Chemins absolus des modules CommonJS du processus principal */
 function listMainModules() {
   const scriptsDir = path.join(ROOT, 'src', 'scripts');
@@ -203,7 +215,12 @@ function listMainModules() {
     .filter((file) => file.endsWith('.js') && !NOT_MAIN_MODULES.has(file))
     .map((file) => path.join(scriptsDir, file));
 
-  return [...scripts, ...MAIN_MODULES_OUTSIDE_SCRIPTS.map((segments) => path.join(ROOT, ...segments))];
+  return [
+    ...scripts,
+    // Les domaines du processus principal, par dossier (src/main/<domaine>/...)
+    ...listJsFiles(path.join(ROOT, 'src', 'main')),
+    ...MAIN_MODULES_OUTSIDE_SCRIPTS.map((segments) => path.join(ROOT, ...segments)),
+  ];
 }
 
 /**

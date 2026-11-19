@@ -55,12 +55,24 @@ const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
 const { PermissionStore } = require('./src/scripts/PermissionStore.js');
-const {
-  createPermissionPolicy,
-} = require('./src/scripts/permissionPolicy.js');
 const { compareVersions, isPrerelease } = require('./src/scripts/versions.js');
 const { iconBaseName } = require('./src/scripts/appIcon.js');
 const { isSafeUrl } = require('./src/scripts/safeUrl.js');
+const {
+  resolveUpdateMode,
+  createFeedSwitcher,
+} = require('./src/main/updates/updateMode.js');
+const {
+  showUpdateNotification,
+} = require('./src/main/updates/updateNotification.js');
+const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
+const { hardenWebContents } = require('./src/main/security/webContentsHardener.js');
+const {
+  createPermissionDialog,
+} = require('./src/main/permissions/permissionDialog.js');
+const {
+  installPermissionHandlers,
+} = require('./src/main/permissions/installPermissionHandlers.js');
 const {
   parseUnreadCount,
   sanitizeMediaState,
@@ -100,9 +112,6 @@ const EDGE_WIDTH = 4;
 
 // Raccourci clavier global qui affiche ou cache la barre
 const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
-
-// Taille maximale (caractères) d'une icône d'application encodée en data URL
-const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
 
 /**
  * @callback SavesUpdatedCallback
@@ -1224,7 +1233,7 @@ class AppMain extends BaseAppObject {
    * @returns {boolean} `true` si l'application est dans la barre (ajoutée ou déjà présente)
    */
   event_request_add_data(_, data) {
-    const clean = AppMain.SanitizeAppData(data);
+    const clean = sanitizeAppData(data);
     if (!clean) return false;
 
     if (this.saves.some((save) => save?.url === clean.url)) return true;
@@ -1264,7 +1273,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_add_data_edit(_, data) {
-    const clean = AppMain.SanitizeAppData(data);
+    const clean = sanitizeAppData(data);
     if (!clean) return;
 
     this.removeWindow('add_dialog');
@@ -1279,7 +1288,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_updated_data(_, data) {
-    const clean = AppMain.SanitizeAppData(data);
+    const clean = sanitizeAppData(data);
     const id = data?.id;
     const target = Number.isInteger(id) ? this.saves[id] : null;
 
@@ -1594,7 +1603,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_toggle_mute(_, { url } = {}) {
-    if (!AppMain.IsSafeUrl(url)) return;
+    if (!isSafeUrl(url)) return;
 
     const muted = !this.mutedUrls.has(url);
     if (muted) this.mutedUrls.add(url);
@@ -1606,7 +1615,7 @@ class AppMain extends BaseAppObject {
   // #endregion
 
   event_open_frame(_, url) {
-    if (!AppMain.IsSafeUrl(url)) return;
+    if (!isSafeUrl(url)) return;
 
     this.url = url;
 
@@ -1631,7 +1640,7 @@ class AppMain extends BaseAppObject {
         height: Math.max(0, bounds.height - APPS_HEADER_HEIGHT),
       });
 
-      AppMain.HardenWebContents(view.webContents);
+      hardenWebContents(view.webContents);
 
       this.views[url] = { view, badge: 0, audible: false };
       this.appsWindow.contentView.addChildView(view);
@@ -1823,7 +1832,7 @@ class AppMain extends BaseAppObject {
         );
       else this.toolbarWindow.hide();
 
-      if (AppMain.IsSafeUrl(url)) shell.openExternal(url);
+      if (isSafeUrl(url)) shell.openExternal(url);
     }
   }
 
@@ -1909,31 +1918,37 @@ class AppMain extends BaseAppObject {
    */
   static InitAutoUpdater() {
     const { feedUrl, testFeedUrl, releasesRepo } = require('./configs/appConfig.js');
-    const simulate = AppMain.IsDev && process.env.RTB_UPDATE_SIMULATE === '1';
-    const packaged = !AppMain.IsDev && app.isPackaged;
-    const squirrel = packaged && ['win32', 'darwin'].includes(process.platform);
+    const mode = resolveUpdateMode({
+      isDev: AppMain.IsDev,
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      simulateRequested: process.env.RTB_UPDATE_SIMULATE === '1',
+    });
 
     // Serveur Hazel normal (versions publiées) ou serveur de test (pré-versions seulement)
-    const setFeed = (channel) =>
-      autoUpdater.setFeedURL({
-        url: `${channel === 'test' ? testFeedUrl : feedUrl}/update/${process.platform}/${app.getVersion()}`,
-      });
+    const setFeed = createFeedSwitcher({
+      stableUrl: feedUrl,
+      testUrl: testFeedUrl,
+      platform: process.platform,
+      version: app.getVersion(),
+      apply: (url) => autoUpdater.setFeedURL({ url }),
+    });
 
-    if (squirrel && feedUrl) setFeed('stable');
+    if (mode.squirrel && feedUrl) setFeed('stable');
 
     AppMain.updater = new UpdateManager({
       version: app.getVersion(),
-      autoUpdater: squirrel && feedUrl ? autoUpdater : null,
+      autoUpdater: mode.squirrel && feedUrl ? autoUpdater : null,
       setFeed,
       testFeed: !!testFeedUrl,
       releasesRepo,
-      manual: packaged && process.platform === 'linux',
-      simulate,
+      manual: mode.manual,
+      simulate: mode.simulate,
       fetch: (url, init) => net.fetch(url, init),
       openExternal: (url) => {
-        if (AppMain.IsSafeUrl(url)) shell.openExternal(url);
+        if (isSafeUrl(url)) shell.openExternal(url);
       },
-      compareVersions: AppMain.CompareVersions,
+      compareVersions,
       beforeInstall: () => {
         // Copie de sécurité des données avant l'installation
         const { FileData } = require('./src/scripts/FileData.js');
@@ -1960,138 +1975,15 @@ class AppMain extends BaseAppObject {
    * Un clic ouvre les Paramètres, où se trouve le bouton.
    */
   static NotifyUpdate() {
-    if (!Notification.isSupported()) return;
-
-    const notification = new Notification({
-      title: t('update.downloadedNotifTitle'),
-      body: t('update.downloadedNotifBody'),
-      icon: path.join(
+    showUpdateNotification({
+      Notification,
+      translate: t,
+      iconPath: path.join(
         __dirname,
         `/src/pictures/${iconBaseName(app.getVersion())}.png`,
       ),
-      urgency: 'normal',
+      onClick: () => runningInstance?.event_tray_on_click(),
     });
-    notification.on('click', () => runningInstance?.event_tray_on_click());
-    notification.show();
-  }
-
-  /**
-   * @type {boolean}
-   * @readonly
-   */
-  static IsSafeUrl(url) {
-    return isSafeUrl(url);
-  }
-
-  /**
-   * Valide et nettoie les données d'une application reçues d'une page (IPC).
-   * @param {unknown} data
-   * @returns {{name:string, url:string, picture:?string}|null} null si invalide
-   */
-  static SanitizeAppData(data) {
-    if (!data || typeof data !== 'object') return null;
-
-    const { name, url, picture } = data;
-    if (typeof url !== 'string' || !AppMain.IsSafeUrl(url)) return null;
-
-    let cleanPicture = null;
-    if (typeof picture === 'string' && picture !== '') {
-      const isDataImage =
-        /^data:image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon|bmp);/i.test(
-          picture,
-        ) && picture.length <= MAX_PICTURE_LENGTH;
-      const isFont = /^font:[\w-]{1,64}$/.test(picture);
-
-      if (isDataImage || isFont) cleanPicture = picture;
-    }
-
-    return {
-      name:
-        typeof name === 'string' && name.trim() !== ''
-          ? name.slice(0, 200)
-          : url,
-      url,
-      picture: cleanPicture,
-    };
-  }
-
-  /**
-   * Restreint ce qu'un site tiers peut faire : popups, navigation et permissions.
-   * @param {Electron.WebContents} contents
-   */
-  static HardenWebContents(contents) {
-    // Popups : uniquement http(s) (ex. connexion OAuth), jamais d'autre schéma
-    contents.setWindowOpenHandler(({ url }) => {
-      if (!AppMain.IsSafeUrl(url)) return { action: 'deny' };
-
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: { autoHideMenuBar: true },
-      };
-    });
-
-    // Les popups autorisées héritent des mêmes restrictions de navigation
-    contents.on('did-create-window', (child) => {
-      AppMain.HardenWebContents(child.webContents);
-    });
-
-    // Navigation : on bloque file:, javascript:, data:, etc.
-    const blockUnsafeNavigation = (event, url) => {
-      if (!AppMain.IsSafeUrl(url)) event.preventDefault();
-    };
-    contents.on('will-navigate', blockUnsafeNavigation);
-    contents.on('will-redirect', blockUnsafeNavigation);
-
-    // Pas de <webview> dans les sites tiers
-    contents.on('will-attach-webview', (event) => event.preventDefault());
-  }
-
-  /**
-   * Politique de permissions des sites tiers (session par défaut).
-   * Les permissions sensibles (caméra/micro, localisation) demandent
-   * une confirmation ; la réponse est mémorisée durablement et révocable
-   * depuis les Paramètres.
-   * @param {Electron.Session} ses
-   * @param {PermissionStore} store
-   */
-  static InstallPermissionHandlers(ses, store) {
-    const LABELS = {
-      media: 'permission.media',
-      geolocation: 'permission.geolocation',
-    };
-
-    const policy = createPermissionPolicy({
-      store,
-      isSafeUrl: AppMain.IsSafeUrl,
-      ask: async (origin, permission) => {
-        const { response } = await dialog.showMessageBox({
-          type: 'question',
-          buttons: [t('permission.allow'), t('permission.deny')],
-          defaultId: 1,
-          cancelId: 1,
-          title: t('permission.title'),
-          message: t('permission.message', {
-            origin,
-            action: t(LABELS[permission]),
-          }),
-          detail: t('permission.remembered'),
-        });
-        return response === 0;
-      },
-    });
-
-    ses.setPermissionCheckHandler(policy.check);
-    ses.setPermissionRequestHandler(policy.request);
-  }
-
-  /**
-   * Compare deux versions `x.y.z`.
-   * @param {string} a
-   * @param {string} b
-   * @returns {number} > 0 si `a` est plus récente que `b`
-   */
-  static CompareVersions(a, b) {
-    return compareVersions(a, b);
   }
 
   /**
@@ -2140,10 +2032,11 @@ app.on('ready', async () => {
       load: () => permissionFile.load(),
       save: (data) => permissionFile.save(data),
     });
-    AppMain.InstallPermissionHandlers(
-      session.defaultSession,
-      AppMain.permissions,
-    );
+    installPermissionHandlers(session.defaultSession, {
+      store: AppMain.permissions,
+      isSafeUrl,
+      ask: createPermissionDialog({ dialog, translate: t }),
+    });
     const instance = AppMain.InitAutoUpdater().Run();
     runningInstance = instance;
 
