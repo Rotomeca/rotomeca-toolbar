@@ -144,30 +144,76 @@ function flushSession(session) {
 }
 
 /**
+ * Réécrit un cookie de session avec une date d'expiration à un an.
+ * @param {Electron.Session} session
+ * @param {Electron.Cookie} cookie
+ * @returns {Promise<void>}
+ */
+function persistCookie(session, cookie) {
+  const scheme = cookie.secure ? 'https' : 'http';
+  const host = cookie.domain.replace(/^\./, '');
+  return session.cookies
+    .set({
+      url: `${scheme}://${host}${cookie.path || '/'}`,
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite,
+      expirationDate: Math.floor(Date.now() / 1000) + COOKIE_LIFETIME_SECONDS,
+    })
+    .catch(() => {});
+}
+
+/**
+ * Journalise (sans les valeurs) l'état des cookies Google/YouTube dans
+ * `<userData>/cookie-diagnostic.log`, pour comprendre une perte de login.
+ * @param {Electron.App} app
+ * @param {Electron.Session} session
+ * @param {string} moment Évènement à l'origine du relevé
+ */
+async function logCookieState(app, session, moment) {
+  try {
+    const cookies = (await session.cookies.get({})).filter((c) =>
+      /google|youtube/i.test(c.domain),
+    );
+    const sessionOnly = cookies.filter((c) => c.session).length;
+    const soonest = Math.min(
+      ...cookies.filter((c) => c.expirationDate).map((c) => c.expirationDate),
+    );
+    const line = `${new Date().toISOString()} v${app.getVersion()} ${moment}: ${cookies.length} cookies google/youtube, ${sessionOnly} de session, plus proche expiration ${
+      Number.isFinite(soonest) ? new Date(soonest * 1000).toISOString() : 'n/a'
+    }
+`;
+    fs.appendFileSync(path.join(app.getPath('userData'), 'cookie-diagnostic.log'), line);
+  } catch (error) {
+    console.error('Diagnostic des cookies impossible', error);
+  }
+}
+
+/**
  * Rend persistants les cookies de session (sans expiration) et vide
  * régulièrement le cache disque des cookies pour ne pas perdre de login.
  * @param {Electron.Session} session
+ * @param {Electron.App} [app] Si fourni, active le journal de diagnostic
  */
-function keepLoginsAlive(session) {
+function keepLoginsAlive(session, app) {
   session.cookies.on('changed', (_event, cookie, _cause, removed) => {
     if (removed || !cookie.session) return;
-
-    const scheme = cookie.secure ? 'https' : 'http';
-    const host = cookie.domain.replace(/^\./, '');
-    session.cookies
-      .set({
-        url: `${scheme}://${host}${cookie.path || '/'}`,
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path,
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        sameSite: cookie.sameSite,
-        expirationDate: Math.floor(Date.now() / 1000) + COOKIE_LIFETIME_SECONDS,
-      })
-      .catch(() => {});
+    persistCookie(session, cookie);
   });
+
+  // Les cookies de session déjà présents (login antérieur à cet écouteur)
+  // n'émettent aucun évènement : on les rend persistants dès le démarrage.
+  session.cookies
+    .get({})
+    .then((cookies) =>
+      Promise.all(cookies.filter((c) => c.session).map((c) => persistCookie(session, c))),
+    )
+    .then(() => app && logCookieState(app, session, 'démarrage'))
+    .catch(() => {});
 
   const timer = setInterval(() => flushSession(session), 60 * 1000);
   timer.unref?.();
@@ -180,4 +226,5 @@ module.exports = {
   restoreFromBackup,
   flushSession,
   keepLoginsAlive,
+  logCookieState,
 };
