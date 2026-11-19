@@ -65,6 +65,17 @@ const {
 const {
   showUpdateNotification,
 } = require('./src/main/updates/updateNotification.js');
+const {
+  updateLevelOf,
+  badgeCornerFor,
+  paintUpdateBadge,
+} = require('./src/main/tray/updateBadge.js');
+const { buildTrayTooltip } = require('./src/main/tray/trayTooltip.js');
+const {
+  mediaProgress,
+  mediaPayload,
+} = require('./src/main/media/mediaState.js');
+const { centeredTop } = require('./src/main/windows/placement.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const { hardenWebContents } = require('./src/main/security/webContentsHardener.js');
 const {
@@ -994,9 +1005,7 @@ class AppMain extends BaseAppObject {
    * @returns {?('pending'|'ready')}
    */
   get updateLevel() {
-    const etat = AppMain.updater?.state.etat;
-    if (etat === 'ready') return 'ready';
-    return etat === 'downloading' || etat === 'available' ? 'pending' : null;
+    return updateLevelOf(AppMain.updater?.state.etat);
   }
 
   /**
@@ -1015,26 +1024,12 @@ class AppMain extends BaseAppObject {
     const base = nativeImage
       .createFromPath(this.appIcon)
       .resize({ width: size, height: size });
-    const bitmap = Buffer.from(base.toBitmap());
-    const [b, g, r] = level === 'ready' ? [76, 175, 80] : [255, 152, 0]; // BGRA
-    const radius = 8;
-    const cx = size - radius - 1;
-    // Le badge « RC » de l'icône de pré-version est en bas à droite : le point passe en haut
-    const cy = isPrerelease(app.getVersion()) ? radius + 1 : size - radius - 1;
-
-    for (let y = 0; y < size; ++y) {
-      for (let x = 0; x < size; ++x) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d > radius + 1.5) continue;
-        const i = (y * size + x) * 4;
-        // Liseré blanc autour du point, pour qu'il reste lisible sur tout fond
-        const [pb, pg, pr] = d <= radius - 1 ? [b, g, r] : [255, 255, 255];
-        bitmap[i] = pb;
-        bitmap[i + 1] = pg;
-        bitmap[i + 2] = pr;
-        bitmap[i + 3] = 255;
-      }
-    }
+    const bitmap = paintUpdateBadge(
+      Buffer.from(base.toBitmap()),
+      size,
+      level,
+      badgeCornerFor(isPrerelease(app.getVersion())),
+    );
 
     return (this.trayIconCache[level] = nativeImage.createFromBitmap(bitmap, {
       width: size,
@@ -1047,19 +1042,20 @@ class AppMain extends BaseAppObject {
    * @returns {string} L'info-bulle, complétée de l'état de la mise à jour
    */
   trayTooltipFor(text) {
-    const lines = [text];
-    const { prerelease, versionActuelle, versionDisponible } =
-      AppMain.updater?.state ?? {};
+    const state = AppMain.updater?.state;
 
-    if (prerelease) lines.push(t('tray.prerelease', { version: versionActuelle }));
-
-    const level = this.updateLevel;
-    if (level) {
-      const key = level === 'ready' ? 'tray.updateReady' : 'tray.updateAvailable';
-      lines.push(t(key, { version: versionDisponible ?? '' }));
-    }
-
-    return lines.join('\n');
+    return buildTrayTooltip({
+      text,
+      update: state
+        ? {
+            prerelease: state.prerelease,
+            versionActuelle: state.versionActuelle,
+            versionDisponible: state.versionDisponible,
+            level: this.updateLevel,
+          }
+        : null,
+      translate: t,
+    });
   }
 
   /** Met à jour l'icône et l'info-bulle de la zone de notification. */
@@ -1434,7 +1430,7 @@ class AppMain extends BaseAppObject {
    * @returns {?number} Avancée du morceau entre 0 et 1, `null` si inconnue
    */
   getMediaProgress(media) {
-    return media?.duration ? media.position / media.duration : null;
+    return mediaProgress(media);
   }
 
   /**
@@ -1442,9 +1438,7 @@ class AppMain extends BaseAppObject {
    * @returns {?Object} État affiché par la fenêtre de contrôle du morceau
    */
   getMediaPayload(url) {
-    const media = this.views[url]?.media;
-
-    return media ? { url, ...media, muted: this.mutedUrls.has(url) } : null;
+    return mediaPayload(url, this.views[url]?.media, this.mutedUrls.has(url));
   }
 
   /**
@@ -1485,10 +1479,7 @@ class AppMain extends BaseAppObject {
 
     const toolbar = this.toolbarWindow.getBounds();
     const wa = this.workArea;
-    const y = Math.min(
-      Math.max(toolbar.y + centerY - MEDIA_POPUP_HEIGHT / 2, wa.y),
-      wa.y + wa.height - MEDIA_POPUP_HEIGHT,
-    );
+    const y = centeredTop(toolbar.y + centerY, MEDIA_POPUP_HEIGHT, wa);
 
     this.mediaHoverUrl = url;
     this.mediaWindow.setPosition(
@@ -1532,10 +1523,7 @@ class AppMain extends BaseAppObject {
 
     const toolbar = this.toolbarWindow.getBounds();
     const wa = this.workArea;
-    const top = Math.min(
-      Math.max(toolbar.y + y - TOOLTIP_HEIGHT / 2, wa.y),
-      wa.y + wa.height - TOOLTIP_HEIGHT,
-    );
+    const top = centeredTop(toolbar.y + y, TOOLTIP_HEIGHT, wa);
 
     const win = this.tooltipWindow;
     win.setPosition(
