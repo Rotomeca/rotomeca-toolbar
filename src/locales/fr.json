@@ -46,7 +46,7 @@
   "update.manualDetail": "Téléchargez le nouveau paquet depuis la page des versions, puis installez-le avec votre gestionnaire de paquets.",
   "update.manualDownload": "Télécharger",
   "update.test.title": "Version de test",
-  "update.test.help": "Pré-versions non finalisées, à essayer avant leur publication. Le téléchargement et l'installation restent manuels.",
+  "update.test.help": "Pré-versions non finalisées, à essayer avant leur publication.",
   "update.test.check": "Rechercher",
   "update.test.found": "Version de test {version} disponible",
   "update.test.none": "Aucune version de test plus récente",

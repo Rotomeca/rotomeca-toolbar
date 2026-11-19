@@ -46,7 +46,7 @@
   "update.manualDetail": "Download the new package from the releases page, then install it with your package manager.",
   "update.manualDownload": "Download",
   "update.test.title": "Test version",
-  "update.test.help": "Unfinished pre-releases to try before they are published. Download and installation stay manual.",
+  "update.test.help": "Unfinished pre-releases to try before they are published.",
   "update.test.check": "Check",
   "update.test.found": "Test version {version} available",
   "update.test.none": "No newer test version",
