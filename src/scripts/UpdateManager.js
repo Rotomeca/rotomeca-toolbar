@@ -20,22 +20,26 @@
 
 const CHECK_INTERVAL = 60 * 60 * 1000;
 
+/** Numéro de version d'une release publiée (`3.3.0`). */
+const RELEASE_VERSION = /^\d+(\.\d+){0,2}$/;
+/** Numéro de version d'une pré-version (`3.3.0` ou `3.3.0-rc1`). */
+const PRERELEASE_VERSION = /^\d+(\.\d+){0,2}(-rc\d+)?$/;
+
 /**
  * Lit une release GitHub : numéro de version (sans « v ») et page de la release.
  * N'accepte qu'un numéro de version et une page du dépôt, jamais une URL quelconque.
  * @param {any} release
  * @param {string} repo `propriétaire/dépôt`
+ * @param {{allowPre?: boolean}} [options] `allowPre` : accepte aussi `X.Y.Z-rcN`
  * @returns {{version: string, page: string}}
  * @throws {Error} Si la réponse est inattendue
  */
-function readRelease(release, repo) {
+function readRelease(release, repo, { allowPre = false } = {}) {
   const version = String(release?.tag_name ?? '').replace(/^v/i, '');
   const page = String(release?.html_url ?? '');
+  const format = allowPre ? PRERELEASE_VERSION : RELEASE_VERSION;
 
-  if (
-    !/^\d+(\.\d+){0,2}$/.test(version) ||
-    !page.startsWith(`https://github.com/${repo}/`)
-  )
+  if (!format.test(version) || !page.startsWith(`https://github.com/${repo}/`))
     throw new Error('Réponse GitHub inattendue');
 
   return { version, page };
@@ -328,7 +332,7 @@ class UpdateManager {
 
         let candidate;
         try {
-          candidate = readRelease(release, releasesRepo);
+          candidate = readRelease(release, releasesRepo, { allowPre: true });
         } catch (error) {
           continue; // Une release au format inattendu ne bloque pas les autres
         }
