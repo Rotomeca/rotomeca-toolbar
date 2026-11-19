@@ -553,3 +553,81 @@ test('installTest : sans installation automatique, ouvre la page de la release',
 });
 
 // #endregion
+
+// #region Pré-versions numérotées (X.Y.Z-rcN)
+
+test('checkTest : accepte les pré-versions X.Y.Z-rcN', async () => {
+  const { manager } = setup({
+    fetch: githubList([release('3.4.0-rc1', { prerelease: true })]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.4.0-rc1');
+});
+
+test('checkTest : retient le rc le plus récent, par numéro', async () => {
+  const { manager } = setup({
+    fetch: githubList([
+      release('3.4.0-rc2', { prerelease: true }),
+      release('3.4.0-rc10', { prerelease: true }),
+      release('3.4.0-rc9', { prerelease: true }),
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.4.0-rc10');
+});
+
+test('checkTest : un rc de la version installée n\'est pas plus récent', async () => {
+  const { manager } = setup({
+    version: '3.4.0',
+    fetch: githubList([release('3.4.0-rc2', { prerelease: true })]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, null);
+});
+
+test('checkTest : depuis un rc installé, propose le rc suivant seulement', async () => {
+  const { manager } = setup({
+    version: '3.4.0-rc1',
+    fetch: githubList([
+      release('3.4.0-rc1', { prerelease: true }),
+      release('3.4.0-rc2', { prerelease: true }),
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.4.0-rc2');
+});
+
+test('checkTest : refuse les suffixes autres que -rcN', async () => {
+  const { manager } = setup({
+    fetch: githubList([
+      release('3.4.0-beta1', { prerelease: true }),
+      release('3.4.0-rc', { prerelease: true }),
+      release('3.4.0-rc1-evil', { prerelease: true }),
+      release('3.4.0-rc1', { prerelease: true }),
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.4.0-rc1');
+});
+
+test('Linux : releases/latest ne doit jamais renvoyer une pré-version numérotée', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const { manager, calls } = setup({ manual: true, fetch: githubRelease('3.4.0-rc1') });
+  await manager.check();
+  assert.equal(manager.state.etat, 'uptodate');
+  assert.equal(manager.state.erreur, 'update.card.errorCheck');
+  assert.deepEqual(calls.notified, []);
+});
+
+test('Linux : depuis un rc installé, la version finale est proposée', async () => {
+  const { manager } = setup({
+    manual: true,
+    version: '3.4.0-rc2',
+    fetch: githubRelease('3.4.0'),
+  });
+  await manager.check();
+  assert.equal(manager.state.etat, 'available');
+  assert.equal(manager.state.versionDisponible, '3.4.0');
+});
+
+// #endregion
