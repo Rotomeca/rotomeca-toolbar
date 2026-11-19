@@ -72,7 +72,7 @@ test('start : en développement, une entrée de débogage ouvre le menu des fen�
   const { service, log } = setup({ debug: true });
   service.start();
   const { template } = log.menus[0];
-  assert.equal(template[0].label, '[DEBUG]Ouvrir une console');
+  assert.equal(template[0].label, 'tray.debugConsole');
   template[0].click();
   assert.equal(log.popups.length, 1);
   assert.equal(log.popups[0].template[0].label, 'Fenêtre');

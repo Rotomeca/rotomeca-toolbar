@@ -143,9 +143,14 @@ export class ToolbarController {
 
     // Barre ancrée fixe : dépliée dès le démarrage
     if (mode.appBar) {
-      if (!mode.autoHide) void this.toggle();
+      if (!mode.autoHide) this.toggleSafely();
       else this.updateDock();
     }
+  }
+
+  /** Déplie ou replie la barre depuis un événement : un échec est journalisé au lieu d'être perdu. */
+  private toggleSafely(): void {
+    this.toggle().catch(console.error);
   }
 
   /** Déplie ou replie la barre. */
@@ -190,7 +195,7 @@ export class ToolbarController {
     const opening = !this.opened;
 
     if (this.mode.button) this.deps.messages.buttonClosed();
-    else void this.toggle();
+    else this.toggleSafely();
 
     // Au clavier, la barre doit recevoir le focus pour réagir à Échap
     if (opening) this.deps.windows.toolbar.focus();
@@ -198,7 +203,7 @@ export class ToolbarController {
 
   /** La souris touche le bord gauche : seule la zone du bord (mode souris ou masquage automatique) ouvre la barre. */
   onEdgeEntered(): void {
-    if ((this.mode.usesEdge || this.mode.autoHide) && !this.opened) void this.toggle();
+    if ((this.mode.usesEdge || this.mode.autoHide) && !this.opened) this.toggleSafely();
   }
 
   /** Replie la barre en rail fin (ou la restaure) si elle est ancrée. */
@@ -270,7 +275,7 @@ export class ToolbarController {
 
       if (mode.appBar && !mode.autoHide) {
         this.stopEdgeDetection();
-        void this.toggle();
+        this.toggleSafely();
       } else if (mode.usesEdge) this.startEdgeDetection();
       else this.stopEdgeDetection();
     }
@@ -360,7 +365,7 @@ export class ToolbarController {
       const step = stepAutoHide(outsideSince, inside, timers.now(), AUTOHIDE_DELAY_MS);
 
       outsideSince = step.outsideSince;
-      if (step.collapse && this.opened) void this.toggle();
+      if (step.collapse && this.opened) this.toggleSafely();
     }, AUTOHIDE_POLL_MS);
   }
 

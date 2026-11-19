@@ -181,7 +181,7 @@ export class AppListService {
     try {
       this.deps.repository.save(this.list);
     } catch (error) {
-      console.error('Failed to save the file', error);
+      console.error('Échec de l’enregistrement de la liste des applications', error);
       this.deps.onSaveError(error instanceof Error ? error : new Error(String(error)));
     }
   }

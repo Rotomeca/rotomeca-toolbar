@@ -28,9 +28,6 @@ export interface UpdateMode {
   readonly manual: boolean;
 }
 
-/** Plateformes où Squirrel installe les mises à jour. */
-const SQUIRREL_PLATFORMS: readonly NodeJS.Platform[] = ['win32', 'darwin'];
-
 /**
  * @param environment Contexte de lancement (développement, paquet, plateforme).
  * @returns Le mode de mise à jour de cet environnement
@@ -40,7 +37,7 @@ export function resolveUpdateMode({ isDev, isPackaged, platform, simulateRequest
 
   return {
     simulate: isDev && simulateRequested,
-    squirrel: packaged && SQUIRREL_PLATFORMS.includes(platform),
+    squirrel: packaged && platform === 'win32',
     manual: packaged && platform === 'linux',
   };
 }

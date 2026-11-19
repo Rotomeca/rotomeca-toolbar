@@ -62,11 +62,14 @@ export class MediaPopup {
 
   /** Le pointeur entre sur un bouton (affiche) ou en sort (masque après un court délai). */
   hover(url: unknown, hovering: boolean, centerY: unknown): void {
-    this.deps.scheduler.clearTimeout(this.hideTimer);
-
     if (hovering) {
-      if (typeof url === 'string' && typeof centerY === 'number') this.show(url, centerY);
+      // Une entrée invalide est ignorée sans toucher au masquage déjà programmé
+      if (typeof url !== 'string' || typeof centerY !== 'number') return;
+
+      this.deps.scheduler.clearTimeout(this.hideTimer);
+      this.show(url, centerY);
     } else {
+      this.deps.scheduler.clearTimeout(this.hideTimer);
       this.hideTimer = this.deps.scheduler.setTimeout(() => this.hide(), this.deps.hideDelayMs);
     }
   }
@@ -76,7 +79,7 @@ export class MediaPopup {
     if (this.hoveredUrl !== url) return;
 
     const window = this.deps.existingWindow();
-    if (!window || !window.isVisible()) return;
+    if (!window || window.isDestroyed() || !window.isVisible()) return;
 
     const payload = this.deps.payloadFor(url);
     if (payload) postWhenLoaded(this.deps.window(), this.deps.stateChannel, payload);
@@ -89,7 +92,7 @@ export class MediaPopup {
     this.hoveredUrl = null;
 
     const window = this.deps.existingWindow();
-    if (window && window.isVisible()) window.hide();
+    if (window && !window.isDestroyed() && window.isVisible()) window.hide();
   }
 
   /** @param centerY Milieu vertical du bouton dans la barre */

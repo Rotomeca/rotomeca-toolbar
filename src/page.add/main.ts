@@ -45,7 +45,7 @@ class EditPage {
     this.saveButton.disabled = !this.urlInput.value;
 
     window.api.on(pageEventList.modeEdit, (_, app) => {
-      document.title = 'Modifier une application';
+      document.title = window.api.t('add.editTitle');
 
       this.saveButton.disabled = false;
       this.urlInput.value = app.url;
@@ -53,7 +53,7 @@ class EditPage {
       this.nameInput.setAttribute('placeholder', this.name);
 
       this.picture = app.picture || null;
-      this.saveButton.textContent = 'Modifier';
+      this.saveButton.textContent = window.api.t('add.edit');
       this.updateClearButton();
 
       this.saveButton.onclick = () => {

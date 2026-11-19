@@ -146,6 +146,24 @@ test('MediaPopup : un survol mal formé est ignoré', () => {
   assert.equal(win.visible, false);
 });
 
+test('MediaPopup : un survol mal formé ne touche pas au masquage programmé', () => {
+  const { popup, sched } = mediaPopup({ payloads: { u: { url: 'u' } } });
+  popup.hover('u', true, 300);
+  popup.hover('u', false);
+  popup.hover(42, true, 300);
+  assert.equal(sched.pending.length, 1, 'le masquage reste programmé');
+});
+
+test('MediaPopup : une fenêtre détruite ne provoque ni refresh ni hide', () => {
+  const { popup, win } = mediaPopup({ payloads: { u: { url: 'u' } } });
+  popup.hover('u', true, 300);
+  win.destroyed = true;
+  win.hide = () => { throw new Error('fenêtre détruite'); };
+  popup.refresh('u');
+  popup.hide();
+  assert.equal(popup.hoverUrl, null);
+});
+
 test('MediaPopup : la sortie du pointeur masque après le délai, le retour annule', () => {
   const { popup, win, sched } = mediaPopup({ payloads: { u: { url: 'u' } } });
   popup.hover('u', true, 300);

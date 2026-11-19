@@ -126,7 +126,7 @@ export class TrayService<Icon> {
 
     if (debugWindows) {
       template.unshift({
-        label: '[DEBUG]Ouvrir une console',
+        label: translate('tray.debugConsole'),
         click: () => tray.popUpContextMenu(buildMenu(debugWindows())),
       });
     }

@@ -245,7 +245,7 @@ export class SettingsPage {
       const option = document.createElement('option');
       option.value = 'appbar';
       option.dataset['i18n'] = 'settings.modeAppBar';
-      option.textContent = 'Barre ancrée';
+      option.textContent = t('settings.modeAppBar');
       control.appendChild(option);
     }
 

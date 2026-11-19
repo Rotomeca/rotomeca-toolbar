@@ -299,7 +299,8 @@ export function initSeasonFx(host: HTMLElement, { narrow = false }: { narrow?: b
     const layer = document.createElement('div');
     layer.className = 'fx';
     layer.setAttribute('aria-hidden', 'true');
-    layer.innerHTML = html;
+    // Décors locaux uniquement ; l'analyse ne lance aucun script, contrairement à `innerHTML`
+    layer.append(...new DOMParser().parseFromString(html, 'text/html').body.childNodes);
     host.prepend(layer);
   };
 
