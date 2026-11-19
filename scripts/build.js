@@ -3,16 +3,22 @@
 // dist/ reproduit l'arborescence du dépôt : les chemins relatifs du code (`__dirname`,
 // imports relatifs des pages) restent valides. Le code est copié tel quel, sauf les deux
 // preloads, bundlés en un seul fichier chacun : un preload sandboxé ne peut charger aucun
-// autre fichier (seul `electron` est requirable). La compilation TypeScript s'ajoutera ici.
+// autre fichier (seul `electron` est requirable). Les fichiers TypeScript sont compilés par
+// tsc (processus principal en CommonJS, pages en modules ES) ; leurs sources ne sont pas copiées.
 //
 // Usage : pnpm build
 
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
+const TSC = path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+
+/** Une configuration par cible : processus principal (CommonJS) et pages (modules ES). */
+const TS_CONFIGS = ['tsconfig.json', 'tsconfig.renderer.json'];
 
 const ROOT_FILES = ['main.js', 'settings.js', 'index.html'];
 const ROOT_DIRS = ['src', 'lib', 'configs'];
@@ -25,7 +31,8 @@ const PRELOADS = ['preload.js', path.join('src', 'scripts', 'media', 'media-prel
 
 /** Sources de styles et fichiers de génération, inutiles à l'exécution. */
 const EXCLUDED_DIRECTORIES = new Set(['less']);
-const EXCLUDED_EXTENSIONS = new Set(['.less']);
+// `.ts` couvre aussi les `.d.ts` : les sources TypeScript sont compilées, jamais copiées
+const EXCLUDED_EXTENSIONS = new Set(['.less', '.ts']);
 const EXCLUDED_NAMES = new Set(['folder.buildable']);
 
 /**
@@ -80,6 +87,21 @@ function bundlePreload(root, dist, relativePath) {
 }
 
 /**
+ * Compile les fichiers TypeScript vers dist/. Une cible sans configuration est ignorée.
+ * @param {string} root
+ * @param {string} dist
+ * @throws {Error} Si la compilation échoue (erreurs de type comprises)
+ */
+function compileTypeScript(root, dist) {
+  for (const config of TS_CONFIGS) {
+    if (!fs.existsSync(path.join(root, config))) continue;
+
+    const result = spawnSync(process.execPath, [TSC, '-p', config, '--outDir', dist], { cwd: root, stdio: 'inherit' });
+    if (result.status !== 0) throw new Error(`La compilation TypeScript a échoué (${config})`);
+  }
+}
+
+/**
  * Reconstruit dist/ depuis zéro.
  * @param {{root?: string, dist?: string}} [options]
  * @returns {string} Le dossier produit
@@ -91,6 +113,7 @@ function build({ root = ROOT, dist = DIST } = {}) {
   for (const dir of ROOT_DIRS) copyEntry(root, dist, dir);
   copyEntry(root, dist, DESIGN_SYSTEM);
   for (const preload of PRELOADS) bundlePreload(root, dist, preload);
+  compileTypeScript(root, dist);
 
   return dist;
 }

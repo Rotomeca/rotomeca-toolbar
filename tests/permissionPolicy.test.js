@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { PermissionStore } = require('../src/scripts/PermissionStore.js');
-const { createPermissionPolicy } = require('../src/scripts/permissionPolicy.js');
-const { isSafeUrl } = require('../src/scripts/safeUrl.js');
+const { PermissionStore } = require('../dist/src/scripts/PermissionStore.js');
+const { createPermissionPolicy } = require('../dist/src/scripts/permissionPolicy.js');
+const { isSafeUrl } = require('../dist/src/scripts/safeUrl.js');
 
 function memoryStorage() {
   const storage = { data: false, load: () => storage.data };

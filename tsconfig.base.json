@@ -1,0 +1,22 @@
+{
+  // Options communes. Chaque cible (processus principal, renderer) les étend.
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    // Le code JavaScript pas encore migré est compilé mais n'est pas vérifié
+    "allowJs": true,
+    "checkJs": false,
+
+    "target": "ES2023",
+    // dist/ reproduit l'arborescence du dépôt (voir scripts/build.js)
+    "rootDir": ".",
+    "outDir": "dist",
+    "sourceMap": false
+  }
+}

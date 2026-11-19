@@ -1,0 +1,21 @@
+{
+  // Pages (fenêtres de l'application) : modules ES natifs chargés par le navigateur, sans bundler.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "src/page.*/**/*.ts",
+    "src/index/**/*.ts",
+    "src/scripts/components/**/*.ts",
+    "src/scripts/seasonFx.ts",
+    "src/scripts/ds.ts",
+    "src/scripts/ToolbarAppData.ts",
+    "src/shared/**/*.ts",
+    "src/types/**/*.d.ts"
+  ]
+}

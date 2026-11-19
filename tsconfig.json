@@ -1,0 +1,36 @@
+{
+  // Processus principal : CommonJS, API Node.js. Configuration par défaut (éditeur, tsc).
+  // Le renderer a la sienne : tsconfig.renderer.json.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": [
+    "*.ts",
+    "configs/**/*.ts",
+    "src/main/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/scripts/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "tests",
+    "scripts",
+    "lib",
+    // Côté renderer (compilé par tsconfig.renderer.json)
+    "src/page.*",
+    "src/index",
+    "src/types",
+    "src/scripts/components",
+    "src/scripts/seasonFx.ts",
+    "src/scripts/ds.ts",
+    "src/scripts/ToolbarAppData.ts",
+    // Preloads : bundlés par esbuild
+    "preload.ts",
+    "src/scripts/media/media-preload.ts"
+  ]
+}
