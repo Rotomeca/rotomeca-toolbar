@@ -1,11 +1,14 @@
 name: Promote release
 
-# À lancer à la main (onglet Actions) une fois la pré-version testée.
-# Hazel (mises à jour Windows) et « releases/latest » (avis Linux) ne voient que
-# les releases qui ne sont pas des pré-versions :
-#   - promote : publie la release, tous les utilisateurs la recevront ;
-#   - demote  : la repasse en pré-version, elle n'est plus proposée à ceux qui
-#               n'ont pas encore mis à jour (ceux qui l'ont installée la gardent).
+# À lancer à la main (onglet Actions). Les vraies releases X.Y.Z sont publiées
+# directement par le workflow Release ; les pré-versions X.Y.Z-rcN ne passent pas
+# par ici. Hazel (mises à jour Windows) et « releases/latest » (avis Linux) ne
+# voient que les releases qui ne sont pas des pré-versions :
+#   - demote  : retire une release publiée trop vite en la repassant en
+#               pré-version : elle n'est plus proposée à ceux qui n'ont pas encore
+#               mis à jour (ceux qui l'ont installée la gardent) ;
+#   - promote : publie une release restée en pré-version (ex: 3.3.0, créée avant
+#               le flux X.Y.Z-rcN), ou annule un demote.
 on:
   workflow_dispatch:
     inputs:

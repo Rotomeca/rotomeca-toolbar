@@ -1,18 +1,21 @@
 name: Release
 
-# Déclenché par un tag de version (ex: 2.1.0) poussé, typiquement sur main
-# après `git flow release finish`. La release contient Windows (Squirrel) et
-# Linux (deb + rpm).
+# Déclenché par un tag poussé. La release contient Windows (Squirrel) et Linux
+# (deb + rpm).
 #
-# Publication en deux temps : la release est créée en PRÉ-VERSION, que le serveur
-# Hazel (Vercel) et `releases/latest` ignorent : personne ne la reçoit
-# automatiquement. On la teste (Paramètres > Version de test), puis on la publie
-# avec le workflow « Promote release ». Une release déjà publiée n'est pas
-# repassée en pré-version par un nouveau passage de ce workflow.
+# Deux sortes de tags :
+#   - X.Y.Z (ex: 2.1.0), typiquement sur main après `git flow release finish` :
+#     vraie release, publiée directement. Le serveur Hazel (Vercel) la propose
+#     alors à tous les utilisateurs.
+#   - X.Y.Z-rcN (ex: 2.1.0-rc1), créé par `pnpm pre-release` sur une branche
+#     `pre-release/` : PRÉ-VERSION, que Hazel et `releases/latest` ignorent.
+#     Personne ne la reçoit automatiquement ; elle s'installe depuis
+#     Paramètres > Version de test.
 on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
   workflow_dispatch:
     inputs:
       tag:
@@ -164,11 +167,16 @@ jobs:
           # on liste uniquement les fichiers, pas les dossiers.
           mapfile -t FILES < <(find dist -type f)
           printf '%s\n' "${FILES[@]}"
+
+          # Un tag avec un suffixe (-rcN) est une pré-version, sinon c'est une release
+          KIND=()
+          if [[ "$TAG" == *-* ]]; then KIND=(--prerelease); fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${FILES[@]}" --clobber
             gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
             gh release create "$TAG" "${FILES[@]}" \
               --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag \
-              --prerelease
+              "${KIND[@]}"
           fi
