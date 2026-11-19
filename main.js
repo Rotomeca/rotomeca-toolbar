@@ -78,6 +78,24 @@ const {
   describeNowPlaying,
 } = require('./src/main/media/mediaState.js');
 const { MediaPopup } = require('./src/main/media/MediaPopup.js');
+const {
+  APPBAR_WIDTH,
+  RAIL_WIDTH,
+  ADD_DIALOG_WIDTH,
+  ADD_DIALOG_HEIGHT,
+  APPS_HEADER_HEIGHT,
+  MEDIA_POPUP_HEIGHT,
+  TOOLTIP_HEIGHT,
+  EDGE_WIDTH,
+  mainWindowSpec,
+  toolbarWindowSpec,
+  mediaWindowSpec,
+  tooltipWindowSpec,
+  addDialogWindowSpec,
+  edgeWindowSpec,
+  settingsWindowSpec,
+  appsChildBounds,
+} = require('./src/main/windows/windowSpecs.js');
 const { AppViewHost } = require('./src/main/apps/AppViewHost.js');
 const { TooltipPopup } = require('./src/main/tooltip/TooltipPopup.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
@@ -110,36 +128,13 @@ const {
 } = require('./src/main/permissions/installPermissionHandlers.js');
 const { sanitizeMediaState } = require('./src/scripts/AppIndicators.js');
 
-// Largeur (px) de la bande réservée à la barre ancrée (AppBar)
-const APPBAR_WIDTH = 72;
-
-// Largeur (px) du rail qui reste visible quand la barre est repliée, et place
-// réservée à l'écran. Windows impose 32 px au minimum à la fenêtre (vérifié) :
-// la page dessine donc une bande de 24 px et laisse les 8 px restants transparents.
-const RAIL_WIDTH = 24;
-
 // Barre ancrée en masquage automatique : délai (ms) avant de se replier une
 // fois la souris sortie, et période (ms) de la surveillance du curseur
 const AUTOHIDE_DELAY = 700;
 const AUTOHIDE_POLL = 150;
 
-// Fenêtre « Ajouter une application » (contenu, en px)
-const ADD_DIALOG_WIDTH = 640;
-const ADD_DIALOG_HEIGHT = 760;
-
-// Hauteur (px) du bandeau d'actions au-dessus des applications
-const APPS_HEADER_HEIGHT = 32;
-
-const MEDIA_POPUP_WIDTH = 340;
-const MEDIA_POPUP_HEIGHT = 200;
+// Délai (ms) avant de masquer la fenêtre du morceau quand le pointeur quitte le bouton
 const MEDIA_POPUP_HIDE_DELAY = 250;
-
-// Infobulle de la barre : fenêtre transparente sans clic, plus grande que son contenu
-const TOOLTIP_WIDTH = 320;
-const TOOLTIP_HEIGHT = 48;
-
-// Largeur (px) de la zone sensible au bord gauche de l'écran (mode souris)
-const EDGE_WIDTH = 4;
 
 // Raccourci clavier global qui affiche ou cache la barre
 const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
@@ -259,17 +254,7 @@ class AppMain extends BaseAppObject {
   get mainWindow() {
     return (
       this.getWindow('main') ??
-      this.createBrowserWindow('main', {
-        ...this.layout.main,
-        alwaysOnTop: true,
-        frame: false,
-        useContentSize: true,
-        transparent: true,
-        skipTaskbar: true,
-        resizable: false,
-        preload: this.preloadPath, // path to your preload.js file
-        file: path.join(__dirname, 'index.html'),
-      })
+      this.createBrowserWindow('main', mainWindowSpec(this.windowSpecContext))
     );
   }
 
@@ -280,18 +265,10 @@ class AppMain extends BaseAppObject {
   get toolbarWindow() {
     return (
       this.getWindow('toolbar') ??
-      this.createBrowserWindow('toolbar', {
-        ...this.layout.toolbar,
-        alwaysOnTop: true,
-        frame: false,
-        transparent: true,
-        // useContentSize: true,
-        skipTaskbar: true,
-        resizable: false,
-        preload: this.preloadPath, // path to your preload.js file
-        file: path.join(__dirname, '/src/page.taskbar/taskbar.html'),
-        show: false,
-      })
+      this.createBrowserWindow(
+        'toolbar',
+        toolbarWindowSpec(this.windowSpecContext),
+      )
     );
   }
 
@@ -303,21 +280,7 @@ class AppMain extends BaseAppObject {
   get mediaWindow() {
     return (
       this.getWindow('media') ??
-      this.createBrowserWindow('media', {
-        width: MEDIA_POPUP_WIDTH,
-        height: MEDIA_POPUP_HEIGHT,
-        alwaysOnTop: true,
-        frame: false,
-        transparent: true,
-        skipTaskbar: true,
-        resizable: false,
-        minimizable: false,
-        maximizable: false,
-        preload: this.preloadPath,
-        file: path.join(__dirname, '/src/page.media/media.html'),
-        show: false,
-        extra: { focusable: false },
-      })
+      this.createBrowserWindow('media', mediaWindowSpec(this.windowSpecContext))
     );
   }
 
@@ -328,21 +291,10 @@ class AppMain extends BaseAppObject {
    */
   get tooltipWindow() {
     if (!this.getWindow('tooltip')) {
-      const win = this.createBrowserWindow('tooltip', {
-        width: TOOLTIP_WIDTH,
-        height: TOOLTIP_HEIGHT,
-        alwaysOnTop: true,
-        frame: false,
-        transparent: true,
-        skipTaskbar: true,
-        resizable: false,
-        minimizable: false,
-        maximizable: false,
-        preload: this.preloadPath,
-        file: path.join(__dirname, '/src/page.tooltip/tooltip.html'),
-        show: false,
-        extra: { focusable: false },
-      });
+      const win = this.createBrowserWindow(
+        'tooltip',
+        tooltipWindowSpec(this.windowSpecContext),
+      );
       // Ne capte jamais la souris : elle reste sur le bouton survolé
       win.setIgnoreMouseEvents(true);
     }
@@ -356,38 +308,10 @@ class AppMain extends BaseAppObject {
    */
   get addDialogWindow() {
     if (!this.getWindow('add_dialog')) {
-      // app.files =
-      //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
-      this.createBrowserWindow('add_dialog', {
-        title: t('window.add'),
-        ...this.layout.addDialog,
-        transparent: false,
-        frame: true,
-        alwaysOnTop: true,
-        useContentSize: true,
-        skipTaskbar: false,
-        minimizable: true,
-        maximizable: false,
-        icon: this.appIcon,
-        preload: this.preloadPath, // path to your preload.js file
-        // file: path.join(__dirname, '/src/page.add/add.html'),
-        show: false,
-        extra: {
-          vibrancy: 'fullscreen-ui', // on MacOS
-          backgroundMaterial: 'acrylic', // on Windows 11
-        },
-      });
-
-      //win.webContents.openDevTools();
-
-      // win.webContents.addListener('dom-ready', () => {
-      //   win.webContents.executeJavaScript(`
-      //   window.electron ??= {};
-      //   window.electron.files = ${
-      //     fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null'
-      //   };
-      //   `);
-      // });
+      this.createBrowserWindow(
+        'add_dialog',
+        addDialogWindowSpec(this.windowSpecContext),
+      );
     }
 
     return this.getWindow('add_dialog');
@@ -402,20 +326,7 @@ class AppMain extends BaseAppObject {
   get edgeWindow() {
     return (
       this.getWindow('edge') ??
-      this.createBrowserWindow('edge', {
-        ...this.layout.edge,
-        alwaysOnTop: true,
-        frame: false,
-        transparent: true,
-        skipTaskbar: true,
-        resizable: false,
-        minimizable: false,
-        maximizable: false,
-        preload: this.preloadPath,
-        file: path.join(__dirname, '/src/page.edge/edge.html'),
-        show: false,
-        extra: { focusable: false, hasShadow: false },
-      })
+      this.createBrowserWindow('edge', edgeWindowSpec(this.windowSpecContext))
     );
   }
 
@@ -433,43 +344,30 @@ class AppMain extends BaseAppObject {
       });
 
       win.on('resize', () => {
-        this.appsWindow.contentView.children.forEach((view, i) => {
-          view.setBounds({
-            x: 0,
-            y: i === 0 ? 0 : APPS_HEADER_HEIGHT,
-            width: this.appsWindow.getBounds().width,
-            height:
-              i === 0
-                ? APPS_HEADER_HEIGHT
-                : this.appsWindow.getBounds().height - APPS_HEADER_HEIGHT,
-          });
-        });
+        const size = this.appsWindow.getBounds();
+        this.appsWindow.contentView.children.forEach((view, index) =>
+          view.setBounds(appsChildBounds(index, size)),
+        );
       });
 
+      // En-tête de la fenêtre (rang 0) ; les sites s'ajoutent après lui
       const view = new WebContentsView({
-        useContentSize: true,
         webPreferences: {
-          nodeIntegration: false, // is default value after Electron v5
-          contextIsolation: true, // protect against prototype pollution
-          enableRemoteModule: false,
-          preload: this.preloadPath, // path to your preload.js file
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+          preload: this.preloadPath,
         },
       });
       win.contentView.addChildView(view);
       view.webContents.loadFile(
         path.join(__dirname, '/src/page.apps/apps.html'),
       );
-      view.setBounds({
-        x: 0,
-        y: 0,
-        width: win.getBounds().width,
-        height: APPS_HEADER_HEIGHT,
-      });
-      // view.webContents.openDevTools();
+      view.setBounds(appsChildBounds(0, win.getBounds()));
 
       view.webContents.addListener('dom-ready', () => {
         this.appsWindow.contentView.children[0].webContents.postMessage(
-          'frameOpen',
+          pageEventList.frameOpen,
           this.viewHost.lastOpened,
         );
       });
@@ -478,6 +376,21 @@ class AppMain extends BaseAppObject {
     }
 
     return win;
+  }
+
+  /**
+   * Ce dont les fenêtres ont besoin pour se décrire (chemins, disposition, textes).
+   * @type {import('./src/main/windows/windowSpecs.js').WindowSpecContext}
+   * @readonly
+   */
+  get windowSpecContext() {
+    return {
+      appRoot: __dirname,
+      preload: this.preloadPath,
+      appIcon: this.appIcon,
+      layout: this.layout,
+      translate: t,
+    };
   }
   // #endregion
 
@@ -975,16 +888,10 @@ class AppMain extends BaseAppObject {
       return;
     }
 
-    let win = this.createBrowserWindow('settings', {
-      title: t('window.settings'),
-      icon: this.appIcon,
-      width: 800,
-      height: 810,
-      useContentSize: true,
-      preload: this.preloadPath, // path to your preload.js file
-      file: path.join(__dirname, '/src/page.settings/settings.html'),
-      show: false,
-    });
+    const win = this.createBrowserWindow(
+      'settings',
+      settingsWindowSpec(this.windowSpecContext),
+    );
 
     win.setMenuBarVisibility(false);
 
