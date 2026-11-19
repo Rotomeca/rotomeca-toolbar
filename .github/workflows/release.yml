@@ -152,7 +152,10 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --latest --strip header
+          # Release finale : du tag final précédent à ce tag. Pré-version : son tag
+          # n'est pas reconnu par cliff.toml, on décrit donc ce qui n'est pas encore
+          # sorti (depuis le dernier tag final) en le nommant avec le tag de la RC.
+          args: --strip header ${{ contains(env.TAG, '-') && format('--unreleased --tag {0}', env.TAG) || '--latest' }}
         env:
           OUTPUT: RELEASE_NOTES.md
 
