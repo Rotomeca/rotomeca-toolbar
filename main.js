@@ -82,6 +82,9 @@ const { AppViewHost } = require('./src/main/apps/AppViewHost.js');
 const { TooltipPopup } = require('./src/main/tooltip/TooltipPopup.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const {
+  applySettingsUpdate,
+} = require('./src/main/settings/applySettingsUpdate.js');
+const {
   ContextMenuController,
 } = require('./src/main/contextmenu/ContextMenuController.js');
 const {
@@ -1489,36 +1492,14 @@ class AppMain extends BaseAppObject {
   }
 
   event_settings_updated(_, settings) {
-    if (!settings || typeof settings !== 'object') return;
+    const result = applySettingsUpdate(this.settings, settings);
+    if (!result) return;
 
-    const isButtonModeEnabled = settings.isButtonModeEnabled === true;
-    const appBarEnabled = settings.appBarEnabled === true;
-    const appBarAutoHide = settings.appBarAutoHide === true;
-    const buttonModeUpdated =
-      this.settings.isButtonModeEnabled !== isButtonModeEnabled ||
-      this.settings.appBarEnabled !== appBarEnabled ||
-      this.settings.appBarAutoHide !== appBarAutoHide;
-
-    // Les setters valident les valeurs (thème en liste blanche, écran entier)
-    this.settings.theme = settings.theme;
-    this.settings.themeAuto = settings.themeAuto === true;
-    this.settings.effetsSaison = settings.effetsSaison;
-    this.settings.densiteEffets = settings.densiteEffets;
-    this.settings.isButtonModeEnabled = isButtonModeEnabled;
-    this.settings.appBarEnabled = appBarEnabled;
-    this.settings.appBarAutoHide = appBarAutoHide;
-
-    const previousDisplayId = this.settings.displayId;
-    this.settings.displayId = settings.displayId;
-    const displayUpdated = this.settings.displayId !== previousDisplayId;
-
-    this.settings.save();
-
-    if (displayUpdated) this.repositionWindows();
+    if (result.screenChanged) this.repositionWindows();
 
     this.broadcastTheme();
 
-    if (buttonModeUpdated) {
+    if (result.displayModeChanged) {
       // Libère l'espace réservé avant de détruire la fenêtre qui le porte
       this.stopAutoHideWatch();
       this.detachAppBar();
