@@ -35,9 +35,6 @@ const path = require('path');
 const { BaseAppObject } = require('./src/main/windows/BaseAppObject.js');
 const { BaseWindow } = require('electron/main');
 const {
-  JsEvent,
-} = require('./lib/RotomecaWebComponents/libs/events_electron.js');
-const {
   pinUserData,
   migrateLegacyData,
   backupUserData,
@@ -90,6 +87,12 @@ const {
 } = require('./src/main/media/mediaState.js');
 const { centeredTop } = require('./src/main/windows/placement.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
+const {
+  ContextMenuController,
+} = require('./src/main/contextmenu/ContextMenuController.js');
+const {
+  startContextMenu,
+} = require('./src/main/contextmenu/electronContextMenu.js');
 const {
   JsonFileStore,
   dataDirectory,
@@ -147,12 +150,6 @@ const EDGE_WIDTH = 4;
 
 // Raccourci clavier global qui affiche ou cache la barre
 const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
-
-/**
- * @callback SavesUpdatedCallback
- * @param {Array<string, string | Object<string, *>>} saves
- * @return {void}
- */
 
 class AppMain extends BaseAppObject {
   constructor() {
@@ -255,11 +252,11 @@ class AppMain extends BaseAppObject {
       this.main.userFileData = {
         save: (data) => {
           store.save(data);
-          this.onsave.call(data);
+          this.contextMenu?.updateSaves(data);
         },
         loadAsync: async () => {
           const data = await store.loadAsync();
-          if (data !== false) this.onload.call(data || {});
+          if (data !== false) this.contextMenu?.updateSaves(data);
           return data;
         },
       };
@@ -501,16 +498,6 @@ class AppMain extends BaseAppObject {
   init() {
     super.init();
     this.state = false;
-    /**
-     * @type {JsEvent<SavesUpdatedCallback>}
-     * @event
-     */
-    this.onsave = new JsEvent();
-    /**
-     * @type {JsEvent<SavesUpdatedCallback>}
-     * @event
-     */
-    this.onload = new JsEvent();
   }
 
   main() {
@@ -916,16 +903,12 @@ class AppMain extends BaseAppObject {
   }
 
   initContextMenu() {
-    const { ContextMenu } = require('./src/scripts/ContextMenu.js');
-    this.contextMenu = new ContextMenu();
-    this.contextMenu.onShowCondition.push(
-      (event, caller) =>
-        caller.id === this.getWindow('toolbar')?.id &&
-        event.target.nodeName === 'ROTOMECA-TOOLBAR-BUTTON',
-    );
-    this.contextMenu.isMuted = (url) => this.mutedUrls.has(url);
-    this.onsave.push(this.contextMenu.getOnSaveCallback());
-    this.onload.push(this.contextMenu.getOnLoadCallback());
+    this.contextMenu = new ContextMenuController({
+      isToolbarWindow: (id) => id === this.getWindow('toolbar')?.id,
+      isMuted: (url) => this.mutedUrls.has(url),
+      translate: t,
+    });
+    startContextMenu(this.contextMenu);
 
     return this;
   }
