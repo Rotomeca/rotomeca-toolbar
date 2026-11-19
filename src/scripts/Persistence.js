@@ -42,7 +42,9 @@ function migrateLegacyData(app, dataDir) {
       for (const entry of fs.readdirSync(root)) {
         if (/^app-\d/.test(entry)) candidates.add(path.join(root, entry));
       }
-    } catch (e) {}
+    } catch (e) {
+      // Dossier parent illisible : on continue sans versions voisines
+    }
 
     fs.mkdirSync(dataDir, { recursive: true });
 
@@ -57,7 +59,9 @@ function migrateLegacyData(app, dataDir) {
           const stat = fs.statSync(source);
           if (stat.isFile() && (!best || stat.mtimeMs > best.mtimeMs))
             best = { source, mtimeMs: stat.mtimeMs };
-        } catch (e) {}
+        } catch (e) {
+          // Fichier absent dans cette version : on passe à la suivante
+        }
       }
 
       if (best) fs.copyFileSync(best.source, target);
