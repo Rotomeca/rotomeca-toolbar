@@ -29,7 +29,7 @@ test('IpcRouter : un site distant est refusé, signalé, et le traitement n\'est
   new IpcRouter(ipc, (message, url) => warnings.push([message, url])).handle('canal', () => { called = true; });
   assert.equal(ipc.handlers.get('canal')(origin('https://exemple.fr')), undefined);
   assert.equal(called, false);
-  assert.deepEqual(warnings, [["IPC 'canal' refusé depuis", 'https://exemple.fr']]);
+  assert.deepEqual(warnings, [['IPC \'canal\' refusé depuis', 'https://exemple.fr']]);
 });
 
 test('IpcRouter : un sous-cadre local est refusé', () => {
