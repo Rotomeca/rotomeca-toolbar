@@ -7,7 +7,7 @@ let notified = false;
 document.documentElement.addEventListener('mouseenter', () => {
   if (notified) return;
   notified = true;
-  window.api.invoke(appEventList.edgeEnter);
+  window.api.invoke(appEventList.edgeEnter).catch(console.error);
 });
 
 // La fenêtre est réaffichée à chaque fermeture de la barre

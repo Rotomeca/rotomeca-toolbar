@@ -52,6 +52,12 @@ async function checkApplication({ withTimeout }) {
   process.env.HOME = home;
   process.env.USERPROFILE = home;
 
+  // Le chargement d'une adresse qui refuse la connexion est attendu : on n'en fait pas un bruit de fond
+  const logError = console.error;
+  console.error = (...args) => {
+    if (!String(args[0]).startsWith('Chargement de')) logError(...args);
+  };
+
   const { App } = require('../main/App.js');
   const instance = new App({ updater: fakeUpdater(), permissions: fakePermissions(), isDev: false });
 
@@ -111,6 +117,7 @@ async function checkApplication({ withTimeout }) {
   } catch (error) {
     problems.push(error.message);
   } finally {
+    console.error = logError;
     instance.releaseDock();
   }
 

@@ -72,7 +72,8 @@ export interface InvokeContracts {
   getDisplays: { args: []; result: DisplayInfo[] };
   toggleMute: { args: [target: { url: string }]; result: void };
   mediaControl: { args: [command: { url: string; action: MediaAction }]; result: void };
-  mediaHover: { args: [hover: { url: string; hovering: boolean; y: number }]; result: void };
+  /** `y` (milieu du bouton dans la barre) n'est donné que par la barre, à l'entrée du pointeur. */
+  mediaHover: { args: [hover: { url: string; hovering: boolean; y?: number }]; result: void };
   'rotomeca-context-menu': { args: [click: ContextMenuClickDto]; result: void };
   edgeEnter: { args: []; result: void };
   requestToggle: { args: []; result: void };
