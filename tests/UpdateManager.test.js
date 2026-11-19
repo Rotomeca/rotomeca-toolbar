@@ -385,3 +385,171 @@ test('openTest : après une recherche sans résultat, n\'ouvre plus rien', async
 });
 
 // #endregion
+
+// #region Installation automatique de la version de test
+
+/** Manager Squirrel avec serveur de test, et une pré-version 3.3.0 sur GitHub. */
+function setupAutoTest(overrides = {}) {
+  const autoUpdater = fakeAutoUpdater();
+  const feeds = [];
+  const ctx = setup({
+    autoUpdater,
+    testFeed: true,
+    setFeed: (channel) => feeds.push(channel),
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+    ...overrides,
+  });
+  ctx.manager.start();
+  autoUpdater.emit('update-not-available'); // termine la vérification de démarrage
+  return { ...ctx, autoUpdater, feeds };
+}
+
+test('testAuto : vrai seulement avec Squirrel, un serveur de test et setFeed', () => {
+  const base = { autoUpdater: fakeAutoUpdater(), testFeed: true, setFeed: () => {} };
+  assert.equal(setup(base).manager.state.testAuto, true);
+  assert.equal(setup({ ...base, testFeed: false }).manager.state.testAuto, false);
+  assert.equal(setup({ ...base, setFeed: null }).manager.state.testAuto, false);
+  assert.equal(setup({ ...base, autoUpdater: null }).manager.state.testAuto, false);
+  assert.equal(setup({ ...base, manual: true }).manager.state.testAuto, false, 'Linux');
+  assert.equal(setup({ ...base, simulate: true }).manager.state.testAuto, false);
+});
+
+test('installTest : sans version de test trouvée, ne fait rien', () => {
+  const { manager, autoUpdater, feeds } = setupAutoTest();
+  const checks = autoUpdater.checks;
+  manager.installTest();
+  assert.equal(autoUpdater.checks, checks);
+  assert.deepEqual(feeds, []);
+});
+
+test('installTest : télécharge et installe comme une mise à jour normale', async () => {
+  const { manager, autoUpdater, feeds, calls } = setupAutoTest();
+  await manager.checkTest();
+  const checks = autoUpdater.checks;
+
+  manager.installTest();
+  assert.deepEqual(feeds, ['test'], 'Squirrel interroge le serveur de test');
+  assert.equal(autoUpdater.checks, checks + 1);
+  assert.equal(manager.state.verification, true);
+  assert.equal(manager.state.versionDisponible, '3.3.0');
+
+  autoUpdater.emit('update-available');
+  assert.equal(manager.state.etat, 'downloading');
+  assert.equal(manager.state.versionDisponible, '3.3.0');
+
+  autoUpdater.emit('update-downloaded', {}, '', '');
+  assert.equal(manager.state.etat, 'ready');
+  assert.equal(manager.state.versionDisponible, '3.3.0');
+  assert.deepEqual(calls.notified, ['3.3.0']);
+
+  manager.install();
+  assert.equal(calls.beforeInstall, 1);
+  assert.equal(autoUpdater.installs, 1);
+});
+
+test('installTest : la vérification normale suivante revient au serveur normal', async () => {
+  const { manager, autoUpdater, feeds } = setupAutoTest();
+  await manager.checkTest();
+  manager.installTest();
+  autoUpdater.emit('update-not-available'); // le serveur de test n'a rien
+
+  await manager.check();
+  assert.deepEqual(feeds, ['test', 'stable']);
+});
+
+test('installTest : une vérification normale ne change pas de serveur inutilement', async () => {
+  const { manager, feeds } = setupAutoTest();
+  await manager.check();
+  await manager.check();
+  assert.deepEqual(feeds, []);
+});
+
+test('installTest : serveur de test pas encore à jour → message dédié, rien d\'installé', async () => {
+  const { manager, autoUpdater } = setupAutoTest();
+  await manager.checkTest();
+  manager.installTest();
+  autoUpdater.emit('update-not-available');
+
+  assert.equal(manager.state.etat, 'uptodate');
+  assert.equal(manager.state.verification, false);
+  assert.equal(manager.state.versionDisponible, null);
+  assert.equal(manager.state.erreurTest, 'update.test.errorUnavailable');
+  assert.equal(manager.state.erreur, null, 'pas d\'erreur sur la carte normale');
+});
+
+test('installTest : un échec Squirrel s\'affiche dans le bloc de test', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const { manager, autoUpdater } = setupAutoTest();
+  await manager.checkTest();
+  manager.installTest();
+  autoUpdater.emit('error', new Error('réseau'));
+
+  assert.equal(manager.state.erreurTest, 'update.card.errorCheck');
+  assert.equal(manager.state.erreur, null);
+  assert.equal(manager.state.etat, 'uptodate');
+  assert.equal(manager.state.versionDisponible, null);
+});
+
+test('installTest : un échec pendant le téléchargement retombe sur « à jour »', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const { manager, autoUpdater } = setupAutoTest();
+  await manager.checkTest();
+  manager.installTest();
+  autoUpdater.emit('update-available');
+  autoUpdater.emit('error', new Error('coupure'));
+
+  assert.equal(manager.state.etat, 'uptodate');
+  assert.equal(manager.state.erreurTest, 'update.card.errorDownload');
+  assert.equal(manager.state.erreur, null);
+});
+
+test('installTest : checkForUpdates qui lève est traité comme un échec', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const { manager, autoUpdater } = setupAutoTest();
+  await manager.checkTest();
+  autoUpdater.checkForUpdates = () => {
+    throw new Error('Update.exe introuvable');
+  };
+  manager.installTest();
+  assert.equal(manager.state.erreurTest, 'update.card.errorCheck');
+  assert.equal(manager.state.verification, false);
+});
+
+test('installTest : ignoré pendant une vérification, un téléchargement ou une mise à jour prête', async () => {
+  const { manager, autoUpdater, feeds } = setupAutoTest();
+  await manager.checkTest();
+
+  manager.installTest(); // lance l'installation de test
+  const checks = autoUpdater.checks;
+  manager.installTest(); // vérification en cours
+  autoUpdater.emit('update-available');
+  manager.installTest(); // téléchargement en cours
+  autoUpdater.emit('update-downloaded', {}, '', '');
+  manager.installTest(); // prête
+
+  assert.equal(autoUpdater.checks, checks);
+  assert.deepEqual(feeds, ['test']);
+});
+
+test('installTest : une vérification normale ne démarre pas pendant l\'installation de test', async () => {
+  const { manager, autoUpdater, feeds } = setupAutoTest();
+  await manager.checkTest();
+  manager.installTest();
+  const checks = autoUpdater.checks;
+
+  await manager.check();
+  assert.equal(autoUpdater.checks, checks);
+  assert.deepEqual(feeds, ['test']);
+});
+
+test('installTest : sans installation automatique, ouvre la page de la release', async () => {
+  const { manager, calls } = setup({
+    manual: true,
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+  });
+  await manager.checkTest();
+  manager.installTest();
+  assert.deepEqual(calls.opened, [`https://github.com/${REPO}/releases/tag/3.3.0`]);
+});
+
+// #endregion

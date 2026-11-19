@@ -41,5 +41,5 @@ export const appEventList = Object.freeze({
   permissionRevoke: 'permissionRevoke',
   permissionsClear: 'permissionsClear',
   updateCheckTest: 'updateCheckTest',
-  updateOpenTest: 'updateOpenTest',
+  updateInstallTest: 'updateInstallTest',
 });

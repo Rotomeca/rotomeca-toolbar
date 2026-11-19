@@ -45,7 +45,7 @@ const INVOKE_CHANNELS = new Set([
   'permissionRevoke',
   'permissionsClear',
   'updateCheckTest',
-  'updateOpenTest',
+  'updateInstallTest',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */

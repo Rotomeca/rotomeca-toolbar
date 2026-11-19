@@ -51,6 +51,8 @@
   "update.test.found": "Test version {version} available",
   "update.test.none": "No newer test version",
   "update.test.open": "Download {version}",
+  "update.test.install": "Install {version}",
+  "update.test.errorUnavailable": "The test server doesn't offer this version yet (its list refreshes every 15 minutes). Try again shortly.",
   "update.card.title": "Updates",
   "update.card.titleUpToDate": "Version {version} · up to date",
   "update.card.titleAvailable": "Version {version} available",

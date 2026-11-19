@@ -487,9 +487,14 @@ export class PageSettings {
 
     const render = (state) => {
       checkButton.loading = state.verificationTest;
-      openButton.hidden = !state.versionTest;
+      // Pendant un téléchargement ou une installation prête, la carte de mises à jour prend le relais
+      openButton.hidden =
+        !state.versionTest || ['downloading', 'ready'].includes(state.etat);
       if (state.versionTest)
-        openButton.textContent = t('update.test.open', { version: state.versionTest });
+        openButton.textContent = t(
+          state.testAuto ? 'update.test.install' : 'update.test.open',
+          { version: state.versionTest },
+        );
 
       if (state.erreurTest) this.#setStatus(status, t(state.erreurTest), true);
       else if (state.versionTest)
@@ -503,7 +508,7 @@ export class PageSettings {
       window.api.invoke(appEventList.updateCheckTest),
     );
     openButton.addEventListener('click', () =>
-      window.api.invoke(appEventList.updateOpenTest),
+      window.api.invoke(appEventList.updateInstallTest),
     );
 
     window.api.on(pageEventList.updateState, (_, next) => render(next));
