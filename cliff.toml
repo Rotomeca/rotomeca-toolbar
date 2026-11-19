@@ -30,8 +30,10 @@ protect_breaking_commits = false
 filter_commits = false
 topo_order = false
 sort_commits = "oldest"
-# Les tags de version n'ont pas de préfixe "v" (cf. gitflow.prefix.versiontag)
-tag_pattern = "[0-9]+\\.[0-9]+\\.[0-9]+"
+# Les tags de version n'ont pas de préfixe "v" (cf. gitflow.prefix.versiontag).
+# Ancré : les pré-versions (X.Y.Z-rcN) ne sont pas des bornes, une release couvre
+# donc tout ce qui s'est passé depuis la release finale précédente.
+tag_pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"
 
 # Retire les gitmojis (:sparkles:, :bug:...) des messages
 commit_preprocessors = [
@@ -41,8 +43,8 @@ commit_preprocessors = [
 
 commit_parsers = [
   { message = "^Merge", skip = true },
-  { message = "^build: .*\\d+\\.\\d+\\.\\d+\\s*$", skip = true },
-  { message = "^app: \\d+\\.\\d+\\.\\d+\\s*$", skip = true },
+  { message = "^build: .*\\d+\\.\\d+\\.\\d+(-rc\\d+)?\\s*$", skip = true },
+  { message = "^app: \\d+\\.\\d+\\.\\d+(-rc\\d+)?\\s*$", skip = true },
   { message = "^feat(ure)?", group = "Nouveautés" },
   { message = "^fix", group = "Corrections" },
   { message = "^refactor", group = "Refactorisation" },
