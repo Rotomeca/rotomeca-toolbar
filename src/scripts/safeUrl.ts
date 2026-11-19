@@ -3,7 +3,7 @@
  * @param url La valeur à contrôler (souvent reçue d'une page : rien n'est supposé)
  * @returns true pour une chaîne qui est une URL http ou https
  */
-export function isSafeUrl(url: unknown): boolean {
+export function isSafeUrl(url: unknown): url is string {
   if (typeof url !== 'string') return false;
 
   try {

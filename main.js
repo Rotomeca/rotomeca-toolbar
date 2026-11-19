@@ -86,6 +86,7 @@ const {
   describeNowPlaying,
 } = require('./src/main/media/mediaState.js');
 const { MediaPopup } = require('./src/main/media/MediaPopup.js');
+const { AppViewHost } = require('./src/main/apps/AppViewHost.js');
 const { TooltipPopup } = require('./src/main/tooltip/TooltipPopup.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const {
@@ -112,11 +113,7 @@ const {
 const {
   installPermissionHandlers,
 } = require('./src/main/permissions/installPermissionHandlers.js');
-const {
-  parseUnreadCount,
-  sanitizeMediaState,
-  MEDIA_ACTIONS,
-} = require('./src/scripts/AppIndicators.js');
+const { sanitizeMediaState } = require('./src/scripts/AppIndicators.js');
 
 // Largeur (px) de la bande réservée à la barre ancrée (AppBar)
 const APPBAR_WIDTH = 72;
@@ -155,14 +152,10 @@ const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
 class AppMain extends BaseAppObject {
   constructor() {
     super();
-    this.views = {};
     this.saves = [];
     this.started = false;
     this.tray;
-    this.url;
     this.contextMenu;
-    /** Apps dont le son est coupé (conservé tant que l'application tourne) */
-    this.mutedUrls = new Set();
     /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
     this.taskbarIgnored = new Set();
   }
@@ -483,7 +476,7 @@ class AppMain extends BaseAppObject {
       view.webContents.addListener('dom-ready', () => {
         this.appsWindow.contentView.children[0].webContents.postMessage(
           'frameOpen',
-          this.url,
+          this.viewHost.lastOpened,
         );
       });
 
@@ -722,8 +715,7 @@ class AppMain extends BaseAppObject {
       );
 
       // La toolbar peut avoir été recréée alors que des sites tournent déjà
-      for (const url of new Set([...Object.keys(this.views), ...this.mutedUrls]))
-        this.sendIndicators(url);
+      for (const url of this.viewHost.knownUrls()) this.sendIndicators(url);
     });
   }
 
@@ -909,7 +901,7 @@ class AppMain extends BaseAppObject {
   initContextMenu() {
     this.contextMenu = new ContextMenuController({
       isToolbarWindow: (id) => id === this.getWindow('toolbar')?.id,
-      isMuted: (url) => this.mutedUrls.has(url),
+      isMuted: (url) => this.viewHost.isMuted(url),
       translate: t,
     });
     startContextMenu(this.contextMenu);
@@ -1270,51 +1262,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_close_frame(_, url) {
-    if (this.views?.[url]?.view) {
-      this.views[url].view.setVisible(false);
-      this.views[url].visible = false;
-    }
-
-    let loaded = false;
-
-    for (const key in this.views) {
-      const element = this.views[key];
-
-      if (element.visible) {
-        loaded = true;
-        break;
-      }
-    }
-
-    if (!loaded) this.appsWindow.hide();
-  }
-
-  /**
-   * Suit le titre (non-lus) et l'état audio d'une vue pour les afficher sur son bouton.
-   * @param {string} url
-   * @param {WebContentsView} view
-   */
-  bindIndicators(url, view) {
-    const { webContents } = view;
-
-    webContents.on('page-title-updated', (_, title) => {
-      this.updateIndicators(url, { badge: parseUnreadCount(title) });
-    });
-    webContents.on('audio-state-changed', (event) => {
-      this.updateIndicators(url, { audible: event.audible });
-    });
-  }
-
-  /**
-   * @param {string} url
-   * @param {{badge?: number, audible?: boolean}} changes
-   */
-  updateIndicators(url, changes) {
-    const entry = this.views[url];
-    if (!entry) return;
-
-    Object.assign(entry, changes);
-    this.sendIndicators(url);
+    this.viewHost.hide(url);
   }
 
   sendIndicators(url) {
@@ -1324,7 +1272,7 @@ class AppMain extends BaseAppObject {
   }
 
   postIndicators(url) {
-    const entry = this.views[url];
+    const entry = this.viewHost.entry(url);
     const toolbar = this.getWindow('toolbar');
 
     if (toolbar && !toolbar.isDestroyed())
@@ -1332,7 +1280,7 @@ class AppMain extends BaseAppObject {
         url,
         badge: entry?.badge ?? 0,
         audible: entry?.audible ?? false,
-        muted: this.mutedUrls.has(url),
+        muted: this.viewHost.isMuted(url),
         cover: entry?.media?.artwork ?? null,
         progress: this.getMediaProgress(entry?.media),
         hasMedia: !!entry?.media,
@@ -1345,9 +1293,7 @@ class AppMain extends BaseAppObject {
    * de notification (un seul morceau affiché : les autres lecteurs sont ignorés).
    */
   updateTaskbar() {
-    const { first, others } = splitTaskbarPlayers(
-      Object.keys(this.views).filter((key) => this.views[key].media),
-    );
+    const { first, others } = splitTaskbarPlayers(this.viewHost.playingUrls());
 
     const previous = this.taskbarIgnored;
     this.taskbarIgnored = new Set(others);
@@ -1363,7 +1309,7 @@ class AppMain extends BaseAppObject {
 
     this.tray.setToolTip(
       this.trayTooltipFor(
-        describeNowPlaying(this.views[first].media, others.length, t),
+        describeNowPlaying(this.viewHost.entry(first).media, others.length, t),
       ),
     );
   }
@@ -1382,7 +1328,11 @@ class AppMain extends BaseAppObject {
    * @returns {?Object} État affiché par la fenêtre de contrôle du morceau
    */
   getMediaPayload(url) {
-    return mediaPayload(url, this.views[url]?.media, this.mutedUrls.has(url));
+    return mediaPayload(
+      url,
+      this.viewHost.entry(url)?.media,
+      this.viewHost.isMuted(url),
+    );
   }
 
   /**
@@ -1391,12 +1341,55 @@ class AppMain extends BaseAppObject {
   event_media_state(event, raw) {
     if (event.senderFrame !== event.sender.mainFrame) return;
 
-    const url = Object.keys(this.views).find((key) => {
-      const { webContents } = this.views[key].view;
-      return !webContents.isDestroyed() && webContents.id === event.sender.id;
+    const url = this.viewHost.urlOfWebContents(event.sender.id);
+
+    if (url) this.viewHost.update(url, { media: sanitizeMediaState(raw) });
+  }
+
+  /**
+   * Les sites ouverts en arrière-plan, dans la fenêtre des applications.
+   * @type {AppViewHost}
+   */
+  get viewHost() {
+    this._viewHost ??= new AppViewHost({
+      surface: {
+        getBounds: () => this.appsWindow.getBounds(),
+        show: () => this.appsWindow.show(),
+        hide: () => this.appsWindow.hide(),
+        addChildView: (view) => this.appsWindow.contentView.addChildView(view),
+        removeChildView: (view) =>
+          this.appsWindow.contentView.removeChildView(view),
+        announceOpened: (url) =>
+          this.appsWindow.contentView.children[0].webContents.postMessage(
+            pageEventList.frameOpen,
+            url,
+          ),
+      },
+      createView: () => {
+        // Site tiers : bac à sable et isolation explicites (défauts d'Electron,
+        // mais ici la frontière de sécurité de l'application). Session par
+        // défaut (persistante) : on ne vide jamais son stockage.
+        const view = new WebContentsView({
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            preload: path.join(
+              __dirname,
+              './src/scripts/media/media-preload.js',
+            ),
+          },
+        });
+        hardenWebContents(view.webContents);
+        return view;
+      },
+      isSafeUrl,
+      headerHeight: APPS_HEADER_HEIGHT,
+      onChange: (url) => this.sendIndicators(url),
+      mediaActionChannel: internalChannels.mediaAction,
     });
 
-    if (url) this.updateIndicators(url, { media: sanitizeMediaState(raw) });
+    return this._viewHost;
   }
 
   /**
@@ -1456,89 +1449,20 @@ class AppMain extends BaseAppObject {
   }
 
   event_media_control(_, { url, action } = {}) {
-    const entry = this.views[url];
-    if (!entry?.media || !MEDIA_ACTIONS.includes(action)) return;
-
-    entry.view.webContents.send(internalChannels.mediaAction, action);
-
-    // Retour immédiat : la page confirmera dans la seconde qui suit
-    if (action === 'play' || action === 'pause') {
-      entry.media.playing = action === 'play';
-      this.mediaPopup.refresh(url);
-    }
+    this.viewHost.controlMedia(url, action);
   }
 
   event_toggle_mute(_, { url } = {}) {
-    if (!isSafeUrl(url)) return;
-
-    const muted = !this.mutedUrls.has(url);
-    if (muted) this.mutedUrls.add(url);
-    else this.mutedUrls.delete(url);
-
-    this.views[url]?.view.webContents.setAudioMuted(muted);
-    this.sendIndicators(url);
+    this.viewHost.toggleMute(url);
   }
   // #endregion
 
   event_open_frame(_, url) {
-    if (!isSafeUrl(url)) return;
-
-    this.url = url;
-
-    if (!this.views[url]) {
-      // Session par défaut (persistante) : on ne vide jamais son stockage
-      // Site tiers : bac à sable et isolation explicites (défauts d'Electron,
-      // mais ici la frontière de sécurité de l'application).
-      const view = new WebContentsView({
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-          preload: path.join(__dirname, './src/scripts/media/media-preload.js'),
-        },
-      });
-      view.webContents.setAudioMuted(this.mutedUrls.has(url));
-      const bounds = this.appsWindow.getBounds();
-      view.setBounds({
-        x: 0,
-        y: APPS_HEADER_HEIGHT,
-        width: bounds.width,
-        height: Math.max(0, bounds.height - APPS_HEADER_HEIGHT),
-      });
-
-      hardenWebContents(view.webContents);
-
-      this.views[url] = { view, badge: 0, audible: false };
-      this.appsWindow.contentView.addChildView(view);
-      this.bindIndicators(url, view);
-
-      view.webContents.loadURL(url);
-    } else {
-      this.views[url].view.setVisible(true);
-    }
-
-    this.views[url].visible = true;
-
-    this.appsWindow.show();
-
-    this.appsWindow.contentView.children[0].webContents.postMessage(
-      pageEventList.frameOpen,
-      url,
-    );
+    this.viewHost.open(url);
   }
 
   event_app_delete(_, url) {
-    if (this.views[url]) {
-      /**@type {WebContentsView} */
-      const view = this.views[url].view;
-      view.setVisible(false);
-      this.appsWindow.contentView.removeChildView(view);
-      view.webContents.stop();
-      view.webContents.close();
-      view.webContents?.destroy?.();
-      delete this.views[url];
-      this.sendIndicators(url);
-    }
+    this.viewHost.discard(url);
 
     this.toolbarWindow.webContents.postMessage(
       pageEventList.toolbarAppDeleted,
@@ -1615,17 +1539,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_kill_app(_, url, open = false) {
-    if (this.views[url]) {
-      /**@type {WebContentsView} */
-      const view = this.views[url].view;
-      view.setVisible(false);
-      this.appsWindow.contentView.removeChildView(view);
-      view.webContents.stop();
-      view.webContents.close();
-      view.webContents?.destroy?.();
-      delete this.views[url];
-      this.sendIndicators(url);
-    }
+    this.viewHost.discard(url);
 
     this.toolbarWindow.webContents.postMessage(
       pageEventList.windowAppsClosed,
@@ -1645,11 +1559,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_refresh_app(_, url) {
-    /**
-     * @type {WebContentsView | undefined}
-     */
-    const view = this.views[url]?.view;
-    view?.webContents.reload();
+    this.viewHost.reload(url);
   }
 
   event_minimise_windows(_, win) {
