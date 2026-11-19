@@ -48,7 +48,8 @@ const { PermissionStore } = require('./src/scripts/PermissionStore.js');
 const {
   createPermissionPolicy,
 } = require('./src/scripts/permissionPolicy.js');
-const { compareVersions } = require('./src/scripts/versions.js');
+const { compareVersions, isPrerelease } = require('./src/scripts/versions.js');
+const { iconBaseName } = require('./src/scripts/appIcon.js');
 const { isSafeUrl } = require('./src/scripts/safeUrl.js');
 const {
   parseUnreadCount,
@@ -165,7 +166,10 @@ class AppMain extends BaseAppObject {
 
   get appIcon() {
     if (!this.main.icon)
-      this.main.icon = path.join(__dirname, '/src/pictures/icon.png');
+      this.main.icon = path.join(
+        __dirname,
+        `/src/pictures/${iconBaseName(app.getVersion())}.png`,
+      );
 
     return this.main.icon;
   }
@@ -175,7 +179,7 @@ class AppMain extends BaseAppObject {
    */
   get trayIcon() {
     return process.platform === 'win32'
-      ? path.join(__dirname, '/src/pictures/icon.ico')
+      ? path.join(__dirname, `/src/pictures/${iconBaseName(app.getVersion())}.ico`)
       : this.appIcon;
   }
 
@@ -996,7 +1000,8 @@ class AppMain extends BaseAppObject {
     const [b, g, r] = level === 'ready' ? [76, 175, 80] : [255, 152, 0]; // BGRA
     const radius = 8;
     const cx = size - radius - 1;
-    const cy = size - radius - 1;
+    // Le badge « RC » de l'icône de pré-version est en bas à droite : le point passe en haut
+    const cy = isPrerelease(app.getVersion()) ? radius + 1 : size - radius - 1;
 
     for (let y = 0; y < size; ++y) {
       for (let x = 0; x < size; ++x) {
@@ -1950,7 +1955,10 @@ class AppMain extends BaseAppObject {
     const notification = new Notification({
       title: t('update.downloadedNotifTitle'),
       body: t('update.downloadedNotifBody'),
-      icon: path.join(__dirname, '/src/pictures/icon.png'),
+      icon: path.join(
+        __dirname,
+        `/src/pictures/${iconBaseName(app.getVersion())}.png`,
+      ),
       urgency: 'normal',
     });
     notification.on('click', () => runningInstance?.event_tray_on_click());
