@@ -18,8 +18,7 @@ Règles générales importées depuis `.claude/claude-config/` (copie locale de 
 
 ## Écarts avec le claude-config
 
-- **JavaScript, pas TypeScript.** Typer avec JSDoc (`@param`, `@returns`, `@typedef`). `any` et `strict` ne s'appliquent pas.
-- **CommonJS dans le processus principal** (`main.js`, `src/scripts/`, `configs/`) : `require` / `module.exports`. **ESM uniquement dans les pages** (`src/page.*/`) : `import`. Ne pas mélanger.
+- **Migration vers TypeScript en cours.** **Tout nouveau fichier est en `.ts`** (strict : pas de `any`, types explicites sur les signatures exportées, contrôlé par ESLint). Les fichiers `.js` existants sont convertis étape par étape ; en attendant, ils gardent JSDoc et CommonJS (`require` / `module.exports`). Un fichier migré est écrit en `import` / `export` : `tsc` produit du CommonJS pour le processus principal et des modules ES pour les pages (`src/page.*/`). Ne pas mélanger les deux cibles.
 - **Commits : gitmoji en code, pas en emoji Unicode** (`:sparkles:`, pas ✨), car `cliff.toml` retire les `:codes:` pour générer le changelog (un emoji Unicode le polluerait). Le reste du format du claude-config s'applique (`type(scope): :gitmoji: description`, un commit = un changement atomique). Messages **en anglais**, au présent, comme tout l'historique.
 - **Pas de PR ni de ticket** : le flux est un git flow local (voir le README). Le format de titre de PR du claude-config ne s'applique pas.
 - **Style existant avant le `.prettierrc.json`.** Le code est en 2 espaces et fonctions fléchées avec parenthèses (`(x) => …`) ; le `.prettierrc.json` (tabulations, `arrowParens: avoid`) ne correspond pas et n'est pas appliqué. Suivre le fichier modifié, ne jamais reformater un fichier existant.
@@ -28,17 +27,23 @@ Règles générales importées depuis `.claude/claude-config/` (copie locale de 
 
 | Commande | Rôle |
 |---|---|
-| `pnpm start` | Lance l'app (electron-forge) |
-| `pnpm debug` | Lance l'app en mode développement (`scripts/dev.js`) |
-| `pnpm lint` | ESLint (`main.js`, `src`, `scripts`, `tests`, configs) |
-| `pnpm test` | Tests `node:test` (`tests/*.test.js`) |
+| `pnpm build` | Construit `dist/` : copie, preloads bundlés (esbuild), compilation TypeScript (tsc) |
+| `pnpm start` | Construit puis lance l'app (electron-forge) |
+| `pnpm debug` | Construit puis lance l'app en mode développement (`scripts/dev.js`) |
+| `pnpm typecheck` | Vérification des types, sans rien produire (processus principal et pages) |
+| `pnpm lint` | ESLint sur tout le dépôt (`.js` et `.ts`) |
+| `pnpm test` | Construit puis lance les tests `node:test` (`tests/*.test.js`, qui lisent `dist/`) |
+| `pnpm smoke` | Construit puis démarre l'app en mode « fumée » (pages, preloads, koffi) |
+| `pnpm package` / `pnpm make` | Construit puis empaquette / crée les installeurs |
+| `pnpm verify:package` / `pnpm smoke:packaged` | Vérifient le paquet de `out/` (contenu) et le font démarrer en mode fumée |
 | `pnpm pre-release X.Y.Z [--push] [--dry-run]` | Crée une pré-version `X.Y.Z-rcN` |
-| `pnpm make` | Construit les installeurs |
 
-Avant de commiter : `pnpm lint` et `pnpm test` doivent passer. Le CI les exécute et bloque la release s'ils échouent.
+Avant de commiter : `pnpm typecheck`, `pnpm lint` et `pnpm test` doivent passer ; après un changement qui touche au build ou aux chemins, `pnpm package` puis `pnpm verify:package` et `pnpm smoke:packaged`. Le CI exécute les trois premiers et bloque la release s'ils échouent.
 
 ## Architecture
 
+- **`dist/` est ce qui s'exécute et ce qui est empaqueté** (`main` de `package.json` = `dist/main.js`) : il reproduit l'arborescence du dépôt, donc les chemins relatifs (`__dirname`, imports des pages) restent valides. Ne jamais l'éditer ni le versionner ; les sources `.ts` n'y sont pas copiées.
+- Les deux preloads (`preload.js`, `src/scripts/media/media-preload.js`) sont **bundlés en un seul fichier** par esbuild : un preload sandboxé ne peut charger aucun autre fichier (seul `electron` est requirable).
 - `main.js` : processus principal (`AppMain`), volumineux (≈2 100 lignes) et à découper progressivement.
 - `src/scripts/` : classes et modules du processus principal. `preload.js` : liste blanche des canaux IPC. `src/page.*/` : une fenêtre par dossier (HTML + JS). `lib/` : composants partagés. `src/locales/{fr,en}.json` : textes. `configs/appConfig.js` : adresses des serveurs de mises à jour.
 - **Logique testable = module pur, sans `electron`.** Les dépendances (fetch, dialogue, Squirrel…) sont injectées. C'est le principe d'inversion de dépendance du claude-config appliqué ici (exemples : `UpdateManager`, `PermissionStore`, `permissionPolicy`, `versions`, `safeUrl`, `appIcon`). `main.js` ne fait que câbler. **En touchant à `main.js`, extraire plutôt qu'ajouter**, et tester le module extrait.
