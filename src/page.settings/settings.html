@@ -70,12 +70,87 @@
         color: var(--ds-text-muted);
       }
 
-      #version {
-        padding: 4px 10px;
-        border-radius: var(--ds-radius-full, 999px);
+      /* Carte « Mises à jour » */
+      .carte-maj {
+        flex-direction: row;
+        align-items: center;
+        gap: 20px;
+        padding: 20px 24px;
+      }
+
+      .maj-pastille {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--ds-input-radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
         background: var(--ds-background-tone-neutral);
         color: var(--ds-text-tone-neutral);
-        font: var(--text-caption);
+      }
+
+      .carte-maj[data-etat='uptodate'] .maj-pastille {
+        background: var(--ds-background-tone-success);
+        color: var(--ds-text-tone-success);
+      }
+
+      .carte-maj[data-etat='available'] .maj-pastille,
+      .carte-maj[data-etat='downloading'] .maj-pastille {
+        background: var(--ds-background-tone-brand);
+        color: var(--ds-text-tone-brand);
+      }
+
+      .carte-maj[data-etat='ready'] .maj-pastille {
+        background: var(--ds-background-tone-accent);
+        color: var(--ds-text-tone-accent);
+      }
+
+      .carte-maj[data-etat='downloading'] .maj-pastille rds-icon {
+        animation: maj-tourne 1.2s linear infinite;
+      }
+
+      @keyframes maj-tourne {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .carte-maj[data-etat='downloading'] .maj-pastille rds-icon {
+          animation: none;
+        }
+      }
+
+      .maj-texte {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .maj-texte h2 {
+        margin: 0;
+        font: var(--text-label);
+        font-size: 1rem;
+      }
+
+      .maj-etat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font: var(--text-helper);
+        color: var(--ds-text-muted);
+      }
+
+      .maj-etat.erreur {
+        color: var(--ds-text-danger);
+      }
+
+      .maj-action {
+        flex: none;
       }
 
       section {
@@ -375,8 +450,20 @@
           <h1 data-i18n="settings.title">Paramètres</h1>
           <p class="helper" data-i18n="settings.subtitle">Comportement et apparence de la barre d'outils</p>
         </div>
-        <span id="version"></span>
       </header>
+
+      <section id="maj" class="carte-maj" data-etat="uptodate" aria-labelledby="sec-maj" aria-live="polite">
+        <div class="maj-pastille" aria-hidden="true"><rds-icon id="maj-icone" name="circle-check"></rds-icon></div>
+        <div class="maj-texte">
+          <h2 id="sec-maj" data-i18n="update.card.title">Mises à jour</h2>
+          <span id="maj-etat" class="maj-etat"></span>
+          <rds-progress id="maj-progres" size="sm" show-value hidden></rds-progress>
+        </div>
+        <div class="maj-action">
+          <rds-button id="maj-rechercher" variant="tertiary" icon-before="refresh-cw" data-i18n="update.card.check">Rechercher</rds-button>
+          <rds-primary-button id="maj-installer" icon-before="refresh-cw" hidden data-i18n="update.card.install">Mettre à jour</rds-primary-button>
+        </div>
+      </section>
 
       <section aria-labelledby="sec-behavior">
         <h2 id="sec-behavior" data-i18n="settings.sectionBehavior">Comportement</h2>

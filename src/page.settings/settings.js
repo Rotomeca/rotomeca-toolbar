@@ -457,6 +457,122 @@ export class PageSettings {
     });
   }
 
+  /**
+   * Carte « Mises à jour » : le processus principal envoie l'état complet à chaque
+   * changement, la page n'affiche que cet état et renvoie deux actions.
+   */
+  async #initUpdates() {
+    const t = window.api.t;
+    const card = document.querySelector('#maj');
+    const icon = document.querySelector('#maj-icone');
+    const title = document.querySelector('#sec-maj');
+    const status = document.querySelector('#maj-etat');
+    const progress = document.querySelector('#maj-progres');
+    const checkButton = document.querySelector('#maj-rechercher');
+    const installButton = document.querySelector('#maj-installer');
+
+    /** @type {?object} */
+    let state = null;
+
+    const lastCheckLabel = () => {
+      if (!state.derniereVerification) return null;
+      const minutes = Math.max(
+        0,
+        Math.floor((Date.now() - state.derniereVerification) / 60000),
+      );
+      if (minutes < 1) return t('update.card.lastNow');
+      if (minutes < 60) return t('update.card.lastMinutes', { n: minutes });
+      return t('update.card.lastHours', { n: Math.floor(minutes / 60) });
+    };
+
+    const setStatus = (text, error = false) => {
+      status.replaceChildren();
+      status.classList.toggle('erreur', error);
+      if (error) {
+        const alert = document.createElement('rds-icon');
+        alert.setAttribute('name', 'circle-alert');
+        alert.setAttribute('aria-hidden', 'true');
+        status.append(alert);
+      }
+      status.append(text);
+    };
+
+    const render = () => {
+      const stage = state.etat;
+      const { versionActuelle: current, versionDisponible: next } = state;
+      card.dataset.etat = stage;
+
+      const icons = {
+        uptodate: 'circle-check',
+        available: 'download',
+        downloading: 'loader-circle',
+        ready: 'refresh-cw',
+      };
+      icon.setAttribute('name', icons[stage]);
+
+      title.textContent = {
+        uptodate: t('update.card.titleUpToDate', { version: current }),
+        available: t('update.card.titleAvailable', { version: next }),
+        downloading: t('update.card.titleDownloading'),
+        ready: t('update.card.titleReady', { version: next ?? '' }),
+      }[stage];
+
+      const downloading = stage === 'downloading';
+      status.hidden = downloading;
+      progress.hidden = !downloading;
+      if (downloading) {
+        // Sans pourcentage (Squirrel), la barre reste indéterminée
+        if (typeof state.pourcentage === 'number') progress.value = state.pourcentage;
+        else progress.removeAttribute('value');
+        progress.label = next
+          ? t('update.card.progressLabel', { version: next })
+          : t('update.card.progressLabelUnknown');
+        progress.textContent = progress.label;
+      } else if (state.erreur) {
+        setStatus(t(state.erreur), true);
+      } else {
+        setStatus(
+          {
+            uptodate: lastCheckLabel()
+              ? t('update.card.statusUpToDate', { last: lastCheckLabel() })
+              : t('update.card.statusNeverChecked'),
+            available: t('update.card.statusCurrent', { version: current }),
+            ready: t('update.card.statusReady'),
+          }[stage],
+        );
+      }
+
+      // Une seule action primaire à la fois
+      checkButton.hidden = stage !== 'uptodate';
+      checkButton.loading = state.verification;
+      installButton.hidden = !['available', 'ready'].includes(stage);
+      installButton.textContent =
+        stage === 'available' ? t('update.card.download') : t('update.card.install');
+      installButton.setAttribute(
+        'icon-before',
+        stage === 'available' ? 'download' : 'refresh-cw',
+      );
+    };
+
+    const apply = (next) => {
+      state = next;
+      render();
+    };
+
+    checkButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateCheck),
+    );
+    installButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateInstall),
+    );
+
+    window.api.on(pageEventList.updateState, (_, next) => apply(next));
+    apply(await window.api.invoke(appEventList.updateGetState));
+
+    // « dernière il y a N min » reste à jour tant que la fenêtre est ouverte
+    setInterval(() => state && !state.erreur && render(), 60000);
+  }
+
   async main() {
     window.api.on(pageEventList.settingsStart, async (_, path) => {
       console.log('path', path);
@@ -473,11 +589,6 @@ export class PageSettings {
           console.error('error: ' + err);
         });
 
-      document.querySelector('#version').textContent = window.api.t(
-        'settings.versionLabel',
-        { version: await window.api.invoke(appEventList.getVersion) },
-      );
-
       this.settings ??= {};
       this.settings.isButtonModeEnabled ??= true;
       this.settings.theme ??= 'system';
@@ -488,6 +599,7 @@ export class PageSettings {
       await this.#initDisplays();
       await this.#initMode();
       await this.#initTheme();
+      await this.#initUpdates();
     });
   }
 }

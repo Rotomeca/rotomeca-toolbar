@@ -17,6 +17,7 @@ const {
   screen,
   autoUpdater,
   Notification,
+  nativeImage,
   dialog,
   ipcMain,
   globalShortcut,
@@ -42,6 +43,7 @@ const { appEventList } = require('./src/scripts/events/AppEventList.js');
 const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
+const { UpdateManager } = require('./src/scripts/UpdateManager.js');
 const {
   parseUnreadCount,
   sanitizeMediaState,
@@ -81,9 +83,6 @@ const EDGE_WIDTH = 4;
 
 // Raccourci clavier global qui affiche ou cache la barre
 const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
-
-// Intervalle (ms) entre deux vérifications de nouvelle version (Linux)
-const MANUAL_UPDATE_INTERVAL = 6 * 60 * 60 * 1000;
 
 // Taille maximale (caractères) d'une icône d'application encodée en data URL
 const MAX_PICTURE_LENGTH = 2 * 1024 * 1024;
@@ -460,7 +459,7 @@ class AppMain extends BaseAppObject {
     // « Système » : suit le mode clair/sombre de Windows en direct
     nativeTheme.on('updated', () => this.broadcastTheme());
 
-    if (AppMain.hasAutoUpdater) AppMain.CheckForUpdate();
+    AppMain.updater?.start();
 
     this.initContextMenu().initTray();
 
@@ -547,6 +546,9 @@ class AppMain extends BaseAppObject {
       )
       .addEventListener(appEventList.getSavedUrls, () => this.event_get_saved_urls())
       .addEventListener(appEventList.getVersion, () => app.getVersion())
+      .addEventListener(appEventList.updateGetState, () => AppMain.updater.state)
+      .addEventListener(appEventList.updateCheck, () => AppMain.updater.check())
+      .addEventListener(appEventList.updateInstall, () => AppMain.updater.install())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
       .addEventListener(appEventList.toggleMute, this.event_toggle_mute.bind(this))
@@ -932,12 +934,86 @@ class AppMain extends BaseAppObject {
 
     const appContextMenu = Menu.buildFromTemplate(menu);
 
-    this.tray = new Tray(this.trayIcon);
-    this.tray.setToolTip(t('tray.tooltip'));
+    this.tray = new Tray(this.trayIconFor(this.updateLevel));
+    this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
     this.tray.setContextMenu(appContextMenu);
     this.tray.on('click', () => this.toggleFromOutside());
 
     return this;
+  }
+
+  /**
+   * Niveau d'alerte de mise à jour : `null` (rien), `pending` (nouvelle version
+   * disponible ou en cours de téléchargement) ou `ready` (prête à installer).
+   * @returns {?('pending'|'ready')}
+   */
+  get updateLevel() {
+    const etat = AppMain.updater?.state.etat;
+    if (etat === 'ready') return 'ready';
+    return etat === 'downloading' || etat === 'available' ? 'pending' : null;
+  }
+
+  /**
+   * Icône de la zone de notification avec un point de couleur en bas à droite :
+   * bleu (version disponible) ou vert (mise à jour prête).
+   * @param {?('pending'|'ready')} level
+   * @returns {Electron.NativeImage|string}
+   */
+  trayIconFor(level) {
+    if (!level) return this.trayIcon;
+
+    this.trayIconCache ??= {};
+    if (this.trayIconCache[level]) return this.trayIconCache[level];
+
+    const size = 32;
+    const base = nativeImage
+      .createFromPath(this.appIcon)
+      .resize({ width: size, height: size });
+    const bitmap = Buffer.from(base.toBitmap());
+    const [b, g, r] = level === 'ready' ? [76, 175, 80] : [255, 152, 0]; // BGRA
+    const radius = 8;
+    const cx = size - radius - 1;
+    const cy = size - radius - 1;
+
+    for (let y = 0; y < size; ++y) {
+      for (let x = 0; x < size; ++x) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d > radius + 1.5) continue;
+        const i = (y * size + x) * 4;
+        // Liseré blanc autour du point, pour qu'il reste lisible sur tout fond
+        const [pb, pg, pr] = d <= radius - 1 ? [b, g, r] : [255, 255, 255];
+        bitmap[i] = pb;
+        bitmap[i + 1] = pg;
+        bitmap[i + 2] = pr;
+        bitmap[i + 3] = 255;
+      }
+    }
+
+    return (this.trayIconCache[level] = nativeImage.createFromBitmap(bitmap, {
+      width: size,
+      height: size,
+    }));
+  }
+
+  /**
+   * @param {string} text Info-bulle de base
+   * @returns {string} L'info-bulle, complétée de l'état de la mise à jour
+   */
+  trayTooltipFor(text) {
+    const level = this.updateLevel;
+    if (!level) return text;
+
+    const { versionDisponible } = AppMain.updater.state;
+    const key = level === 'ready' ? 'tray.updateReady' : 'tray.updateAvailable';
+    return `${text}\n${t(key, { version: versionDisponible ?? '' })}`;
+  }
+
+  /** Met à jour l'icône et l'info-bulle de la zone de notification. */
+  refreshTrayUpdate() {
+    if (!this.tray || this.tray.isDestroyed()) return;
+
+    this.tray.setImage(this.trayIconFor(this.updateLevel));
+    this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
   }
 
   async save() {
@@ -972,7 +1048,7 @@ class AppMain extends BaseAppObject {
       title: t('window.settings'),
       icon: this.appIcon,
       width: 800,
-      height: 920,
+      height: 1020,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
@@ -1280,7 +1356,7 @@ class AppMain extends BaseAppObject {
     if (!this.tray || this.tray.isDestroyed()) return;
 
     if (!first) {
-      this.tray.setToolTip(t('tray.tooltip'));
+      this.tray.setToolTip(this.trayTooltipFor(t('tray.tooltip')));
       return;
     }
 
@@ -1295,7 +1371,7 @@ class AppMain extends BaseAppObject {
     if (others.length)
       lines.push(t('tray.ignoredPlayers', { count: others.length }));
 
-    this.tray.setToolTip(lines.join('\n'));
+    this.tray.setToolTip(this.trayTooltipFor(lines.join('\n')));
   }
 
   // #region Media
@@ -1777,96 +1853,70 @@ class AppMain extends BaseAppObject {
     }
   }
 
+  /**
+   * Prépare le gestionnaire de mises à jour (Squirrel sous Windows/macOS,
+   * vérification GitHub sous Linux). La vérification démarre dans `main()`.
+   */
   static InitAutoUpdater() {
-    // Squirrel n'existe que sur Windows/macOS et uniquement en version packagée
-    if (
-      AppMain.IsDev ||
-      !app.isPackaged ||
-      !['win32', 'darwin'].includes(process.platform)
-    )
-      return this;
+    const { feedUrl, releasesRepo } = require('./configs/appConfig.js');
+    const simulate = AppMain.IsDev && process.env.RTB_UPDATE_SIMULATE === '1';
+    const packaged = !AppMain.IsDev && app.isPackaged;
+    const squirrel = packaged && ['win32', 'darwin'].includes(process.platform);
 
-    autoUpdater.on('error', (error) => {
-      console.error('Auto update error', error);
-    });
-
-    const server = require('./configs/appConfig.js').feedUrl;
-
-    if (server) {
-      const url = `${server}/update/${process.platform}/${app.getVersion()}`;
-      autoUpdater.setFeedURL({ url });
-      this.InitAutoUpdater.hasAutoUpdater = true;
+    if (squirrel && feedUrl) {
+      autoUpdater.setFeedURL({
+        url: `${feedUrl}/update/${process.platform}/${app.getVersion()}`,
+      });
     }
+
+    AppMain.updater = new UpdateManager({
+      version: app.getVersion(),
+      autoUpdater: squirrel && feedUrl ? autoUpdater : null,
+      releasesRepo,
+      manual: packaged && process.platform === 'linux',
+      simulate,
+      fetch: (url, init) => net.fetch(url, init),
+      openExternal: (url) => {
+        if (AppMain.IsSafeUrl(url)) shell.openExternal(url);
+      },
+      compareVersions: AppMain.CompareVersions,
+      beforeInstall: () => {
+        // Copie de sécurité des données avant l'installation
+        const { FileData } = require('./src/scripts/FileData.js');
+        backupUserData(app, FileData.BasePath);
+        // Sauvegarde des sessions (logins) avant que l'app soit tuée
+        flushSession(session.defaultSession);
+      },
+      onChange: (state) => {
+        for (const name of ['settings', 'toolbar']) {
+          const win = runningInstance?.getWindow(name);
+          if (win && !win.isDestroyed())
+            win.webContents.postMessage(pageEventList.updateState, state);
+        }
+        runningInstance?.refreshTrayUpdate();
+      },
+      notifyReady: (version) => AppMain.NotifyUpdate(version),
+    });
 
     return this;
   }
 
-  static CheckForUpdate() {
-    if (AppMain.IsDev) return false;
+  /**
+   * Notification système : une mise à jour est prête (ou disponible sous Linux).
+   * Un clic ouvre les Paramètres, où se trouve le bouton.
+   * @param {?string} version
+   */
+  static NotifyUpdate(version) {
+    if (!Notification.isSupported()) return;
 
-    let checked = false;
-    if (this.hasAutoUpdater) {
-      autoUpdater.on(
-        'update-downloaded',
-        (event, releaseNotes, releaseName) => {
-          const showDialogInfos = () => {
-            const dialogOpts = {
-              type: 'info',
-              buttons: [t('update.restart'), t('update.later')],
-              title: t('update.title'),
-              message:
-                process.platform === 'win32' ? releaseNotes : releaseName,
-              detail: t('update.downloadedDetail'),
-            };
-
-            dialog.showMessageBox(dialogOpts).then((returnValue) => {
-              if (returnValue.response === 0) {
-                // Copie de sécurité des données avant l'installation
-                try {
-                  const { FileData } = require('./src/scripts/FileData.js');
-                  backupUserData(app, FileData.BasePath);
-                } catch (e) {
-                  console.error(e);
-                }
-                // Sauvegarde des sessions (logins) avant que l'app soit tuée
-                flushSession(session.defaultSession);
-                autoUpdater.quitAndInstall();
-              }
-            });
-          };
-
-          if (Notification.isSupported()) {
-            let notification = new Notification({
-              title: t('update.downloadedNotifTitle'),
-              body: t('update.downloadedNotifBody'),
-              icon: path.join(__dirname, '/src/pictures/icon.png'),
-              urgency: 'normal',
-            });
-
-            notification.on('click', () => {
-              showDialogInfos();
-            });
-
-            notification.show();
-          } else showDialogInfos();
-        },
-      );
-      autoUpdater.on('update-available', () => {
-        if (Notification.isSupported()) {
-          new Notification({
-            title: t('update.availableNotifTitle'),
-            body: t('update.availableNotifBody'),
-            icon: path.join(__dirname, '/src/pictures/icon.png'),
-            urgency: 'normal',
-          }).show();
-        }
-      });
-
-      autoUpdater.checkForUpdates();
-      checked = true;
-    }
-
-    return checked;
+    const notification = new Notification({
+      title: t('update.downloadedNotifTitle'),
+      body: t('update.downloadedNotifBody'),
+      icon: path.join(__dirname, '/src/pictures/icon.png'),
+      urgency: 'normal',
+    });
+    notification.on('click', () => runningInstance?.event_tray_on_click());
+    notification.show();
   }
 
   /**
@@ -2035,69 +2085,6 @@ class AppMain extends BaseAppObject {
   }
 
   /**
-   * Squirrel n'existe pas sous Linux : on vérifie la dernière version publiée
-   * sur GitHub et on propose d'ouvrir la page de téléchargement. L'installation
-   * d'un paquet deb ou rpm demande les droits administrateur, elle reste donc
-   * à la charge de l'utilisateur.
-   */
-  static StartManualUpdateCheck() {
-    const repo = require('./configs/appConfig.js').releasesRepo;
-    if (AppMain.IsDev || !app.isPackaged || process.platform !== 'linux' || !repo)
-      return;
-
-    let notifiedVersion = null;
-
-    const check = async () => {
-      try {
-        const response = await net.fetch(
-          `https://api.github.com/repos/${repo}/releases/latest`,
-          { headers: { Accept: 'application/vnd.github+json' } },
-        );
-        if (!response.ok) return;
-
-        const release = await response.json();
-        const version = String(release?.tag_name ?? '').replace(/^v/i, '');
-        const page = String(release?.html_url ?? '');
-
-        // N'ouvrir que la page des versions du dépôt, jamais une URL quelconque
-        if (
-          !/^\d+(\.\d+){0,2}$/.test(version) ||
-          !page.startsWith(`https://github.com/${repo}/`) ||
-          AppMain.CompareVersions(version, app.getVersion()) <= 0 ||
-          notifiedVersion === version
-        )
-          return;
-
-        notifiedVersion = version;
-
-        const { response: choice } = await dialog.showMessageBox({
-          type: 'info',
-          buttons: [t('update.manualDownload'), t('update.later')],
-          defaultId: 0,
-          cancelId: 1,
-          title: t('update.title'),
-          message: t('update.manualMessage', {
-            version,
-            current: app.getVersion(),
-          }),
-          detail: t('update.manualDetail'),
-        });
-
-        if (choice === 0) shell.openExternal(page);
-      } catch (error) {
-        console.error('Manual update check failed', error);
-      }
-    };
-
-    check();
-    setInterval(check, MANUAL_UPDATE_INTERVAL).unref();
-  }
-
-  static get hasAutoUpdater() {
-    return !!this.InitAutoUpdater.hasAutoUpdater;
-  }
-
-  /**
    * @type {boolean}
    * @readonly
    */
@@ -2141,7 +2128,6 @@ app.on('ready', async () => {
     AppMain.InstallPermissionHandlers(session.defaultSession);
     const instance = AppMain.InitAutoUpdater().Run();
     runningInstance = instance;
-    AppMain.StartManualUpdateCheck();
 
     // Raccourci clavier global : afficher ou cacher la barre
     if (!globalShortcut.register(TOGGLE_SHORTCUT, () => instance.toggleFromOutside()))
