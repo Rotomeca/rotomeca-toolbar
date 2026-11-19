@@ -42,6 +42,18 @@ function requiredEntries(mainFile) {
   return [`/${mainPath}`, '/package.json', ...entries];
 }
 
+/** Ce que l'archive ne doit pas contenir : sources, tests et outils de développement. */
+const FORBIDDEN_FROM_ROOT = ['main.js', 'preload.js', 'settings.js', 'src', 'lib', 'tests', 'scripts', 'plan-refonte', 'build.py'];
+
+/**
+ * @param {string} mainFile Champ `main` de package.json
+ * @returns {string[]} Chemins interdits à la racine de l'archive (vide tant que le code n'est pas dans `dist/`)
+ */
+function forbiddenEntries(mainFile) {
+  const inDist = mainFile.replaceAll('\\', '/').startsWith('dist/');
+  return inDist ? FORBIDDEN_FROM_ROOT.map((entry) => `/${entry}`) : [];
+}
+
 /**
  * @param {string[]} paths Chemins renvoyés par asar (séparateur selon la plateforme)
  * @returns {Set<string>}
@@ -57,6 +69,15 @@ function normalizeAsarPaths(paths) {
  */
 function missingEntries(present, required) {
   return required.filter((entry) => !present.has(entry));
+}
+
+/**
+ * @param {Set<string>} present
+ * @param {string[]} forbidden
+ * @returns {string[]} Les chemins interdits présents (le chemin lui-même ou un de ses enfants)
+ */
+function unexpectedEntries(present, forbidden) {
+  return forbidden.filter((entry) => [...present].some((file) => file === entry || file.startsWith(`${entry}/`)));
 }
 
 /**
@@ -91,7 +112,9 @@ function main() {
   const asarFile = path.join(resources, 'app.asar');
   if (!fs.existsSync(asarFile)) throw new Error(`Archive absente : ${asarFile}`);
 
-  const missing = missingEntries(normalizeAsarPaths(asar.listPackage(asarFile)), requiredEntries(appMain));
+  const present = normalizeAsarPaths(asar.listPackage(asarFile));
+  const missing = missingEntries(present, requiredEntries(appMain));
+  const unexpected = unexpectedEntries(present, forbiddenEntries(appMain));
   // koffi 3 livre son binaire dans un paquet séparé (@koromix/koffi-<plateforme>)
   const koffiBinaries = findFiles(
     path.join(resources, 'app.asar.unpacked', 'node_modules'),
@@ -99,16 +122,17 @@ function main() {
   );
 
   for (const entry of missing) console.error(`FAIL absent de l'archive : ${entry}`);
+  for (const entry of unexpected) console.error(`FAIL ne devrait pas être embarqué : ${entry}`);
   if (koffiBinaries.length === 0) console.error(`FAIL ${KOFFI_BINARY} absent de app.asar.unpacked`);
 
-  if (missing.length > 0 || koffiBinaries.length === 0) {
+  if (missing.length > 0 || unexpected.length > 0 || koffiBinaries.length === 0) {
     process.exitCode = 1;
     return;
   }
   console.log(`OK  paquet conforme (${koffiBinaries.length} binaire(s) koffi décompressé(s))`);
 }
 
-module.exports = { requiredEntries, normalizeAsarPaths, missingEntries };
+module.exports = { requiredEntries, forbiddenEntries, normalizeAsarPaths, missingEntries, unexpectedEntries };
 
 if (require.main === module) {
   try {

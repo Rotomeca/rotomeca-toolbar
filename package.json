@@ -2,20 +2,21 @@
 	"name": "rotomecatoolbar",
 	"version": "3.4.1",
 	"description": "Application toolbar pour avoir des sites en arrière plan",
-	"main": "main.js",
+	"main": "dist/main.js",
 	"packageManager": "pnpm@10.33.0",
 	"scripts": {
-		"debug": "node scripts/dev.js",
+		"build": "node scripts/build.js",
+		"debug": "pnpm run build && node scripts/dev.js",
 		"pre-release": "node scripts/pre-release.js",
 		"lint": "eslint main.js preload.js settings.js forge.config.js src scripts tests",
 		"test": "node --test \"tests/**/*.test.js\"",
-		"smoke": "node scripts/smoke.js",
+		"smoke": "pnpm run build && node scripts/smoke.js",
 		"smoke:packaged": "node scripts/smoke.js --packaged",
 		"verify:package": "node scripts/verify-package.js",
-		"start": "electron-forge start",
-		"package": "electron-forge package",
-		"make": "electron-forge make",
-		"publish": "electron-forge publish"
+		"start": "pnpm run build && electron-forge start",
+		"package": "pnpm run build && electron-forge package",
+		"make": "pnpm run build && electron-forge make",
+		"publish": "pnpm run build && electron-forge publish"
 	},
 	"repository": {
 		"type": "git",

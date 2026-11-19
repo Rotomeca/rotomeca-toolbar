@@ -2,8 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   requiredEntries,
+  forbiddenEntries,
   normalizeAsarPaths,
   missingEntries,
+  unexpectedEntries,
 } = require('../scripts/verify-package.js');
 
 test('requiredEntries : sans dist/, les fichiers sont attendus à la racine de l archive', () => {
@@ -41,4 +43,30 @@ test('missingEntries : liste ce qui manque, et seulement cela', () => {
 
 test('missingEntries : tout manque pour une archive vide', () => {
   assert.deepEqual(missingEntries(new Set(), ['/a', '/b']), ['/a', '/b']);
+});
+
+test('forbiddenEntries : rien d\'interdit tant que le code n\'est pas dans dist/', () => {
+  assert.deepEqual(forbiddenEntries('main.js'), []);
+});
+
+test('forbiddenEntries : avec dist/, les sources et outils sont interdits à la racine', () => {
+  const forbidden = forbiddenEntries('dist/main.js');
+  for (const entry of ['/main.js', '/src', '/lib', '/tests', '/scripts', '/plan-refonte'])
+    assert.ok(forbidden.includes(entry), entry);
+  assert.ok(!forbidden.includes('/dist'));
+  assert.ok(!forbidden.includes('/node_modules'));
+});
+
+test('unexpectedEntries : repère un fichier interdit et le contenu d\'un dossier interdit', () => {
+  const present = new Set(['/dist/main.js', '/main.js', '/tests/a.test.js', '/node_modules/x/index.js']);
+  assert.deepEqual(unexpectedEntries(present, ['/main.js', '/tests', '/src']), ['/main.js', '/tests']);
+});
+
+test('unexpectedEntries : un nom qui commence pareil n\'est pas un faux positif', () => {
+  const present = new Set(['/dist/src/a.js', '/srcmap.json', '/main.jsx']);
+  assert.deepEqual(unexpectedEntries(present, ['/src', '/main.js']), []);
+});
+
+test('unexpectedEntries : archive conforme, rien à signaler', () => {
+  assert.deepEqual(unexpectedEntries(new Set(['/dist/main.js', '/package.json']), ['/main.js', '/src']), []);
 });
