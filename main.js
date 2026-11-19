@@ -74,9 +74,19 @@ const { buildTrayTooltip } = require('./src/main/tray/trayTooltip.js');
 const {
   mediaProgress,
   mediaPayload,
+  splitTaskbarPlayers,
+  changedIgnored,
+  describeNowPlaying,
 } = require('./src/main/media/mediaState.js');
 const { centeredTop } = require('./src/main/windows/placement.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
+const {
+  savedUrls,
+  removeApp,
+  moveApp,
+  insertSeparatorAfter,
+  replaceApp,
+} = require('./src/main/apps/appList.js');
 const { hardenWebContents } = require('./src/main/security/webContentsHardener.js');
 const {
   createPermissionDialog,
@@ -1219,9 +1229,7 @@ class AppMain extends BaseAppObject {
    * @returns {string[]}
    */
   event_get_saved_urls() {
-    return this.saves
-      .filter((save) => save && typeof save === 'object')
-      .map((save) => save.url);
+    return savedUrls(this.saves);
   }
 
   /**
@@ -1244,25 +1252,22 @@ class AppMain extends BaseAppObject {
 
   event_request_add_separator(_, data) {
     const url = data;
+    const insertion = insertSeparatorAfter(this.saves, url);
 
-    const index = this.saves.findIndex((x) => x.url === url);
-
-    if (index >= 0) {
-      if (index + 1 >= this.saves.length) {
-        this.toolbarWindow.webContents.postMessage(
-          pageEventList.appAdded,
-          'separator',
-        );
-        this.saves.push('separator');
-      } else {
-        this.toolbarWindow.webContents.postMessage(pageEventList.appInserted, {
-          url,
-          index,
-          data: 'separator',
-        });
-        this.saves.splice(index + 1, 0, 'separator');
-      }
+    if (insertion?.kind === 'appended') {
+      this.toolbarWindow.webContents.postMessage(
+        pageEventList.appAdded,
+        'separator',
+      );
+    } else if (insertion) {
+      this.toolbarWindow.webContents.postMessage(pageEventList.appInserted, {
+        url,
+        index: insertion.index,
+        data: 'separator',
+      });
     }
+
+    if (insertion) this.saves = [...insertion.list];
 
     this.save();
     this.toolbarWindow.focus();
@@ -1286,18 +1291,15 @@ class AppMain extends BaseAppObject {
   event_request_updated_data(_, data) {
     const clean = sanitizeAppData(data);
     const id = data?.id;
-    const target = Number.isInteger(id) ? this.saves[id] : null;
-
     // Un séparateur est une chaîne : on ne modifie que de vraies applications
-    if (!clean || !target || typeof target !== 'object') return;
+    const replaced = clean ? replaceApp(this.saves, id, clean) : null;
+
+    if (!clean || !replaced) return;
 
     this.removeWindow('add_dialog');
 
-    const oldLink = target.url;
-
-    target.name = clean.name;
-    target.url = clean.url;
-    target.picture = clean.picture;
+    const { oldLink } = replaced;
+    this.saves = [...replaced.list];
 
     this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, {
       ...clean,
@@ -1392,16 +1394,14 @@ class AppMain extends BaseAppObject {
    * de notification (un seul morceau affiché : les autres lecteurs sont ignorés).
    */
   updateTaskbar() {
-    const playing = Object.keys(this.views).filter(
-      (key) => this.views[key].media,
+    const { first, others } = splitTaskbarPlayers(
+      Object.keys(this.views).filter((key) => this.views[key].media),
     );
-    const [first, ...others] = playing;
 
     const previous = this.taskbarIgnored;
     this.taskbarIgnored = new Set(others);
-    for (const key of new Set([...previous, ...this.taskbarIgnored]))
-      if (previous.has(key) !== this.taskbarIgnored.has(key))
-        this.postIndicators(key);
+    for (const key of changedIgnored(previous, this.taskbarIgnored))
+      this.postIndicators(key);
 
     if (!this.tray || this.tray.isDestroyed()) return;
 
@@ -1410,18 +1410,11 @@ class AppMain extends BaseAppObject {
       return;
     }
 
-    const media = this.views[first].media;
-    const progress = this.getMediaProgress(media);
-    const lines = [
-      `${media.playing ? '▶' : '⏸'} ${[media.title, media.artist]
-        .filter(Boolean)
-        .join(' – ')}`,
-    ];
-    if (progress !== null) lines.push(`${Math.round(progress * 100)} %`);
-    if (others.length)
-      lines.push(t('tray.ignoredPlayers', { count: others.length }));
-
-    this.tray.setToolTip(this.trayTooltipFor(lines.join('\n')));
+    this.tray.setToolTip(
+      this.trayTooltipFor(
+        describeNowPlaying(this.views[first].media, others.length, t),
+      ),
+    );
   }
 
   // #region Media
@@ -1669,31 +1662,14 @@ class AppMain extends BaseAppObject {
 
     this.toolbarWindow.focus();
 
-    this.saves = this.saves.filter((x) => x.url !== url);
+    const { list, removedSeparators } = removeApp(this.saves, url);
+    for (const ref of removedSeparators)
+      this.toolbarWindow.webContents.postMessage(
+        pageEventList.toolbarAppSeparatorDelete,
+        ref,
+      );
 
-    let tmp = [];
-    let corrector = 0;
-    for (let index = 0, len = this.saves.length; index < len; ++index) {
-      const element = this.saves[index];
-
-      if (
-        index + 1 < len &&
-        element === 'separator' &&
-        this.saves[index + 1] === 'separator'
-      ) {
-        this.toolbarWindow.webContents.postMessage(
-          pageEventList.toolbarAppSeparatorDelete,
-          this.saves[index - (1 + corrector)].url,
-        );
-        ++corrector;
-        continue;
-      } else {
-        corrector = 0;
-        tmp.push(element);
-      }
-    }
-
-    this.saves = tmp;
+    this.saves = [...list];
 
     this.save();
   }
@@ -1729,64 +1705,23 @@ class AppMain extends BaseAppObject {
     if (typeof url !== 'string' || !['up', 'down'].includes(type)) return;
     const args = { url, type };
 
-    const index = this.saves.findIndex((x) => x.url === url);
-    if (index < 0) return;
-    const element = this.saves.splice(index, 1)[0];
-
-    let modifier = 0;
-    while (
-      this.saves[type === 'up' ? index - modifier : index + modifier] ===
-      'separator'
-    ) {
-      ++modifier;
-    }
-
-    this.saves.splice(
-      type === 'up' ? index - (1 + modifier) : index + (1 + modifier),
-      0,
-      element,
-    );
-
-    args.modifier = modifier;
+    const moved = moveApp(this.saves, url, type);
+    if (!moved) return;
 
     //On déplace l'élément
-    this.toolbarWindow.webContents.postMessage(
-      pageEventList.windowAppMovement,
-      args,
-    );
+    this.toolbarWindow.webContents.postMessage(pageEventList.windowAppMovement, {
+      ...args,
+      modifier: moved.modifier,
+    });
 
     //On supprime les separator en double
-    let tmp = [];
-    let corrector = 0;
-    for (let i = 0, len = this.saves.length; i < len; ++i) {
-      const item = this.saves[i];
+    for (const ref of moved.removedSeparators)
+      this.toolbarWindow.webContents.postMessage(
+        pageEventList.toolbarAppSeparatorDelete,
+        ref,
+      );
 
-      if (i === 0 && item === 'separator') {
-        this.toolbarWindow.webContents.postMessage(
-          pageEventList.toolbarAppSeparatorDelete,
-          0,
-        );
-        continue;
-      }
-
-      if (
-        i + 1 < len &&
-        item === 'separator' &&
-        this.saves[i + 1] === 'separator'
-      ) {
-        this.toolbarWindow.webContents.postMessage(
-          pageEventList.toolbarAppSeparatorDelete,
-          this.saves[i - (1 + corrector)].url,
-        );
-        ++corrector;
-        continue;
-      } else {
-        corrector = 0;
-        tmp.push(item);
-      }
-    }
-
-    this.saves = tmp;
+    this.saves = [...moved.list];
 
     //on sauvegarde
     this.save();

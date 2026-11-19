@@ -63,3 +63,30 @@ test('centeredTop : zone de travail décalée (écran secondaire, barre des tâc
 });
 
 // #endregion
+
+// #region Infobulle de la zone de notification
+
+const { splitTaskbarPlayers, changedIgnored, describeNowPlaying } = require('../dist/src/main/media/mediaState.js');
+const tr = (key, vars = {}) => `${key}${vars.count !== undefined ? `:${vars.count}` : ''}`;
+
+test('splitTaskbarPlayers : le premier est affiché, les autres ignorés', () => {
+  assert.deepEqual({ ...splitTaskbarPlayers(['a', 'b', 'c']) }, { first: 'a', others: ['b', 'c'] });
+  assert.equal(splitTaskbarPlayers([]).first, undefined);
+});
+
+test('changedIgnored : seulement les adresses dont l\'état change', () => {
+  assert.deepEqual(changedIgnored(new Set(['a', 'b']), new Set(['b', 'c'])).sort(), ['a', 'c']);
+  assert.deepEqual(changedIgnored(new Set(), new Set()), []);
+});
+
+test('describeNowPlaying : titre, artiste, avancement et lecteurs ignorés', () => {
+  const media = { playing: true, title: 'T', artist: 'A', duration: 200, position: 50 };
+  assert.equal(describeNowPlaying(media, 2, tr), '▶ T – A\n25 %\ntray.ignoredPlayers:2');
+});
+
+test('describeNowPlaying : en pause, sans artiste ni durée, sans ignoré', () => {
+  const media = { playing: false, title: 'T', artist: '', duration: null, position: null };
+  assert.equal(describeNowPlaying(media, 0, tr), '⏸ T');
+});
+
+// #endregion
