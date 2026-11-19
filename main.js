@@ -32,7 +32,7 @@ const {
 } = require('electron');
 
 const path = require('path');
-const { BaseAppObject } = require('./src/scripts/BaseAppObject.js');
+const { BaseAppObject } = require('./src/main/windows/BaseAppObject.js');
 const { BaseWindow } = require('electron/main');
 const {
   JsEvent,
@@ -274,9 +274,6 @@ class AppMain extends BaseAppObject {
         transparent: true,
         skipTaskbar: true,
         resizable: false,
-        nodeIntegration: false, // is default value after Electron v5
-        contextIsolation: true, // protect against prototype pollution
-        enableRemoteModule: false,
         preload: this.preloadPath, // path to your preload.js file
         file: path.join(__dirname, 'index.html'),
       })
@@ -298,9 +295,6 @@ class AppMain extends BaseAppObject {
         // useContentSize: true,
         skipTaskbar: true,
         resizable: false,
-        nodeIntegration: false, // is default value after Electron v5
-        contextIsolation: true, // protect against prototype pollution
-        enableRemoteModule: false,
         preload: this.preloadPath, // path to your preload.js file
         file: path.join(__dirname, '/src/page.taskbar/taskbar.html'),
         show: false,
@@ -329,7 +323,7 @@ class AppMain extends BaseAppObject {
         preload: this.preloadPath,
         file: path.join(__dirname, '/src/page.media/media.html'),
         show: false,
-        otherArgs: { focusable: false },
+        extra: { focusable: false },
       })
     );
   }
@@ -354,7 +348,7 @@ class AppMain extends BaseAppObject {
         preload: this.preloadPath,
         file: path.join(__dirname, '/src/page.tooltip/tooltip.html'),
         show: false,
-        otherArgs: { focusable: false },
+        extra: { focusable: false },
       });
       // Ne capte jamais la souris : elle reste sur le bouton survolé
       win.setIgnoreMouseEvents(true);
@@ -382,13 +376,10 @@ class AppMain extends BaseAppObject {
         minimizable: true,
         maximizable: false,
         icon: this.appIcon,
-        nodeIntegration: false, // is default value after Electron v5
-        contextIsolation: true, // protect against prototype pollution
-        enableRemoteModule: false,
         preload: this.preloadPath, // path to your preload.js file
         // file: path.join(__dirname, '/src/page.add/add.html'),
         show: false,
-        otherArgs: {
+        extra: {
           vibrancy: 'fullscreen-ui', // on MacOS
           backgroundMaterial: 'acrylic', // on Windows 11
         },
@@ -430,7 +421,7 @@ class AppMain extends BaseAppObject {
         preload: this.preloadPath,
         file: path.join(__dirname, '/src/page.edge/edge.html'),
         show: false,
-        otherArgs: { focusable: false, hasShadow: false },
+        extra: { focusable: false, hasShadow: false },
       })
     );
   }
@@ -1122,9 +1113,6 @@ class AppMain extends BaseAppObject {
       width: 800,
       height: 810,
       useContentSize: true,
-      nodeIntegration: false, // is default value after Electron v5
-      contextIsolation: true, // protect against prototype pollution
-      enableRemoteModule: false,
       preload: this.preloadPath, // path to your preload.js file
       file: path.join(__dirname, '/src/page.settings/settings.html'),
       show: false,

@@ -1,7 +1,7 @@
 const {
   JsEvent,
 } = require('../../lib/RotomecaWebComponents/libs/events_electron.js');
-const { BaseAppObject } = require('./BaseAppObject');
+const { BaseAppObject } = require('../main/windows/BaseAppObject.js');
 const { t } = require('./i18n');
 
 /**
