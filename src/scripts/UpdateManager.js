@@ -18,6 +18,8 @@
  * ne fait qu'afficher et déclencher « rechercher » / « mettre à jour ».
  */
 
+const { isPrerelease } = require('./versions.js');
+
 const CHECK_INTERVAL = 60 * 60 * 1000;
 
 /** Numéro de version d'une release publiée (`3.3.0`). */
@@ -55,6 +57,7 @@ function readRelease(release, repo, { allowPre = false } = {}) {
  * @property {UpdateStage} etat
  * @property {boolean} verification Vérification en cours
  * @property {string} versionActuelle
+ * @property {boolean} prerelease La version installée est une pré-version (`X.Y.Z-rcN`)
  * @property {?string} versionDisponible
  * @property {?number} pourcentage `null` : progression inconnue (Squirrel)
  * @property {?number} derniereVerification Horodatage (ms) de la dernière vérification réussie
@@ -100,6 +103,7 @@ class UpdateManager {
       etat: 'uptodate',
       verification: false,
       versionActuelle: deps.version,
+      prerelease: isPrerelease(deps.version),
       versionDisponible: null,
       pourcentage: null,
       derniereVerification: null,

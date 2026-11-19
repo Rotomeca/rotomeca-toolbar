@@ -1023,12 +1023,19 @@ class AppMain extends BaseAppObject {
    * @returns {string} L'info-bulle, complétée de l'état de la mise à jour
    */
   trayTooltipFor(text) {
-    const level = this.updateLevel;
-    if (!level) return text;
+    const lines = [text];
+    const { prerelease, versionActuelle, versionDisponible } =
+      AppMain.updater?.state ?? {};
 
-    const { versionDisponible } = AppMain.updater.state;
-    const key = level === 'ready' ? 'tray.updateReady' : 'tray.updateAvailable';
-    return `${text}\n${t(key, { version: versionDisponible ?? '' })}`;
+    if (prerelease) lines.push(t('tray.prerelease', { version: versionActuelle }));
+
+    const level = this.updateLevel;
+    if (level) {
+      const key = level === 'ready' ? 'tray.updateReady' : 'tray.updateAvailable';
+      lines.push(t(key, { version: versionDisponible ?? '' }));
+    }
+
+    return lines.join('\n');
   }
 
   /** Met à jour l'icône et l'info-bulle de la zone de notification. */

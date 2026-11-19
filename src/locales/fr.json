@@ -6,6 +6,7 @@
   "tray.ignoredPlayers": "Seul le premier lecteur est pris en compte (+{count} ignoré(s))",
   "tray.updateAvailable": "Mise à jour disponible ({version})",
   "tray.updateReady": "Mise à jour prête : redémarrez pour l'installer",
+  "tray.prerelease": "Pré-version {version}",
   "toolbar.settingsUpdateAvailable": "Paramètres · mise à jour disponible",
   "toolbar.settingsUpdateReady": "Paramètres · mise à jour prête",
 
@@ -55,6 +56,10 @@
   "update.test.errorUnavailable": "Le serveur de test ne propose pas encore cette version (mise à jour de sa liste toutes les 15 minutes). Réessayez dans un moment.",
   "update.card.title": "Mises à jour",
   "update.card.titleUpToDate": "Version {version} · à jour",
+  "update.card.prerelease": "Pré-version",
+  "update.card.prereleaseHelp": "Version de test, pas encore publiée pour tous les utilisateurs",
+  "update.card.titlePrerelease": "Version {version}",
+  "update.card.statusPrerelease": "Version de test · la version finale vous sera proposée à sa publication",
   "update.card.titleAvailable": "Version {version} disponible",
   "update.card.titleDownloading": "Mise à jour en cours…",
   "update.card.titleReady": "Version {version} prête",
