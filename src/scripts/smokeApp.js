@@ -17,6 +17,14 @@ const LOAD_TIMEOUT_MS = 20000;
 const APP_URL = 'https://example.com/';
 // Une adresse qui refuse la connexion : la vue est créée sans dépendre du réseau
 const SITE_URL = 'http://127.0.0.1:9/';
+// Liste enregistrée telle que l'écrivait la version 3.4.1 : l'application doit la relire et la conserver
+const SEEDED_LIST = [
+  { name: 'Courrier', url: 'https://mail.example.test/', picture: null },
+  { name: 'Discussion', url: 'https://chat.example.test/', picture: 'font:chat' },
+  'separator',
+  { name: 'Wiki', url: 'https://wiki.example.test/', picture: null },
+];
+const SEEDED_URLS = SEEDED_LIST.filter((entry) => entry !== 'separator').map((entry) => entry.url);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -52,6 +60,11 @@ async function checkApplication({ withTimeout }) {
   process.env.HOME = home;
   process.env.USERPROFILE = home;
 
+  const dataDir = path.join(home, '.rotomeca-toolbar-data');
+  const dataFile = path.join(dataDir, 'data.rsft');
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(dataFile, JSON.stringify(SEEDED_LIST));
+
   // Le chargement d'une adresse qui refuse la connexion est attendu : on n'en fait pas un bruit de fond
   const logError = console.error;
   console.error = (...args) => {
@@ -69,6 +82,9 @@ async function checkApplication({ withTimeout }) {
     if (toolbar.webContents.isLoading())
       await withTimeout(new Promise((resolve) => toolbar.webContents.once('did-finish-load', resolve)), LOAD_TIMEOUT_MS, 'page de la barre');
     await sleep(PAGE_SETTLE_MS);
+    // Chemin réel du démarrage : la barre reçoit la liste enregistrée
+    await instance.sendInitialState();
+    await sleep(PAGE_SETTLE_MS);
 
     const invoke = (channel, ...args) =>
       toolbar.webContents.executeJavaScript(
@@ -83,16 +99,18 @@ async function checkApplication({ withTimeout }) {
     };
 
     expect('getVersion', await invoke(appEventList.getVersion), app.getVersion());
-    expect('getSavedUrls (vide)', await invoke(appEventList.getSavedUrls), []);
+    expect('getSavedUrls (liste de la 3.4.1)', await invoke(appEventList.getSavedUrls), SEEDED_URLS);
+    expect('boutons affichés depuis la liste de la 3.4.1', await count('rotomeca-toolbar-button'), 3);
+    expect('séparateurs affichés depuis la liste de la 3.4.1', await count('#apps .separator'), 2);
     expect('requestAddData', await invoke(appEventList.requestAddData, { name: 'Exemple', url: APP_URL }), true);
     expect('requestAddData (adresse dangereuse)', await invoke(appEventList.requestAddData, { url: 'javascript:alert(1)' }), false);
-    expect('getSavedUrls', await invoke(appEventList.getSavedUrls), [APP_URL]);
+    expect('getSavedUrls', await invoke(appEventList.getSavedUrls), [...SEEDED_URLS, APP_URL]);
     await sleep(PAGE_SETTLE_MS / 2);
-    expect('boutons de la barre après ajout', await count('rotomeca-toolbar-button'), 1);
+    expect('boutons de la barre après ajout', await count('rotomeca-toolbar-button'), 4);
     await invoke(appEventList.requestAddSeparator, APP_URL);
-    expect('getSavedUrls (séparateur)', await invoke(appEventList.getSavedUrls), [APP_URL]);
+    expect('getSavedUrls (séparateur)', await invoke(appEventList.getSavedUrls), [...SEEDED_URLS, APP_URL]);
     await sleep(PAGE_SETTLE_MS / 2);
-    expect('séparateurs de la barre', await count('#apps .separator'), 2);
+    expect('séparateurs de la barre', await count('#apps .separator'), 3);
     expect('isAppBarSupported', typeof (await invoke(appEventList.isAppBarSupported)), 'boolean');
 
     const displays = await invoke(appEventList.getDisplays);
@@ -114,15 +132,19 @@ async function checkApplication({ withTimeout }) {
     });
 
     await invoke(appEventList.appDelete, APP_URL);
-    expect('getSavedUrls (après suppression)', await invoke(appEventList.getSavedUrls), []);
+    expect('getSavedUrls (après suppression)', await invoke(appEventList.getSavedUrls), SEEDED_URLS);
     await sleep(PAGE_SETTLE_MS / 2);
-    expect('boutons de la barre après suppression', await count('rotomeca-toolbar-button'), 0);
+    expect('boutons de la barre après suppression', await count('rotomeca-toolbar-button'), 3);
 
     // Laisse finir le chargement des fenêtres créées en route avant de quitter
     await sleep(PAGE_SETTLE_MS);
 
-    const dataFile = path.join(home, '.rotomeca-toolbar-data', 'data.rsft');
-    if (!fs.existsSync(dataFile)) problems.push('la liste des applications n\'a pas été enregistrée');
+    // Les entrées d'origine (séparateur et icône de police compris) doivent être réécrites sans altération
+    const saved = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    const preserved = Array.isArray(saved)
+      ? SEEDED_LIST.filter((seed) => saved.some((entry) => JSON.stringify(entry) === JSON.stringify(seed))).length
+      : 0;
+    expect('liste réécrite : entrées de la 3.4.1 conservées', preserved, SEEDED_LIST.length);
   } catch (error) {
     problems.push(error.message);
   } finally {
