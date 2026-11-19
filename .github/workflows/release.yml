@@ -1,9 +1,14 @@
 name: Release
 
 # Déclenché par un tag de version (ex: 2.1.0) poussé, typiquement sur main
-# après `git flow release finish`. Le serveur Hazel (Vercel) lit ensuite
-# la dernière release GitHub pour proposer la mise à jour via Squirrel.
-# La release contient Windows (Squirrel) et Linux (deb + rpm).
+# après `git flow release finish`. La release contient Windows (Squirrel) et
+# Linux (deb + rpm).
+#
+# Publication en deux temps : la release est créée en PRÉ-VERSION, que le serveur
+# Hazel (Vercel) et `releases/latest` ignorent : personne ne la reçoit
+# automatiquement. On la teste (Paramètres > Version de test), puis on la publie
+# avec le workflow « Promote release ». Une release déjà publiée n'est pas
+# repassée en pré-version par un nouveau passage de ce workflow.
 on:
   push:
     tags:
@@ -18,7 +23,33 @@ permissions:
   contents: write
 
 jobs:
+  # Garde-fou : aucune release n'est construite si le lint ou les tests échouent.
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Tests
+        run: pnpm run test
+
   build:
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -138,5 +169,6 @@ jobs:
             gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
             gh release create "$TAG" "${FILES[@]}" \
-              --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
+              --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag \
+              --prerelease
           fi

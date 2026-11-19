@@ -3,7 +3,7 @@ const path = require('path');
 
 // NE JAMAIS MODIFIER : changer ce nom ferait perdre les sessions/cookies/localStorage
 const USER_DATA_NAME = 'rotomecatoolbar';
-const DATA_FILES = ['data.rsft', 'settings.rcft'];
+const DATA_FILES = ['data.rsft', 'settings.rcft', 'permissions.rcft'];
 // Un an : les cookies de session deviennent persistants pour garder les logins
 const COOKIE_LIFETIME_SECONDS = 60 * 60 * 24 * 365;
 
@@ -42,7 +42,9 @@ function migrateLegacyData(app, dataDir) {
       for (const entry of fs.readdirSync(root)) {
         if (/^app-\d/.test(entry)) candidates.add(path.join(root, entry));
       }
-    } catch (e) {}
+    } catch (e) {
+      // Dossier parent illisible : on continue sans versions voisines
+    }
 
     fs.mkdirSync(dataDir, { recursive: true });
 
@@ -57,7 +59,9 @@ function migrateLegacyData(app, dataDir) {
           const stat = fs.statSync(source);
           if (stat.isFile() && (!best || stat.mtimeMs > best.mtimeMs))
             best = { source, mtimeMs: stat.mtimeMs };
-        } catch (e) {}
+        } catch (e) {
+          // Fichier absent dans cette version : on passe à la suivante
+        }
       }
 
       if (best) fs.copyFileSync(best.source, target);

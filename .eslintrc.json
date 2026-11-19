@@ -1,14 +1,21 @@
 {
   "env": {
     "browser": true,
-    "es6": true,
+    "es2022": true,
     "node": true
   },
   "extends": ["eslint:recommended"],
   "parserOptions": {
-    "ecmaVersion": 2020,
+    "ecmaVersion": 2022,
     "sourceType": "module"
   },
+  "overrides": [
+    {
+      "files": ["./main.js"],
+      "parserOptions": { "sourceType": "script" },
+      "env": { "node": true }
+    }
+  ],
   "rules": {
     "no-unsafe-optional-chaining": "off",
     "no-debugger": 1,

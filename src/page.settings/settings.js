@@ -458,6 +458,64 @@ export class PageSettings {
   }
 
   /**
+   * Affiche un statut texte, avec une icône d'alerte en cas d'erreur.
+   * @param {HTMLElement} target
+   * @param {string} text
+   * @param {boolean} [error]
+   */
+  #setStatus(target, text, error = false) {
+    target.replaceChildren();
+    target.classList.toggle('erreur', error);
+    if (error) {
+      const alert = document.createElement('rds-icon');
+      alert.setAttribute('name', 'circle-alert');
+      alert.setAttribute('aria-hidden', 'true');
+      target.append(alert);
+    }
+    target.append(text);
+  }
+
+  /**
+   * Bloc « Version de test » : cherche une pré-version, puis ouvre sa page
+   * (téléchargement manuel). L'état vient du même message que la carte de mises à jour.
+   */
+  async #initTestChannel() {
+    const t = window.api.t;
+    const status = document.querySelector('#test-etat');
+    const checkButton = document.querySelector('#test-rechercher');
+    const openButton = document.querySelector('#test-telecharger');
+
+    const render = (state) => {
+      checkButton.loading = state.verificationTest;
+      // Pendant un téléchargement ou une installation prête, la carte de mises à jour prend le relais
+      openButton.hidden =
+        !state.versionTest || ['downloading', 'ready'].includes(state.etat);
+      if (state.versionTest)
+        openButton.textContent = t(
+          state.testAuto ? 'update.test.install' : 'update.test.open',
+          { version: state.versionTest },
+        );
+
+      if (state.erreurTest) this.#setStatus(status, t(state.erreurTest), true);
+      else if (state.versionTest)
+        this.#setStatus(status, t('update.test.found', { version: state.versionTest }));
+      else if (state.derniereVerificationTest)
+        this.#setStatus(status, t('update.test.none'));
+      else this.#setStatus(status, '');
+    };
+
+    checkButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateCheckTest),
+    );
+    openButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateInstallTest),
+    );
+
+    window.api.on(pageEventList.updateState, (_, next) => render(next));
+    render(await window.api.invoke(appEventList.updateGetState));
+  }
+
+  /**
    * Carte « Mises à jour » : le processus principal envoie l'état complet à chaque
    * changement, la page n'affiche que cet état et renvoie deux actions.
    */
@@ -485,17 +543,8 @@ export class PageSettings {
       return t('update.card.lastHours', { n: Math.floor(minutes / 60) });
     };
 
-    const setStatus = (text, error = false) => {
-      status.replaceChildren();
-      status.classList.toggle('erreur', error);
-      if (error) {
-        const alert = document.createElement('rds-icon');
-        alert.setAttribute('name', 'circle-alert');
-        alert.setAttribute('aria-hidden', 'true');
-        status.append(alert);
-      }
-      status.append(text);
-    };
+    const setStatus = (text, error = false) =>
+      this.#setStatus(status, text, error);
 
     const render = () => {
       const stage = state.etat;
@@ -573,6 +622,65 @@ export class PageSettings {
     setInterval(() => state && !state.erreur && render(), 60000);
   }
 
+  /**
+   * Section « Permissions des sites » : liste des décisions mémorisées, avec
+   * révocation une à une ou en bloc. Les origines viennent de sites tiers :
+   * elles ne sont insérées que via `textContent`.
+   */
+  async #initPermissions() {
+    const t = window.api.t;
+    const list = document.querySelector('#perm-list');
+    const empty = document.querySelector('#perm-empty');
+    const clearButton = document.querySelector('#perm-clear');
+
+    const render = (decisions) => {
+      list.replaceChildren();
+
+      for (const { origin, permission, allowed } of decisions) {
+        const kind = t(`permissions.kind.${permission}`);
+
+        const item = document.createElement('li');
+
+        const info = document.createElement('div');
+        info.className = 'perm-info';
+        const originLabel = document.createElement('span');
+        originLabel.className = 'perm-origin';
+        originLabel.textContent = origin;
+        originLabel.title = origin;
+        const kindLabel = document.createElement('span');
+        kindLabel.className = 'perm-kind';
+        kindLabel.textContent = kind;
+        info.append(originLabel, kindLabel);
+
+        const state = document.createElement('span');
+        state.className = 'perm-state';
+        state.dataset.allowed = String(allowed);
+        state.textContent = t(allowed ? 'permissions.allowed' : 'permissions.denied');
+
+        const revoke = document.createElement('rds-button');
+        revoke.setAttribute('variant', 'tertiary');
+        revoke.setAttribute('icon-before', 'trash-2');
+        revoke.setAttribute('aria-label', t('permissions.revokeLabel', { kind, origin }));
+        revoke.textContent = t('permissions.revoke');
+        revoke.addEventListener('click', async () =>
+          render(await window.api.invoke(appEventList.permissionRevoke, { origin, permission })),
+        );
+
+        item.append(info, state, revoke);
+        list.append(item);
+      }
+
+      empty.hidden = decisions.length > 0;
+      clearButton.hidden = decisions.length === 0;
+    };
+
+    clearButton.addEventListener('click', async () =>
+      render(await window.api.invoke(appEventList.permissionsClear)),
+    );
+
+    render(await window.api.invoke(appEventList.permissionsList));
+  }
+
   async main() {
     window.api.on(pageEventList.settingsStart, async (_, path) => {
       console.log('path', path);
@@ -600,6 +708,8 @@ export class PageSettings {
       await this.#initMode();
       await this.#initTheme();
       await this.#initUpdates();
+      await this.#initTestChannel();
+      await this.#initPermissions();
     });
   }
 }

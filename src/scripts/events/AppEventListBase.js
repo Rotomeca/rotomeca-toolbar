@@ -1,6 +1,8 @@
 /**
+ * Base concaténée par le build : `appEventList` est utilisée par les variantes.
  * @enum {string}
  */
+// eslint-disable-next-line no-unused-vars
 const appEventList = Object.freeze({
   toggleToolbar: 'toggleToolbar',
   requestAdd: 'requestAdd',
@@ -29,6 +31,7 @@ const appEventList = Object.freeze({
   rotomecaContextMenu: 'rotomeca-context-menu',
   edgeEnter: 'edgeEnter',
   requestToggle: 'requestToggle',
+  openSettings: 'openSettings',
   tooltipShow: 'tooltipShow',
   tooltipHide: 'tooltipHide',
   getSavedUrls: 'getSavedUrls',
@@ -36,4 +39,9 @@ const appEventList = Object.freeze({
   updateGetState: 'updateGetState',
   updateCheck: 'updateCheck',
   updateInstall: 'updateInstall',
+  permissionsList: 'permissionsList',
+  permissionRevoke: 'permissionRevoke',
+  permissionsClear: 'permissionsClear',
+  updateCheckTest: 'updateCheckTest',
+  updateInstallTest: 'updateInstallTest',
 });

@@ -41,6 +41,11 @@ const INVOKE_CHANNELS = new Set([
   'updateGetState',
   'updateCheck',
   'updateInstall',
+  'permissionsList',
+  'permissionRevoke',
+  'permissionsClear',
+  'updateCheckTest',
+  'updateInstallTest',
 ]);
 
 /** Canaux envoyés par le process principal vers le renderer */

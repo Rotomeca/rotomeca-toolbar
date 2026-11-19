@@ -44,6 +44,12 @@ const { t, getLocale, getDictionary } = require('./src/scripts/i18n.js');
 const { pageEventList } = require('./src/scripts/events/PageEventList.js');
 const { AppBar } = require('./src/scripts/AppBar.js');
 const { UpdateManager } = require('./src/scripts/UpdateManager.js');
+const { PermissionStore } = require('./src/scripts/PermissionStore.js');
+const {
+  createPermissionPolicy,
+} = require('./src/scripts/permissionPolicy.js');
+const { compareVersions } = require('./src/scripts/versions.js');
+const { isSafeUrl } = require('./src/scripts/safeUrl.js');
 const {
   parseUnreadCount,
   sanitizeMediaState,
@@ -309,7 +315,7 @@ class AppMain extends BaseAppObject {
     if (!this.getWindow('add_dialog')) {
       // app.files =
       //   fs.readFileSync('./configs/config.json')?.toString?.() ?? 'null';
-      const win = this.createBrowserWindow('add_dialog', {
+      this.createBrowserWindow('add_dialog', {
         title: t('window.add'),
         ...this.layout.addDialog,
         transparent: false,
@@ -548,6 +554,23 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.updateGetState, () => AppMain.updater.state)
       .addEventListener(appEventList.updateCheck, () => AppMain.updater.check())
+      .addEventListener(appEventList.updateCheckTest, () =>
+        AppMain.updater.checkTest(),
+      )
+      .addEventListener(appEventList.updateInstallTest, () =>
+        AppMain.updater.installTest(),
+      )
+      .addEventListener(appEventList.permissionsList, () =>
+        AppMain.permissions.list(),
+      )
+      .addEventListener(appEventList.permissionRevoke, (_, decision) => {
+        AppMain.permissions.revoke(decision?.origin, decision?.permission);
+        return AppMain.permissions.list();
+      })
+      .addEventListener(appEventList.permissionsClear, () => {
+        AppMain.permissions.clear();
+        return AppMain.permissions.list();
+      })
       .addEventListener(appEventList.updateInstall, () => AppMain.updater.install())
       .addEventListener(appEventList.isAppBarSupported, () => AppBar.isSupported)
       .addEventListener(appEventList.getDisplays, () => this.getDisplaysInfo())
@@ -926,8 +949,8 @@ class AppMain extends BaseAppObject {
               }.bind(this, x.id),
             };
           });
-          const menu = Menu.buildFromTemplate(windows);
-          this.tray.popUpContextMenu(menu);
+          const devMenu = Menu.buildFromTemplate(windows);
+          this.tray.popUpContextMenu(devMenu);
         },
       });
     }
@@ -1048,7 +1071,7 @@ class AppMain extends BaseAppObject {
       title: t('window.settings'),
       icon: this.appIcon,
       width: 800,
-      height: 1020,
+      height: 810,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
@@ -1567,8 +1590,13 @@ class AppMain extends BaseAppObject {
 
     if (!this.views[url]) {
       // Session par défaut (persistante) : on ne vide jamais son stockage
+      // Site tiers : bac à sable et isolation explicites (défauts d'Electron,
+      // mais ici la frontière de sécurité de l'application).
       const view = new WebContentsView({
         webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
           preload: path.join(__dirname, './src/scripts/media/media-preload.js'),
         },
       });
@@ -1711,10 +1739,10 @@ class AppMain extends BaseAppObject {
     //On supprime les separator en double
     let tmp = [];
     let corrector = 0;
-    for (let index = 0, len = this.saves.length; index < len; ++index) {
-      const element = this.saves[index];
+    for (let i = 0, len = this.saves.length; i < len; ++i) {
+      const item = this.saves[i];
 
-      if (index === 0 && element === 'separator') {
+      if (i === 0 && item === 'separator') {
         this.toolbarWindow.webContents.postMessage(
           pageEventList.toolbarAppSeparatorDelete,
           0,
@@ -1723,19 +1751,19 @@ class AppMain extends BaseAppObject {
       }
 
       if (
-        index + 1 < len &&
-        element === 'separator' &&
-        this.saves[index + 1] === 'separator'
+        i + 1 < len &&
+        item === 'separator' &&
+        this.saves[i + 1] === 'separator'
       ) {
         this.toolbarWindow.webContents.postMessage(
           pageEventList.toolbarAppSeparatorDelete,
-          this.saves[index - (1 + corrector)].url,
+          this.saves[i - (1 + corrector)].url,
         );
         ++corrector;
         continue;
       } else {
         corrector = 0;
-        tmp.push(element);
+        tmp.push(item);
       }
     }
 
@@ -1858,20 +1886,24 @@ class AppMain extends BaseAppObject {
    * vérification GitHub sous Linux). La vérification démarre dans `main()`.
    */
   static InitAutoUpdater() {
-    const { feedUrl, releasesRepo } = require('./configs/appConfig.js');
+    const { feedUrl, testFeedUrl, releasesRepo } = require('./configs/appConfig.js');
     const simulate = AppMain.IsDev && process.env.RTB_UPDATE_SIMULATE === '1';
     const packaged = !AppMain.IsDev && app.isPackaged;
     const squirrel = packaged && ['win32', 'darwin'].includes(process.platform);
 
-    if (squirrel && feedUrl) {
+    // Serveur Hazel normal (versions publiées) ou serveur de test (pré-versions seulement)
+    const setFeed = (channel) =>
       autoUpdater.setFeedURL({
-        url: `${feedUrl}/update/${process.platform}/${app.getVersion()}`,
+        url: `${channel === 'test' ? testFeedUrl : feedUrl}/update/${process.platform}/${app.getVersion()}`,
       });
-    }
+
+    if (squirrel && feedUrl) setFeed('stable');
 
     AppMain.updater = new UpdateManager({
       version: app.getVersion(),
       autoUpdater: squirrel && feedUrl ? autoUpdater : null,
+      setFeed,
+      testFeed: !!testFeedUrl,
       releasesRepo,
       manual: packaged && process.platform === 'linux',
       simulate,
@@ -1895,7 +1927,7 @@ class AppMain extends BaseAppObject {
         }
         runningInstance?.refreshTrayUpdate();
       },
-      notifyReady: (version) => AppMain.NotifyUpdate(version),
+      notifyReady: () => AppMain.NotifyUpdate(),
     });
 
     return this;
@@ -1904,9 +1936,8 @@ class AppMain extends BaseAppObject {
   /**
    * Notification système : une mise à jour est prête (ou disponible sous Linux).
    * Un clic ouvre les Paramètres, où se trouve le bouton.
-   * @param {?string} version
    */
-  static NotifyUpdate(version) {
+  static NotifyUpdate() {
     if (!Notification.isSupported()) return;
 
     const notification = new Notification({
@@ -1924,11 +1955,7 @@ class AppMain extends BaseAppObject {
    * @readonly
    */
   static IsSafeUrl(url) {
-    try {
-      return ['http:', 'https:'].includes(new URL(url).protocol);
-    } catch (error) {
-      return false;
-    }
+    return isSafeUrl(url);
   }
 
   /**
@@ -1997,68 +2024,39 @@ class AppMain extends BaseAppObject {
   /**
    * Politique de permissions des sites tiers (session par défaut).
    * Les permissions sensibles (caméra/micro, localisation) demandent
-   * une confirmation, mémorisée pour la durée de l'exécution.
+   * une confirmation ; la réponse est mémorisée durablement et révocable
+   * depuis les Paramètres.
    * @param {Electron.Session} ses
+   * @param {PermissionStore} store
    */
-  static InstallPermissionHandlers(ses) {
-    const ALLOWED = new Set([
-      'notifications',
-      'fullscreen',
-      'pointerLock',
-      'clipboard-sanitized-write',
-      'mediaKeySystem', // DRM (Spotify, Netflix...)
-      'speaker-selection',
-    ]);
-    const ASK = new Set(['media', 'geolocation']);
+  static InstallPermissionHandlers(ses, store) {
     const LABELS = {
       media: 'permission.media',
       geolocation: 'permission.geolocation',
     };
-    /** @type {Map<string, boolean>} */
-    const decisions = new Map();
 
-    const originOf = (url) => {
-      try {
-        return new URL(url).origin;
-      } catch (error) {
-        return null;
-      }
-    };
-
-    ses.setPermissionCheckHandler((_, permission, requestingOrigin) => {
-      if (ALLOWED.has(permission)) return true;
-      if (ASK.has(permission))
-        return decisions.get(`${requestingOrigin}|${permission}`) === true;
-      return false;
+    const policy = createPermissionPolicy({
+      store,
+      isSafeUrl: AppMain.IsSafeUrl,
+      ask: async (origin, permission) => {
+        const { response } = await dialog.showMessageBox({
+          type: 'question',
+          buttons: [t('permission.allow'), t('permission.deny')],
+          defaultId: 1,
+          cancelId: 1,
+          title: t('permission.title'),
+          message: t('permission.message', {
+            origin,
+            action: t(LABELS[permission]),
+          }),
+          detail: t('permission.remembered'),
+        });
+        return response === 0;
+      },
     });
 
-    ses.setPermissionRequestHandler(
-      async (contents, permission, callback, details) => {
-        if (ALLOWED.has(permission)) return callback(true);
-        if (!ASK.has(permission)) return callback(false);
-
-        const origin = originOf(details?.requestingUrl ?? contents?.getURL());
-        if (!origin || !AppMain.IsSafeUrl(origin)) return callback(false);
-
-        const key = `${origin}|${permission}`;
-        if (!decisions.has(key)) {
-          const { response } = await dialog.showMessageBox({
-            type: 'question',
-            buttons: [t('permission.allow'), t('permission.deny')],
-            defaultId: 1,
-            cancelId: 1,
-            title: t('permission.title'),
-            message: t('permission.message', {
-              origin,
-              action: t(LABELS[permission]),
-            }),
-          });
-          decisions.set(key, response === 0);
-        }
-
-        callback(decisions.get(key));
-      },
-    );
+    ses.setPermissionCheckHandler(policy.check);
+    ses.setPermissionRequestHandler(policy.request);
   }
 
   /**
@@ -2068,20 +2066,7 @@ class AppMain extends BaseAppObject {
    * @returns {number} > 0 si `a` est plus récente que `b`
    */
   static CompareVersions(a, b) {
-    const parse = (v) =>
-      String(v)
-        .replace(/^v/i, '')
-        .split('.')
-        .map((n) => parseInt(n, 10) || 0);
-    const left = parse(a);
-    const right = parse(b);
-
-    for (let i = 0; i < Math.max(left.length, right.length); ++i) {
-      const diff = (left[i] ?? 0) - (right[i] ?? 0);
-      if (diff !== 0) return diff;
-    }
-
-    return 0;
+    return compareVersions(a, b);
   }
 
   /**
@@ -2125,7 +2110,15 @@ app.on('ready', async () => {
     migrateLegacyData(app, FileData.BasePath);
     restoreFromBackup(FileData.BasePath);
     keepLoginsAlive(session.defaultSession, app);
-    AppMain.InstallPermissionHandlers(session.defaultSession);
+    const permissionFile = new FileData('permissions.rcft');
+    AppMain.permissions = new PermissionStore({
+      load: () => permissionFile.load(),
+      save: (data) => permissionFile.save(data),
+    });
+    AppMain.InstallPermissionHandlers(
+      session.defaultSession,
+      AppMain.permissions,
+    );
     const instance = AppMain.InitAutoUpdater().Run();
     runningInstance = instance;
 
@@ -2142,7 +2135,7 @@ app.on('ready', async () => {
       // detail: error.stack,
     };
 
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {});
+    dialog.showMessageBox(dialogOpts);
   }
 });
 

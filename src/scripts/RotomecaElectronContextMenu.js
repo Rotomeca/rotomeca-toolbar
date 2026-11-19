@@ -63,7 +63,9 @@ class ElectronContextMenu {
       function (id) {
         try {
           delete this.#_window.rotomeca.contextMenu;
-        } catch (error) {}
+        } catch (error) {
+          // Fenêtre déjà détruite : rien à nettoyer
+        }
         delete _listeners[id];
       }.bind(this, this.id),
     );
