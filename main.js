@@ -85,7 +85,8 @@ const {
   changedIgnored,
   describeNowPlaying,
 } = require('./src/main/media/mediaState.js');
-const { centeredTop } = require('./src/main/windows/placement.js');
+const { MediaPopup } = require('./src/main/media/MediaPopup.js');
+const { TooltipPopup } = require('./src/main/tooltip/TooltipPopup.js');
 const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const {
   ContextMenuController,
@@ -162,8 +163,6 @@ class AppMain extends BaseAppObject {
     this.contextMenu;
     /** Apps dont le son est coupé (conservé tant que l'application tourne) */
     this.mutedUrls = new Set();
-    this.mediaHoverUrl = null;
-    this.mediaHideTimer = null;
     /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
     this.taskbarIgnored = new Set();
   }
@@ -589,8 +588,10 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.openSettings, () =>
         this.event_tray_on_click(),
       )
-      .addEventListener(appEventList.tooltipShow, this.event_tooltip_show.bind(this))
-      .addEventListener(appEventList.tooltipHide, () => this.hideTooltip())
+      .addEventListener(appEventList.tooltipShow, (_, args) =>
+        this.tooltipPopup.show(args),
+      )
+      .addEventListener(appEventList.tooltipHide, () => this.tooltipPopup.hide())
       .addEventListener(appEventList.getSeasonInfo, () =>
         require('./src/scripts/Seasons.js').seasonInfo(),
       )
@@ -623,7 +624,10 @@ class AppMain extends BaseAppObject {
         appEventList.mediaControl,
         this.event_media_control.bind(this),
       )
-      .addEventListener(appEventList.mediaHover, this.event_media_hover.bind(this));
+      .addEventListener(appEventList.mediaHover, (_, args) => {
+        const { url, hovering, y } = args ?? {};
+        this.mediaPopup.hover(url, !!hovering, y);
+      });
 
     // Envoyé par le preload des sites (pas par nos pages locales)
     ipcMain.on(internalChannels.mediaState, this.event_media_state.bind(this));
@@ -899,7 +903,7 @@ class AppMain extends BaseAppObject {
       });
     }
 
-    this.hideMediaPopup();
+    this.mediaPopup.hide();
   }
 
   initContextMenu() {
@@ -1112,8 +1116,8 @@ class AppMain extends BaseAppObject {
       this.appsWindow.hide();
       // Ancrée, la barre reste affichée mais réduite à un rail fin
       if (!this.settingIsAppBar) this.toolbarWindow.hide();
-      this.hideMediaPopup();
-      this.hideTooltip();
+      this.mediaPopup.hide();
+      this.tooltipPopup.hide();
       this.toolbarWindow.webContents.postMessage(
         pageEventList.windowAppsClosed,
         true,
@@ -1315,7 +1319,7 @@ class AppMain extends BaseAppObject {
 
   sendIndicators(url) {
     this.postIndicators(url);
-    this.pushMediaState(url);
+    this.mediaPopup.refresh(url);
     this.updateTaskbar();
   }
 
@@ -1382,63 +1386,6 @@ class AppMain extends BaseAppObject {
   }
 
   /**
-   * Envoie un message à la fenêtre média, une fois sa page chargée.
-   */
-  sendToMediaWindow(channel, payload) {
-    const win = this.mediaWindow;
-
-    if (win.webContents.isLoading())
-      win.webContents.once('did-finish-load', () =>
-        win.webContents.postMessage(channel, payload),
-      );
-    else win.webContents.postMessage(channel, payload);
-  }
-
-  /**
-   * Met à jour la fenêtre média si elle est affichée pour cette application.
-   */
-  pushMediaState(url) {
-    if (this.mediaHoverUrl !== url) return;
-
-    const win = this.getWindow('media');
-    if (!win || !win.isVisible()) return;
-
-    const payload = this.getMediaPayload(url);
-
-    if (payload) this.sendToMediaWindow(pageEventList.mediaState, payload);
-    else this.hideMediaPopup();
-  }
-
-  /**
-   * @param {string} url
-   * @param {number} centerY Milieu vertical du bouton dans la toolbar
-   */
-  showMediaPopup(url, centerY) {
-    const payload = this.getMediaPayload(url);
-    if (!payload) return;
-
-    const toolbar = this.toolbarWindow.getBounds();
-    const wa = this.workArea;
-    const y = centeredTop(toolbar.y + centerY, MEDIA_POPUP_HEIGHT, wa);
-
-    this.mediaHoverUrl = url;
-    this.mediaWindow.setPosition(
-      Math.round(toolbar.x + toolbar.width + 10),
-      Math.round(y),
-    );
-    this.sendToMediaWindow(pageEventList.mediaState, payload);
-    this.mediaWindow.showInactive();
-  }
-
-  hideMediaPopup() {
-    clearTimeout(this.mediaHideTimer);
-    this.mediaHoverUrl = null;
-
-    const win = this.getWindow('media');
-    if (win && win.isVisible()) win.hide();
-  }
-
-  /**
    * Reçoit le morceau en cours d'un site (depuis son preload).
    */
   event_media_state(event, raw) {
@@ -1453,34 +1400,43 @@ class AppMain extends BaseAppObject {
   }
 
   /**
-   * Affiche l'infobulle à droite de la barre, centrée sur le bouton.
-   * @param {*} _
-   * @param {{text: string, badge: ?string, y: number}} args
+   * Fenêtre flottante du morceau en cours, affichée au survol d'un bouton.
+   * @type {MediaPopup}
    */
-  event_tooltip_show(_, { text, badge, y } = {}) {
-    if (typeof text !== 'string' || text === '' || typeof y !== 'number')
-      return;
+  get mediaPopup() {
+    this._mediaPopup ??= new MediaPopup({
+      window: () => this.mediaWindow,
+      existingWindow: () => this.getWindow('media'),
+      payloadFor: (url) => this.getMediaPayload(url),
+      toolbarBounds: () => this.toolbarWindow.getBounds(),
+      workArea: () => this.workArea,
+      scheduler: {
+        setTimeout: (callback, delay) => setTimeout(callback, delay),
+        clearTimeout: (handle) => clearTimeout(handle),
+      },
+      height: MEDIA_POPUP_HEIGHT,
+      hideDelayMs: MEDIA_POPUP_HIDE_DELAY,
+      stateChannel: pageEventList.mediaState,
+    });
 
-    const toolbar = this.toolbarWindow.getBounds();
-    const wa = this.workArea;
-    const top = centeredTop(toolbar.y + y, TOOLTIP_HEIGHT, wa);
+    return this._mediaPopup;
+  }
 
-    const win = this.tooltipWindow;
-    win.setPosition(
-      Math.round(toolbar.x + toolbar.width + 8),
-      Math.round(top),
-    );
+  /**
+   * Infobulle affichée à droite de la barre, au survol d'un bouton.
+   * @type {TooltipPopup}
+   */
+  get tooltipPopup() {
+    this._tooltipPopup ??= new TooltipPopup({
+      window: () => this.tooltipWindow,
+      existingWindow: () => this.getWindow('tooltip'),
+      toolbarBounds: () => this.toolbarWindow.getBounds(),
+      workArea: () => this.workArea,
+      height: TOOLTIP_HEIGHT,
+      stateChannel: pageEventList.tooltipState,
+    });
 
-    const payload = {
-      text: text.slice(0, 200),
-      badge: typeof badge === 'string' ? badge.slice(0, 10) : null,
-    };
-    const send = () =>
-      win.webContents.postMessage(pageEventList.tooltipState, payload);
-    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
-    else send();
-
-    win.showInactive();
+    return this._tooltipPopup;
   }
 
   /**
@@ -1499,24 +1455,6 @@ class AppMain extends BaseAppObject {
     powerMonitor.on('resume', check);
   }
 
-  hideTooltip() {
-    const win = this.getWindow('tooltip');
-    if (win && !win.isDestroyed() && win.isVisible()) win.hide();
-  }
-
-  event_media_hover(_, { url, hovering, y } = {}) {
-    clearTimeout(this.mediaHideTimer);
-
-    if (hovering) {
-      if (typeof url === 'string' && typeof y === 'number')
-        this.showMediaPopup(url, y);
-    } else
-      this.mediaHideTimer = setTimeout(
-        () => this.hideMediaPopup(),
-        MEDIA_POPUP_HIDE_DELAY,
-      );
-  }
-
   event_media_control(_, { url, action } = {}) {
     const entry = this.views[url];
     if (!entry?.media || !MEDIA_ACTIONS.includes(action)) return;
@@ -1526,7 +1464,7 @@ class AppMain extends BaseAppObject {
     // Retour immédiat : la page confirmera dans la seconde qui suit
     if (action === 'play' || action === 'pause') {
       entry.media.playing = action === 'play';
-      this.pushMediaState(url);
+      this.mediaPopup.refresh(url);
     }
   }
 
