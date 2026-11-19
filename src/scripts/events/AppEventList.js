@@ -40,5 +40,7 @@ const appEventList = Object.freeze({
   permissionsList: 'permissionsList',
   permissionRevoke: 'permissionRevoke',
   permissionsClear: 'permissionsClear',
+  updateCheckTest: 'updateCheckTest',
+  updateInstallTest: 'updateInstallTest',
 });
  module.exports = { appEventList };

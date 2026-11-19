@@ -1,0 +1,51 @@
+name: Promote release
+
+# À lancer à la main (onglet Actions) une fois la pré-version testée.
+# Hazel (mises à jour Windows) et « releases/latest » (avis Linux) ne voient que
+# les releases qui ne sont pas des pré-versions :
+#   - promote : publie la release, tous les utilisateurs la recevront ;
+#   - demote  : la repasse en pré-version, elle n'est plus proposée à ceux qui
+#               n'ont pas encore mis à jour (ceux qui l'ont installée la gardent).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de la release (ex: 3.3.0)'
+        required: true
+      action:
+        description: 'promote = publier pour tous ; demote = repasser en pré-version'
+        type: choice
+        options:
+          - promote
+          - demote
+        default: promote
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      ACTION: ${{ inputs.action }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Vérifier le tag
+        shell: bash
+        run: |
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag invalide : $TAG (attendu : X.Y.Z)"
+            exit 1
+          fi
+
+      - name: Appliquer
+        shell: bash
+        run: |
+          if [ "$ACTION" = "promote" ]; then
+            gh release edit "$TAG" --prerelease=false --latest
+          else
+            gh release edit "$TAG" --prerelease=true
+          fi
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft

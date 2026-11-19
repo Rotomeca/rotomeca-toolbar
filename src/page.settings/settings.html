@@ -153,6 +153,19 @@
         flex: none;
       }
 
+      .test-texte {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .test-texte h2 {
+        margin: 0;
+        font: var(--text-label);
+        font-size: 1rem;
+      }
+
       section {
         display: flex;
         flex-direction: column;
@@ -546,6 +559,20 @@
           </div>
           <div id="appbar-settings" hidden>
             <rds-switch id="autohide" icons data-i18n="settings.appBarAutoHide">Masquer automatiquement</rds-switch>
+          </div>
+        </div>
+      </section>
+
+      <section id="test" aria-labelledby="sec-test" aria-live="polite">
+        <div class="card-head">
+          <div class="test-texte">
+            <h2 id="sec-test" data-i18n="update.test.title">Version de test</h2>
+            <p class="helper" data-i18n="update.test.help">Pré-versions non finalisées, à essayer avant leur publication.</p>
+            <span id="test-etat" class="maj-etat"></span>
+          </div>
+          <div class="maj-action">
+            <rds-button id="test-rechercher" variant="tertiary" icon-before="flask-conical" data-i18n="update.test.check">Rechercher</rds-button>
+            <rds-primary-button id="test-telecharger" icon-before="download" hidden>Télécharger</rds-primary-button>
           </div>
         </div>
       </section>

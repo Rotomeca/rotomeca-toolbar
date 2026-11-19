@@ -458,6 +458,64 @@ export class PageSettings {
   }
 
   /**
+   * Affiche un statut texte, avec une icône d'alerte en cas d'erreur.
+   * @param {HTMLElement} target
+   * @param {string} text
+   * @param {boolean} [error]
+   */
+  #setStatus(target, text, error = false) {
+    target.replaceChildren();
+    target.classList.toggle('erreur', error);
+    if (error) {
+      const alert = document.createElement('rds-icon');
+      alert.setAttribute('name', 'circle-alert');
+      alert.setAttribute('aria-hidden', 'true');
+      target.append(alert);
+    }
+    target.append(text);
+  }
+
+  /**
+   * Bloc « Version de test » : cherche une pré-version, puis ouvre sa page
+   * (téléchargement manuel). L'état vient du même message que la carte de mises à jour.
+   */
+  async #initTestChannel() {
+    const t = window.api.t;
+    const status = document.querySelector('#test-etat');
+    const checkButton = document.querySelector('#test-rechercher');
+    const openButton = document.querySelector('#test-telecharger');
+
+    const render = (state) => {
+      checkButton.loading = state.verificationTest;
+      // Pendant un téléchargement ou une installation prête, la carte de mises à jour prend le relais
+      openButton.hidden =
+        !state.versionTest || ['downloading', 'ready'].includes(state.etat);
+      if (state.versionTest)
+        openButton.textContent = t(
+          state.testAuto ? 'update.test.install' : 'update.test.open',
+          { version: state.versionTest },
+        );
+
+      if (state.erreurTest) this.#setStatus(status, t(state.erreurTest), true);
+      else if (state.versionTest)
+        this.#setStatus(status, t('update.test.found', { version: state.versionTest }));
+      else if (state.derniereVerificationTest)
+        this.#setStatus(status, t('update.test.none'));
+      else this.#setStatus(status, '');
+    };
+
+    checkButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateCheckTest),
+    );
+    openButton.addEventListener('click', () =>
+      window.api.invoke(appEventList.updateInstallTest),
+    );
+
+    window.api.on(pageEventList.updateState, (_, next) => render(next));
+    render(await window.api.invoke(appEventList.updateGetState));
+  }
+
+  /**
    * Carte « Mises à jour » : le processus principal envoie l'état complet à chaque
    * changement, la page n'affiche que cet état et renvoie deux actions.
    */
@@ -485,17 +543,8 @@ export class PageSettings {
       return t('update.card.lastHours', { n: Math.floor(minutes / 60) });
     };
 
-    const setStatus = (text, error = false) => {
-      status.replaceChildren();
-      status.classList.toggle('erreur', error);
-      if (error) {
-        const alert = document.createElement('rds-icon');
-        alert.setAttribute('name', 'circle-alert');
-        alert.setAttribute('aria-hidden', 'true');
-        status.append(alert);
-      }
-      status.append(text);
-    };
+    const setStatus = (text, error = false) =>
+      this.#setStatus(status, text, error);
 
     const render = () => {
       const stage = state.etat;
@@ -659,6 +708,7 @@ export class PageSettings {
       await this.#initMode();
       await this.#initTheme();
       await this.#initUpdates();
+      await this.#initTestChannel();
       await this.#initPermissions();
     });
   }

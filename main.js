@@ -554,6 +554,12 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.updateGetState, () => AppMain.updater.state)
       .addEventListener(appEventList.updateCheck, () => AppMain.updater.check())
+      .addEventListener(appEventList.updateCheckTest, () =>
+        AppMain.updater.checkTest(),
+      )
+      .addEventListener(appEventList.updateInstallTest, () =>
+        AppMain.updater.installTest(),
+      )
       .addEventListener(appEventList.permissionsList, () =>
         AppMain.permissions.list(),
       )
@@ -1065,7 +1071,7 @@ class AppMain extends BaseAppObject {
       title: t('window.settings'),
       icon: this.appIcon,
       width: 800,
-      height: 730,
+      height: 810,
       useContentSize: true,
       nodeIntegration: false, // is default value after Electron v5
       contextIsolation: true, // protect against prototype pollution
@@ -1880,20 +1886,24 @@ class AppMain extends BaseAppObject {
    * vérification GitHub sous Linux). La vérification démarre dans `main()`.
    */
   static InitAutoUpdater() {
-    const { feedUrl, releasesRepo } = require('./configs/appConfig.js');
+    const { feedUrl, testFeedUrl, releasesRepo } = require('./configs/appConfig.js');
     const simulate = AppMain.IsDev && process.env.RTB_UPDATE_SIMULATE === '1';
     const packaged = !AppMain.IsDev && app.isPackaged;
     const squirrel = packaged && ['win32', 'darwin'].includes(process.platform);
 
-    if (squirrel && feedUrl) {
+    // Serveur Hazel normal (versions publiées) ou serveur de test (pré-versions seulement)
+    const setFeed = (channel) =>
       autoUpdater.setFeedURL({
-        url: `${feedUrl}/update/${process.platform}/${app.getVersion()}`,
+        url: `${channel === 'test' ? testFeedUrl : feedUrl}/update/${process.platform}/${app.getVersion()}`,
       });
-    }
+
+    if (squirrel && feedUrl) setFeed('stable');
 
     AppMain.updater = new UpdateManager({
       version: app.getVersion(),
       autoUpdater: squirrel && feedUrl ? autoUpdater : null,
+      setFeed,
+      testFeed: !!testFeedUrl,
       releasesRepo,
       manual: packaged && process.platform === 'linux',
       simulate,
