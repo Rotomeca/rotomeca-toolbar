@@ -98,7 +98,6 @@ const {
 } = require('./src/main/windows/windowSpecs.js');
 const { AppViewHost } = require('./src/main/apps/AppViewHost.js');
 const { TooltipPopup } = require('./src/main/tooltip/TooltipPopup.js');
-const { sanitizeAppData } = require('./src/main/security/sanitizeAppData.js');
 const {
   applySettingsUpdate,
 } = require('./src/main/settings/applySettingsUpdate.js');
@@ -112,13 +111,7 @@ const {
   JsonFileStore,
   dataDirectory,
 } = require('./src/main/persistence/JsonFileStore.js');
-const {
-  savedUrls,
-  removeApp,
-  moveApp,
-  insertSeparatorAfter,
-  replaceApp,
-} = require('./src/main/apps/appList.js');
+const { AppListService } = require('./src/main/apps/AppListService.js');
 const { hardenWebContents } = require('./src/main/security/webContentsHardener.js');
 const {
   createPermissionDialog,
@@ -142,7 +135,6 @@ const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
 class AppMain extends BaseAppObject {
   constructor() {
     super();
-    this.saves = [];
     this.started = false;
     this.contextMenu;
     /** Apps qui jouent un morceau mais ne pilotent pas la barre des tâches */
@@ -610,11 +602,11 @@ class AppMain extends BaseAppObject {
       if (this.started) return;
       this.started = true;
 
-      const loaded = await this.load();
+      const loaded = await this.appList.load();
       this.toolbarWindow.webContents.postMessage(
         loaded ? pageEventList.init : 'init',
         {
-          saves: loaded ? this.saves : [],
+          saves: loaded ? this.appList.entries : [],
           settings: {
             isButton: this.settingIsButton,
           },
@@ -860,26 +852,6 @@ class AppMain extends BaseAppObject {
     return this;
   }
 
-  async save() {
-    try {
-      this.userFileData.save(this.saves);
-    } catch (e) {
-      console.error('Failed to save the file', e);
-      dialog.showErrorBox(
-        t('dialog.error'),
-        t('dialog.saveFailed', { error: e.message }),
-      );
-    }
-  }
-
-  async load() {
-    const data = await this.userFileData.loadAsync();
-
-    if (data !== false) this.saves = data;
-
-    return data !== false;
-  }
-
   event_tray_on_click() {
     const existing = this.getWindow('settings');
     if (existing && !existing.isDestroyed()) {
@@ -1004,7 +976,7 @@ class AppMain extends BaseAppObject {
    * @returns {string[]}
    */
   event_get_saved_urls() {
-    return savedUrls(this.saves);
+    return this.appList.urls();
   }
 
   /**
@@ -1012,77 +984,24 @@ class AppMain extends BaseAppObject {
    * @returns {boolean} `true` si l'application est dans la barre (ajoutée ou déjà présente)
    */
   event_request_add_data(_, data) {
-    const clean = sanitizeAppData(data);
-    if (!clean) return false;
-
-    if (this.saves.some((save) => save?.url === clean.url)) return true;
-
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
-
-    this.saves.push(clean);
-    this.save();
-
-    return true;
+    return this.appList.add(data);
   }
 
-  event_request_add_separator(_, data) {
-    const url = data;
-    const insertion = insertSeparatorAfter(this.saves, url);
-
-    if (insertion?.kind === 'appended') {
-      this.toolbarWindow.webContents.postMessage(
-        pageEventList.appAdded,
-        'separator',
-      );
-    } else if (insertion) {
-      this.toolbarWindow.webContents.postMessage(pageEventList.appInserted, {
-        url,
-        index: insertion.index,
-        data: 'separator',
-      });
-    }
-
-    if (insertion) this.saves = [...insertion.list];
-
-    this.save();
+  event_request_add_separator(_, url) {
+    this.appList.addSeparatorAfter(url);
     this.toolbarWindow.focus();
   }
 
   event_request_add_data_edit(_, data) {
-    const clean = sanitizeAppData(data);
-    if (!clean) return;
+    const added = this.appList.addForEdit(data);
+    if (!added) return;
 
     this.removeWindow('add_dialog');
-    this.toolbarWindow.webContents.postMessage(pageEventList.appAdded, clean);
-
-    this.saves.push(clean);
-    this.save();
-    this.event_toolbar_add_button_click({
-      ...clean,
-      index: this.saves.length - 1,
-    });
+    this.event_toolbar_add_button_click(added);
   }
 
   event_request_updated_data(_, data) {
-    const clean = sanitizeAppData(data);
-    const id = data?.id;
-    // Un séparateur est une chaîne : on ne modifie que de vraies applications
-    const replaced = clean ? replaceApp(this.saves, id, clean) : null;
-
-    if (!clean || !replaced) return;
-
-    this.removeWindow('add_dialog');
-
-    const { oldLink } = replaced;
-    this.saves = [...replaced.list];
-
-    this.toolbarWindow.webContents.postMessage(pageEventList.appUpdated, {
-      ...clean,
-      id,
-      oldLink,
-    });
-
-    this.save();
+    if (this.appList.update(data)) this.removeWindow('add_dialog');
   }
 
   event_close_app() {
@@ -1169,6 +1088,35 @@ class AppMain extends BaseAppObject {
     const url = this.viewHost.urlOfWebContents(event.sender.id);
 
     if (url) this.viewHost.update(url, { media: sanitizeMediaState(raw) });
+  }
+
+  /**
+   * Les applications de la barre : leur ordre, leurs séparateurs et leur enregistrement.
+   * @type {AppListService}
+   */
+  get appList() {
+    const toolbarMessage = (channel, payload) =>
+      this.toolbarWindow.webContents.postMessage(channel, payload);
+
+    this._appList ??= new AppListService({
+      repository: this.userFileData,
+      toolbar: {
+        appAdded: (entry) => toolbarMessage(pageEventList.appAdded, entry),
+        appInserted: (args) => toolbarMessage(pageEventList.appInserted, args),
+        appUpdated: (args) => toolbarMessage(pageEventList.appUpdated, args),
+        appDeleted: (url) => toolbarMessage(pageEventList.toolbarAppDeleted, url),
+        separatorDeleted: (reference) =>
+          toolbarMessage(pageEventList.toolbarAppSeparatorDelete, reference),
+        appMoved: (args) => toolbarMessage(pageEventList.windowAppMovement, args),
+      },
+      onSaveError: (error) =>
+        dialog.showErrorBox(
+          t('dialog.error'),
+          t('dialog.saveFailed', { error: error.message }),
+        ),
+    });
+
+    return this._appList;
   }
 
   /**
@@ -1288,28 +1236,12 @@ class AppMain extends BaseAppObject {
 
   event_app_delete(_, url) {
     this.viewHost.discard(url);
-
-    this.toolbarWindow.webContents.postMessage(
-      pageEventList.toolbarAppDeleted,
-      url,
-    );
-
+    this.appList.remove(url);
     this.toolbarWindow.focus();
-
-    const { list, removedSeparators } = removeApp(this.saves, url);
-    for (const ref of removedSeparators)
-      this.toolbarWindow.webContents.postMessage(
-        pageEventList.toolbarAppSeparatorDelete,
-        ref,
-      );
-
-    this.saves = [...list];
-
-    this.save();
   }
 
   event_app_edit(_, data) {
-    data.index = this.saves.findIndex((x) => x.url === data.url);
+    data.index = this.appList.indexOf(data.url);
     this.event_toolbar_add_button_click(data);
   }
 
@@ -1335,32 +1267,7 @@ class AppMain extends BaseAppObject {
   }
 
   event_request_movement(_, rawArgs) {
-    const { url, type } = rawArgs ?? {};
-    if (typeof url !== 'string' || !['up', 'down'].includes(type)) return;
-    const args = { url, type };
-
-    const moved = moveApp(this.saves, url, type);
-    if (!moved) return;
-
-    //On déplace l'élément
-    this.toolbarWindow.webContents.postMessage(pageEventList.windowAppMovement, {
-      ...args,
-      modifier: moved.modifier,
-    });
-
-    //On supprime les separator en double
-    for (const ref of moved.removedSeparators)
-      this.toolbarWindow.webContents.postMessage(
-        pageEventList.toolbarAppSeparatorDelete,
-        ref,
-      );
-
-    this.saves = [...moved.list];
-
-    //on sauvegarde
-    this.save();
-
-    this.toolbarWindow.focus();
+    if (this.appList.move(rawArgs)) this.toolbarWindow.focus();
   }
 
   event_kill_app(_, url, open = false) {
