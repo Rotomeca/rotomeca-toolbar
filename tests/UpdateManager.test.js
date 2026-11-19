@@ -226,3 +226,162 @@ test('state : renvoie une copie, non modifiable de l\'extérieur', () => {
   state.etat = 'ready';
   assert.equal(manager.state.etat, 'uptodate');
 });
+
+// #region Canal de test (pré-versions)
+
+/** Réponse GitHub factice pour la liste des releases. */
+function githubList(releases) {
+  return async () => ({ ok: true, status: 200, json: async () => releases });
+}
+
+const release = (tag, extra = {}) => ({
+  tag_name: tag,
+  html_url: `https://github.com/${REPO}/releases/tag/${tag}`,
+  prerelease: false,
+  draft: false,
+  ...extra,
+});
+
+test('checkTest : trouve la pré-version plus récente que la version actuelle', async () => {
+  const { manager } = setup({
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.3.0');
+  assert.equal(manager.state.verificationTest, false);
+  assert.equal(manager.state.erreurTest, null);
+  assert.notEqual(manager.state.derniereVerificationTest, null);
+});
+
+test('checkTest : retient la plus récente parmi plusieurs pré-versions', async () => {
+  const { manager } = setup({
+    fetch: githubList([
+      release('3.3.0', { prerelease: true }),
+      release('3.10.0', { prerelease: true }),
+      release('3.4.0', { prerelease: true }),
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.10.0');
+});
+
+test('checkTest : ignore les versions stables, les brouillons et les versions non récentes', async () => {
+  const { manager } = setup({
+    fetch: githubList([
+      release('3.9.0'), // stable : jamais proposée comme version de test
+      release('3.8.0', { prerelease: true, draft: true }),
+      release('3.2.0', { prerelease: true }), // égale à l'actuelle
+      release('3.1.0', { prerelease: true }), // plus ancienne
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, null);
+  assert.notEqual(manager.state.derniereVerificationTest, null);
+});
+
+test('checkTest : une release au format inattendu ne bloque pas les autres', async () => {
+  const { manager } = setup({
+    fetch: githubList([
+      release('latest', { prerelease: true }),
+      release('3.3.0', { prerelease: true, html_url: 'https://evil.example/x' }),
+      null,
+      'texte',
+      release('3.4.0', { prerelease: true }),
+    ]),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.versionTest, '3.4.0');
+});
+
+test('checkTest : une réponse qui n\'est pas une liste est une erreur', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const { manager } = setup({
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ message: 'nope' }) }),
+  });
+  await manager.checkTest();
+  assert.equal(manager.state.erreurTest, 'update.card.errorCheck');
+  assert.equal(manager.state.versionTest, null);
+  assert.equal(manager.state.verificationTest, false);
+});
+
+test('checkTest : réponse GitHub en erreur ou réseau coupé', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  for (const fetch of [
+    async () => ({ ok: false, status: 403 }),
+    async () => {
+      throw new Error('ECONNREFUSED');
+    },
+  ]) {
+    const { manager } = setup({ fetch });
+    await manager.checkTest();
+    assert.equal(manager.state.erreurTest, 'update.card.errorCheck');
+    assert.equal(manager.state.verificationTest, false);
+  }
+});
+
+test('checkTest : sans dépôt de releases, ne fait rien', async () => {
+  const { manager, calls } = setup({ releasesRepo: null });
+  await manager.checkTest();
+  assert.equal(calls.changes.length, 0);
+});
+
+test('checkTest : une recherche déjà en cours n\'en lance pas une seconde', async () => {
+  let fetches = 0;
+  const { manager } = setup({
+    fetch: async () => {
+      ++fetches;
+      return { ok: true, status: 200, json: async () => [] };
+    },
+  });
+  await Promise.all([manager.checkTest(), manager.checkTest(), manager.checkTest()]);
+  assert.equal(fetches, 1);
+});
+
+test('checkTest : n\'affecte pas l\'état des mises à jour normales', async () => {
+  const autoUpdater = fakeAutoUpdater();
+  const { manager } = setup({
+    autoUpdater,
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+  });
+  manager.start();
+  autoUpdater.emit('update-available');
+
+  await manager.checkTest();
+  assert.equal(manager.state.etat, 'downloading');
+  assert.equal(manager.state.versionDisponible, null);
+  assert.equal(manager.state.versionTest, '3.3.0');
+});
+
+test('checkTest : n\'est jamais notifiée', async () => {
+  const { manager, calls } = setup({
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+  });
+  await manager.checkTest();
+  assert.deepEqual(calls.notified, []);
+});
+
+test('openTest : ouvre la page de la pré-version trouvée, et seulement elle', async () => {
+  const { manager, calls } = setup({
+    fetch: githubList([release('3.3.0', { prerelease: true })]),
+  });
+  manager.openTest(); // rien trouvé pour l'instant
+  assert.deepEqual(calls.opened, []);
+
+  await manager.checkTest();
+  manager.openTest();
+  assert.deepEqual(calls.opened, [`https://github.com/${REPO}/releases/tag/3.3.0`]);
+});
+
+test('openTest : après une recherche sans résultat, n\'ouvre plus rien', async () => {
+  let list = [release('3.3.0', { prerelease: true })];
+  const { manager, calls } = setup({ fetch: async () => ({ ok: true, status: 200, json: async () => list }) });
+  await manager.checkTest();
+
+  list = []; // la pré-version a été promue ou retirée
+  await manager.checkTest();
+  manager.openTest();
+  assert.equal(manager.state.versionTest, null);
+  assert.deepEqual(calls.opened, []);
+});
+
+// #endregion

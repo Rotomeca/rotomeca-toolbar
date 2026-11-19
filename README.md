@@ -26,3 +26,12 @@ git push --follow-tags origin main develop
 
 Le tag `X.Y.Z` déclenche le workflow `Release`, dont les notes sont produites par git-cliff.
 
+### Publication en deux temps
+
+1. Le tag `X.Y.Z` déclenche le workflow `Release` : il construit les installeurs et crée la release en **pré-version**. Le serveur de mises à jour (Hazel) et l'avis de nouvelle version sous Linux ignorent les pré-versions : personne ne la reçoit automatiquement.
+2. Pour tester : dans l'application, **Paramètres > Général > Version de test > Rechercher**, puis **Télécharger** ouvre la page de la release. L'installation est manuelle.
+3. Une fois validée : onglet **Actions > Promote release**, tag `X.Y.Z`, action `promote`. La release est alors proposée à tous.
+4. Retour arrière : le même workflow avec `demote` repasse la release en pré-version. Ceux qui l'ont déjà installée la gardent ; les autres ne la reçoivent plus.
+
+> Les installeurs Windows ne sont signés que si les secrets `WINDOWS_CERTIFICATE_BASE64` et `WINDOWS_CERTIFICATE_PASSWORD` sont définis. Sans eux, Windows affiche un avertissement SmartScreen à l'installation.
+

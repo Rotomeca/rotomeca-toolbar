@@ -7,11 +7,37 @@
  * - Linux : pas d'installation automatique ; on compare avec la dernière release GitHub
  *   et l'action ouvre la page de téléchargement.
  *
+ * - Canal de test (toutes plateformes) : les releases GitHub marquées « pré-version »
+ *   ne sont jamais proposées automatiquement (Hazel et `releases/latest` les ignorent).
+ *   `checkTest()` cherche la plus récente et `openTest()` ouvre sa page : le
+ *   téléchargement et l'installation restent manuels.
+ *
  * L'état complet est renvoyé à la fenêtre Paramètres à chaque changement, la fenêtre
  * ne fait qu'afficher et déclencher « rechercher » / « mettre à jour ».
  */
 
 const CHECK_INTERVAL = 60 * 60 * 1000;
+
+/**
+ * Lit une release GitHub : numéro de version (sans « v ») et page de la release.
+ * N'accepte qu'un numéro de version et une page du dépôt, jamais une URL quelconque.
+ * @param {any} release
+ * @param {string} repo `propriétaire/dépôt`
+ * @returns {{version: string, page: string}}
+ * @throws {Error} Si la réponse est inattendue
+ */
+function readRelease(release, repo) {
+  const version = String(release?.tag_name ?? '').replace(/^v/i, '');
+  const page = String(release?.html_url ?? '');
+
+  if (
+    !/^\d+(\.\d+){0,2}$/.test(version) ||
+    !page.startsWith(`https://github.com/${repo}/`)
+  )
+    throw new Error('Réponse GitHub inattendue');
+
+  return { version, page };
+}
 
 /**
  * @typedef {'uptodate'|'available'|'downloading'|'ready'} UpdateStage
@@ -27,6 +53,10 @@ const CHECK_INTERVAL = 60 * 60 * 1000;
  * @property {?number} pourcentage `null` : progression inconnue (Squirrel)
  * @property {?number} derniereVerification Horodatage (ms) de la dernière vérification réussie
  * @property {?string} erreur Clé de traduction du dernier échec
+ * @property {boolean} verificationTest Recherche d'une version de test en cours
+ * @property {?string} versionTest Version de test plus récente que l'actuelle
+ * @property {?number} derniereVerificationTest Horodatage (ms) de la dernière recherche réussie
+ * @property {?string} erreurTest Clé de traduction du dernier échec de la recherche
  */
 
 class UpdateManager {
@@ -37,6 +67,7 @@ class UpdateManager {
   #started = false;
   #notifiedVersion = null;
   #pageUrl = null;
+  #testUrl = null;
 
   /**
    * @param {Object} deps
@@ -62,6 +93,10 @@ class UpdateManager {
       pourcentage: null,
       derniereVerification: null,
       erreur: null,
+      verificationTest: false,
+      versionTest: null,
+      derniereVerificationTest: null,
+      erreurTest: null,
     };
   }
 
@@ -181,16 +216,11 @@ class UpdateManager {
     );
     if (!response.ok) throw new Error(`GitHub ${response.status}`);
 
-    const release = await response.json();
-    const latest = String(release?.tag_name ?? '').replace(/^v/i, '');
-    const page = String(release?.html_url ?? '');
-
     // N'ouvrir que la page des versions du dépôt, jamais une URL quelconque
-    if (
-      !/^\d+(\.\d+){0,2}$/.test(latest) ||
-      !page.startsWith(`https://github.com/${releasesRepo}/`)
-    )
-      throw new Error('Réponse GitHub inattendue');
+    const { version: latest, page } = readRelease(
+      await response.json(),
+      releasesRepo,
+    );
 
     if (compareVersions(latest, version) > 0) {
       this.#pageUrl = page;
@@ -211,6 +241,62 @@ class UpdateManager {
         derniereVerification: Date.now(),
       });
     }
+  }
+
+  /**
+   * Cherche la plus récente pré-version GitHub, plus récente que la version
+   * actuelle. Action volontaire : jamais lancée automatiquement, et sans effet
+   * sur l'état des mises à jour normales.
+   */
+  async checkTest() {
+    const { releasesRepo, compareVersions, version } = this.#deps;
+    if (!releasesRepo || this.#state.verificationTest) return;
+
+    this.#set({ verificationTest: true, erreurTest: null });
+    try {
+      const response = await this.#deps.fetch(
+        `https://api.github.com/repos/${releasesRepo}/releases?per_page=30`,
+        { headers: { Accept: 'application/vnd.github+json' } },
+      );
+      if (!response.ok) throw new Error(`GitHub ${response.status}`);
+
+      const releases = await response.json();
+      if (!Array.isArray(releases)) throw new Error('Réponse GitHub inattendue');
+
+      let best = null;
+      for (const release of releases) {
+        if (!release?.prerelease || release.draft) continue;
+
+        let candidate;
+        try {
+          candidate = readRelease(release, releasesRepo);
+        } catch (error) {
+          continue; // Une release au format inattendu ne bloque pas les autres
+        }
+
+        if (compareVersions(candidate.version, version) <= 0) continue;
+        if (!best || compareVersions(candidate.version, best.version) > 0)
+          best = candidate;
+      }
+
+      this.#testUrl = best?.page ?? null;
+      this.#set({
+        verificationTest: false,
+        versionTest: best?.version ?? null,
+        derniereVerificationTest: Date.now(),
+      });
+    } catch (error) {
+      console.error('Test update error', error);
+      this.#set({
+        verificationTest: false,
+        erreurTest: 'update.card.errorCheck',
+      });
+    }
+  }
+
+  /** Ouvre la page de la version de test trouvée (téléchargement manuel). */
+  openTest() {
+    if (this.#testUrl) this.#deps.openExternal(this.#testUrl);
   }
 
   /** Cycle factice : vérification, téléchargement puis prête. */

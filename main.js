@@ -554,6 +554,12 @@ class AppMain extends BaseAppObject {
       .addEventListener(appEventList.getVersion, () => app.getVersion())
       .addEventListener(appEventList.updateGetState, () => AppMain.updater.state)
       .addEventListener(appEventList.updateCheck, () => AppMain.updater.check())
+      .addEventListener(appEventList.updateCheckTest, () =>
+        AppMain.updater.checkTest(),
+      )
+      .addEventListener(appEventList.updateOpenTest, () =>
+        AppMain.updater.openTest(),
+      )
       .addEventListener(appEventList.permissionsList, () =>
         AppMain.permissions.list(),
       )
