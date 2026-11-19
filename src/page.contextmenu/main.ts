@@ -4,13 +4,6 @@ import { requireElement } from '../scripts/dom.js';
 import type { ContextMenuItem } from '../shared/dto.js';
 import { appEventList } from '../shared/ipc/events.js';
 
-declare global {
-  interface Window {
-    /** Posé par le processus principal juste après le chargement de la page. */
-    electron?: { menu?: readonly ContextMenuItem[] };
-  }
-}
-
 const POLL_INTERVAL_MS = 10;
 
 /** Attend que le processus principal ait posé la liste des boutons. */

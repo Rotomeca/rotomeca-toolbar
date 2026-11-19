@@ -1,10 +1,7 @@
-import type { UpdateStage } from '../../scripts/UpdateManager.js';
+import type { UpdateLevel } from '../../shared/updateLevel.js';
 
-/**
- * Niveau d'alerte de mise à jour : `pending` (nouvelle version disponible ou en cours de
- * téléchargement) ou `ready` (prête à installer).
- */
-export type UpdateLevel = 'pending' | 'ready';
+export { updateLevelOf } from '../../shared/updateLevel.js';
+export type { UpdateLevel };
 
 /** Coin de l'icône où se place la pastille. */
 export type BadgeCorner = 'bottom-right' | 'top-right';
@@ -20,12 +17,6 @@ const BADGE_RADIUS = 8;
 /** Épaisseur (px) du liseré blanc autour de la pastille. */
 const BADGE_OUTLINE = 1.5;
 const BYTES_PER_PIXEL = 4;
-
-/** @returns Le niveau d'alerte correspondant à l'état des mises à jour, ou null s'il n'y en a pas */
-export function updateLevelOf(stage: UpdateStage | undefined): UpdateLevel | null {
-  if (stage === 'ready') return 'ready';
-  return stage === 'downloading' || stage === 'available' ? 'pending' : null;
-}
 
 /**
  * Le badge « RC » de l'icône d'une pré-version est en bas à droite : la pastille passe en haut

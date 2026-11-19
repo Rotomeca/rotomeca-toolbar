@@ -31,8 +31,12 @@ const ERR_ABORTED = -3;
  * modules ES des pages, et ce fichier lui-même.
  */
 const NOT_MAIN_MODULES = new Set([
+  // Modules ES des pages
   'seasonFx.js',
   'ds.js',
+  'dom.js',
+  'appForm.js',
+  'mediaView.js',
   'ToolbarAppData.js',
   // Lu comme du texte puis injecté dans la page du menu contextuel : du code de page
   'WebContentElecrtonContextMenu.js',
@@ -48,7 +52,7 @@ const MAIN_MODULES_OUTSIDE_SCRIPTS = [
 
 /** Pages qui dépendent du réseau (recherche Google) : hors du périmètre. */
 const SKIPPED_PAGES = new Set(['search.html']);
-const RESOURCE_ERROR = /ERR_FILE_NOT_FOUND|Failed to load (module script|resource)|Refused to (load|execute|apply)/i;
+const RESOURCE_ERROR = /ERR_FILE_NOT_FOUND|Failed to load (module script|resource)|Refused to (load|execute|apply)|Uncaught/i;
 const MEDIA_TITLE = 'smoke-title';
 const MEDIA_PAGE = `data:text/html,${encodeURIComponent(
   `<script>navigator.mediaSession.metadata = new MediaMetadata({ title: '${MEDIA_TITLE}' });</script>`,

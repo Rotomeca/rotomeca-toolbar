@@ -74,6 +74,9 @@ async function checkApplication({ withTimeout }) {
       toolbar.webContents.executeJavaScript(
         `window.api.invoke(${JSON.stringify(channel)}, ...${JSON.stringify(args)})`,
       );
+    // Nombre d'éléments de la page de la barre qui correspondent au sélecteur
+    const count = (selector) =>
+      toolbar.webContents.executeJavaScript(`document.querySelectorAll(${JSON.stringify(selector)}).length`);
     const expect = (label, actual, expected) => {
       if (JSON.stringify(actual) !== JSON.stringify(expected))
         problems.push(`${label} : ${JSON.stringify(actual)} au lieu de ${JSON.stringify(expected)}`);
@@ -84,8 +87,12 @@ async function checkApplication({ withTimeout }) {
     expect('requestAddData', await invoke(appEventList.requestAddData, { name: 'Exemple', url: APP_URL }), true);
     expect('requestAddData (adresse dangereuse)', await invoke(appEventList.requestAddData, { url: 'javascript:alert(1)' }), false);
     expect('getSavedUrls', await invoke(appEventList.getSavedUrls), [APP_URL]);
+    await sleep(PAGE_SETTLE_MS / 2);
+    expect('boutons de la barre après ajout', await count('rotomeca-toolbar-button'), 1);
     await invoke(appEventList.requestAddSeparator, APP_URL);
     expect('getSavedUrls (séparateur)', await invoke(appEventList.getSavedUrls), [APP_URL]);
+    await sleep(PAGE_SETTLE_MS / 2);
+    expect('séparateurs de la barre', await count('#apps .separator'), 2);
     expect('isAppBarSupported', typeof (await invoke(appEventList.isAppBarSupported)), 'boolean');
 
     const displays = await invoke(appEventList.getDisplays);
@@ -108,6 +115,8 @@ async function checkApplication({ withTimeout }) {
 
     await invoke(appEventList.appDelete, APP_URL);
     expect('getSavedUrls (après suppression)', await invoke(appEventList.getSavedUrls), []);
+    await sleep(PAGE_SETTLE_MS / 2);
+    expect('boutons de la barre après suppression', await count('rotomeca-toolbar-button'), 0);
 
     // Laisse finir le chargement des fenêtres créées en route avant de quitter
     await sleep(PAGE_SETTLE_MS);

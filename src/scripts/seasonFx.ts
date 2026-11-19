@@ -12,14 +12,16 @@ const DECORS = new URL('../assets/decors/', import.meta.url).href;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** Nombre de particules selon la densité : [barre, fenêtres] */
-const COUNTS = {
+/** Nombre de particules par densité : [barre étroite, grande fenêtre]. */
+const COUNTS: Readonly<Record<string, readonly [number, number]>> = {
   discrete: [6, 12],
   normale: [12, 22],
   abondante: [20, 34],
 };
 
 /** Saison selon la palette */
-const KINDS = {
+/** Type d'animation de chaque palette de saison. */
+const KINDS: Readonly<Record<string, string>> = {
   hiver: 'neige',
   automne: 'automne',
   printemps: 'printemps',
@@ -28,7 +30,7 @@ const KINDS = {
   noel: 'noel',
 };
 
-const LEAF_COLORS = {
+const LEAF_COLORS: Readonly<Record<string, readonly string[]>> = {
   automne: ['#e07a3a', '#c9452c', '#d4a95a', '#8e2a1e'],
   printemps: ['#7fc28f', '#4f9a62', '#a8d8a0', '#3f8a55'],
   cerisier: ['#f7c1d0', '#f2a7bd', '#fbd9e3', '#e88aa8'],
@@ -37,7 +39,14 @@ const LEAF_COLORS = {
 const GIFT_BOXES = ['#d62839', '#f2c14e', '#1e8a4c', '#ffffff', '#c0392b', '#2e7d32'];
 
 /** Décor posé en bas à droite, par saison : fichier, [largeur, hauteur] fenêtre, [largeur, hauteur] barre, classe */
-const DECO = {
+interface Decoration {
+  readonly file: string;
+  readonly wide: readonly [number, number];
+  readonly narrow: readonly [number, number];
+  readonly cls: string;
+}
+
+const DECO: Readonly<Record<string, Decoration>> = {
   neige: { file: 'bonhomme-de-neige', wide: [84, 104], narrow: [44, 56], cls: 'fx-wobble' },
   automne: { file: 'renard', wide: [84, 104], narrow: [44, 56], cls: '' },
   printemps: { file: 'lapin', wide: [84, 104], narrow: [44, 56], cls: '' },
@@ -46,7 +55,9 @@ const DECO = {
 };
 
 /** Tournesols de l'été : [position gauche, largeur, hauteur, délai] */
-const SUNFLOWERS = {
+type Sunflower = readonly [left: string, width: number, height: number, delay: string];
+
+const SUNFLOWERS: Readonly<Record<'wide' | 'narrow', readonly Sunflower[]>> = {
   wide: [
     ['calc(100% - 170px)', 58, 99, '-1.4s'],
     ['calc(100% - 128px)', 76, 129, '0s'],
@@ -55,14 +66,14 @@ const SUNFLOWERS = {
   narrow: [['16px', 40, 68, '0s']],
 };
 
-const templates = new Map();
+const templates = new Map<string, Promise<string>>();
 
 /**
  * Charge (une seule fois) le texte d'un SVG de décor.
  * @param {string} name Nom du fichier, sans extension
  * @returns {Promise<string>}
  */
-async function loadSvg(name) {
+async function loadSvg(name: string): Promise<string> {
   if (!templates.has(name)) {
     templates.set(
       name,
@@ -75,7 +86,7 @@ async function loadSvg(name) {
     );
   }
 
-  return templates.get(name);
+  return templates.get(name) ?? Promise.resolve('');
 }
 
 /**
@@ -84,7 +95,7 @@ async function loadSvg(name) {
  * @param {string} attributes Attributs de la nouvelle racine (classe, taille, style)
  * @returns {string}
  */
-function withRoot(svg, attributes) {
+function withRoot(svg: string, attributes: string): string {
   const root = /<svg[^>]*>/.exec(svg)?.[0] ?? '';
   const viewBox = /viewBox="[^"]*"/.exec(root)?.[0] ?? '';
   const ratio = /preserveAspectRatio="[^"]*"/.exec(root)?.[0] ?? '';
@@ -96,13 +107,13 @@ function withRoot(svg, attributes) {
  * @param {number} n
  * @returns {number} Valeur pseudo-aléatoire stable entre 0 et 1
  */
-function rnd(n) {
+function rnd(n: number): number {
   const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
 }
 
 /** Variante de rnd() de la pluie de cadeaux */
-function rndGift(n) {
+function rndGift(n: number): number {
   const x = Math.sin(n * 78.233 + 12.9898) * 43758.5453;
   return x - Math.floor(x);
 }
@@ -111,7 +122,7 @@ function rndGift(n) {
  * Particules qui tombent : neige, feuilles ou pétales.
  * @returns {string} Balisage
  */
-function particles(kind, count) {
+function particles(kind: string, count: number): string {
   if (!['neige', 'automne', 'printemps', 'cerisier'].includes(kind)) return '';
 
   const snow = kind === 'neige';
@@ -144,7 +155,7 @@ function particles(kind, count) {
 /**
  * Soleil en haut à gauche et rayons qui pulsent (été).
  */
-function sun(narrow) {
+function sun(narrow: boolean): string {
   const angles = narrow ? [64, 71, 78, 85] : [20, 29, 38, 47, 56];
   const size = narrow ? 64 : 110;
 
@@ -166,7 +177,7 @@ function sun(narrow) {
 /**
  * Pluie de cadeaux : chacun tombe quand la hotte du traîneau passe au-dessus de lui.
  */
-function gifts(count) {
+function gifts(count: number): string {
   let html = '';
 
   for (let i = 0; i < count; i++) {
@@ -196,8 +207,9 @@ function gifts(count) {
  * @param {boolean} narrow Hôte étroit (la barre)
  * @returns {Promise<string>}
  */
-async function build(kind, density, narrow) {
-  const count = (COUNTS[density] ?? COUNTS.normale)[narrow ? 0 : 1];
+async function build(kind: string, density: string, narrow: boolean): Promise<string> {
+  const [narrowCount, wideCount] = COUNTS[density] ?? COUNTS['normale'] ?? [0, 0];
+  const count = narrow ? narrowCount : wideCount;
   let html = particles(kind, count);
 
   if (kind === 'ete') {
@@ -235,7 +247,7 @@ async function build(kind, density, narrow) {
  * @param {HTMLElement} host Élément hôte (devient `.fx-host`)
  * @param {{narrow?: boolean}} [options] `narrow` pour la barre de 72 px
  */
-export function initSeasonFx(host, { narrow = false } = {}) {
+export function initSeasonFx(host: HTMLElement, { narrow = false }: { narrow?: boolean } = {}): void {
   host.classList.add('fx-host');
   host.classList.toggle('fx-narrow', narrow);
 

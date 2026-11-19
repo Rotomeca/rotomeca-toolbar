@@ -15,6 +15,7 @@
     "src/scripts/seasonFx.ts",
     "src/scripts/ds.ts",
     "src/scripts/dom.ts",
+    "src/scripts/WebContentElecrtonContextMenu.ts",
     "src/scripts/ToolbarAppData.ts",
     "src/shared/**/*.ts",
     "src/types/**/*.d.ts"
