@@ -23,7 +23,11 @@ async function runAction({ action, data }: Pick<ContextMenuItem, 'action' | 'dat
     case 'delete':
       return window.api.invoke(appEventList.appDelete, url);
     case 'edit':
-      return window.api.invoke(appEventList.appEdit, { url, picture: data.picture, title: data.title ?? undefined });
+      return window.api.invoke(appEventList.appEdit, {
+        url,
+        ...(data.picture === undefined ? {} : { picture: data.picture }),
+        ...(data.title ? { title: data.title } : {}),
+      });
     case 'addseparator':
       return window.api.invoke(appEventList.requestAddSeparator, url);
     case 'goUp':

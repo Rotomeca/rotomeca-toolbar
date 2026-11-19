@@ -64,6 +64,6 @@ export function createElectronTray(options: ElectronTrayOptions): TrayService<Ic
     translate: options.translate,
     shortcut: options.shortcut,
     actions: options.actions,
-    debugWindows: options.isDev ? debugWindows : undefined,
+    ...(options.isDev ? { debugWindows } : {}),
   });
 }

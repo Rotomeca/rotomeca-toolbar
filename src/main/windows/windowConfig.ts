@@ -55,8 +55,8 @@ export function buildWindowConfig(name: string, options: WindowOptions = {}): Br
     title,
     width,
     height,
-    x,
-    y,
+    ...(x === undefined ? {} : { x }),
+    ...(y === undefined ? {} : { y }),
     show,
     alwaysOnTop,
     frame,
@@ -65,14 +65,14 @@ export function buildWindowConfig(name: string, options: WindowOptions = {}): Br
     skipTaskbar,
     minimizable,
     maximizable,
-    icon,
+    ...(icon === undefined ? {} : { icon }),
     resizable,
     ...extra,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      preload,
+      ...(preload === undefined ? {} : { preload }),
     },
   };
 }

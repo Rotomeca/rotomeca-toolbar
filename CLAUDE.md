@@ -18,7 +18,8 @@ Règles générales importées depuis `.claude/claude-config/` (copie locale de 
 
 ## Écarts avec le claude-config
 
-- **Migration vers TypeScript en cours.** **Tout nouveau fichier est en `.ts`** (strict : pas de `any`, types explicites sur les signatures exportées, contrôlé par ESLint). Les fichiers `.js` existants sont convertis étape par étape ; en attendant, ils gardent JSDoc et CommonJS (`require` / `module.exports`). Un fichier migré est écrit en `import` / `export` : `tsc` produit du CommonJS pour le processus principal et des modules ES pour les pages (`src/page.*/`). Ne pas mélanger les deux cibles.
+- **Le code de l'application est en TypeScript strict** (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, pas de `any`, types explicites sur les signatures exportées, contrôlé par ESLint). **Tout nouveau fichier de code est en `.ts`**, écrit en `import` / `export` : `tsc` produit du CommonJS pour le processus principal et des modules ES pour les pages (`src/page.*/`, `src/scripts/` côté page, `src/shared/`). Ne pas mélanger les deux cibles. Restent en JavaScript, volontairement : `scripts/` (outils de build), `tests/` (`node:test` sur `dist/`), `src/scripts/smokeRun.js` et `smokeApp.js` (mode « fumée »), `lib/` (bibliothèque vendorisée, typée par des `.d.ts` voisins) ; le JavaScript existant garde JSDoc et CommonJS.
+- **Données partagées** : les formes échangées entre le processus principal et les pages sont dans `src/shared/dto.ts`, et `src/shared/ipc/contracts.ts` donne les arguments et la réponse de chaque canal (un test de compilation vérifie qu'ils couvrent exactement `events.ts`). Un canal ou une donnée change à un seul endroit.
 - **Commits : gitmoji en code, pas en emoji Unicode** (`:sparkles:`, pas ✨), car `cliff.toml` retire les `:codes:` pour générer le changelog (un emoji Unicode le polluerait). Le reste du format du claude-config s'applique (`type(scope): :gitmoji: description`, un commit = un changement atomique). Messages **en anglais**, au présent, comme tout l'historique.
 - **Pas de PR ni de ticket** : le flux est un git flow local (voir le README). Le format de titre de PR du claude-config ne s'applique pas.
 - **Style existant avant le `.prettierrc.json`.** Le code est en 2 espaces et fonctions fléchées avec parenthèses (`(x) => …`) ; le `.prettierrc.json` (tabulations, `arrowParens: avoid`) ne correspond pas et n'est pas appliqué. Suivre le fichier modifié, ne jamais reformater un fichier existant.
@@ -53,7 +54,7 @@ Avant de commiter : `pnpm typecheck`, `pnpm lint` et `pnpm test` doivent passer 
 ## Sécurité (en plus de `security.md`)
 
 - Toute fenêtre ou vue, explicitement : `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`. Pas encore explicités (ils reposent sur le défaut d'Electron, déjà sûr) : le menu contextuel (`RotomecaElectronContextMenu`) et la vue d'en-tête des apps.
-- L'IPC n'est accepté que depuis la page principale d'une fenêtre locale `file://` (`BaseAppObject.addEventListener`).
+- L'IPC n'est accepté que depuis la page principale d'une fenêtre locale `file://` (`IpcRouter`).
 - Contenu des sites tiers : jamais de `innerHTML` (utiliser `textContent`), URL passées par `isSafeUrl`, popups et navigation restreintes (`HardenWebContents`), permissions via `PermissionStore` / `permissionPolicy`.
 - Une URL de release GitHub n'est ouverte que si elle appartient au dépôt (`readRelease`).
 
