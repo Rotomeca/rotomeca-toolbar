@@ -154,6 +154,28 @@ test('MediaPopup : un survol mal formé ne touche pas au masquage programmé', (
   assert.equal(sched.pending.length, 1, 'le masquage reste programmé');
 });
 
+test('MediaPopup : le pointeur sur le popup lui-même (sans position) annule le masquage', () => {
+  const { popup, win, sched } = mediaPopup({ payloads: { u: { url: 'u' } } });
+  popup.hover('u', true, 300);
+  popup.hover('u', false); // le pointeur quitte le bouton pour aller vers le popup
+  assert.equal(sched.pending.length, 1);
+
+  popup.hover('u', true, undefined); // mouseenter de la page du popup : aucune position
+  assert.equal(sched.pending.length, 0, 'le popup reste ouvert');
+  assert.equal(win.visible, true);
+
+  popup.hover('u', false); // il le quitte : masquage normal
+  sched.pending[0].fn();
+  assert.equal(win.visible, false);
+});
+
+test('MediaPopup : l\'entrée sur un popup qui n\'est pas affiché pour cette application est ignorée', () => {
+  const { popup, win, sched } = mediaPopup({ payloads: { u: { url: 'u' } } });
+  popup.hover('u', true, undefined);
+  assert.equal(win.visible, false);
+  assert.equal(sched.pending.length, 0);
+});
+
 test('MediaPopup : une fenêtre détruite ne provoque ni refresh ni hide', () => {
   const { popup, win } = mediaPopup({ payloads: { u: { url: 'u' } } });
   popup.hover('u', true, 300);

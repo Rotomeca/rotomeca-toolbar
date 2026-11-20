@@ -60,11 +60,22 @@ export class MediaPopup {
     return this.hoveredUrl;
   }
 
-  /** Le pointeur entre sur un bouton (affiche) ou en sort (masque après un court délai). */
+  /**
+   * Le pointeur entre sur un bouton (affiche) ou en sort (masque après un court délai) ; l'entrée sur le popup
+   * lui-même (sans `centerY`) annule le masquage.
+   */
   hover(url: unknown, hovering: boolean, centerY: unknown): void {
     if (hovering) {
+      if (typeof url !== 'string') return;
+
+      // Le pointeur est sur le popup lui-même (sa page n'envoie aucune position) : il garde ouvert celui déjà affiché
+      if (centerY === undefined && url === this.hoveredUrl) {
+        this.deps.scheduler.clearTimeout(this.hideTimer);
+        return;
+      }
+
       // Une entrée invalide est ignorée sans toucher au masquage déjà programmé
-      if (typeof url !== 'string' || typeof centerY !== 'number') return;
+      if (typeof centerY !== 'number') return;
 
       this.deps.scheduler.clearTimeout(this.hideTimer);
       this.show(url, centerY);
