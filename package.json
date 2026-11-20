@@ -1,6 +1,6 @@
 {
 	"name": "rotomecatoolbar",
-	"version": "4.0.0",
+	"version": "4.1.0-rc2",
 	"description": "Application toolbar pour avoir des sites en arrière plan",
 	"main": "dist/main.js",
 	"packageManager": "pnpm@10.33.0",
