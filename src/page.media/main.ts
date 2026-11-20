@@ -10,6 +10,8 @@ import '../scripts/ds.js';
 import { requireElement } from '../scripts/dom.js';
 // [mediaView.ts] Fonctions pures d'affichage du lecteur multimédia : durée et avancement
 import { formatTime, progressPercent } from '../scripts/mediaView.js';
+// [marquee.ts] Défilement d'un texte trop long pour sa place (titre et artiste du lecteur)
+import { applyMarquee } from './marquee.js';
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { MediaAction, MediaPayload } from '../shared/dto.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
@@ -71,9 +73,11 @@ class MediaPlayer {
 
     this.renderCover(state);
     const title = requireElement('#title');
-    title.textContent = state.title;
+    applyMarquee(title, state.title);
     title.title = state.title;
-    requireElement('#artist').textContent = state.artist;
+    const artist = requireElement('#artist');
+    applyMarquee(artist, state.artist);
+    artist.title = state.artist;
 
     this.renderProgress(state);
 

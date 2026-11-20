@@ -45,6 +45,30 @@ test('normalizeUrl : sans barre finale ni ancre, comparable', async () => {
 
 // #endregion
 
+// #region marquee
+
+test('marqueeTiming : rien à faire quand le texte tient ou que les mesures sont inutilisables', async () => {
+  const { marqueeTiming } = await load('src/page.media/marquee.js');
+  assert.equal(marqueeTiming(100, 200), null);
+  assert.equal(marqueeTiming(200, 200), null);
+  assert.equal(marqueeTiming(300, 0), null, 'fenêtre pas encore mesurable');
+  assert.equal(marqueeTiming(Number.NaN, 200), null);
+});
+
+test('marqueeTiming : décalage = dépassement + marge, durée proportionnelle avec un minimum', async () => {
+  const { marqueeTiming } = await load('src/page.media/marquee.js');
+
+  const small = marqueeTiming(210, 200);
+  assert.equal(small.shift, 14);
+  assert.equal(small.durationSeconds, 3.3, 'minimum de 2 s de défilement, pauses comprises');
+
+  const long = marqueeTiming(600, 200);
+  assert.equal(long.shift, 404);
+  assert.ok(long.durationSeconds > small.durationSeconds);
+});
+
+// #endregion
+
 // #region themeCatalog
 
 test('themeCatalog : chaque thème des familles a un aperçu et un libellé', async () => {
