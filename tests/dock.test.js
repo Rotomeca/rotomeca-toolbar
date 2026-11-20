@@ -5,6 +5,8 @@ const {
 } = require('../dist/src/main/dock/dockGeometry.js');
 const { AppBar } = require('../dist/src/main/dock/AppBar.js');
 const { loadAppBarApi } = require('../dist/src/main/dock/appBarApi.js');
+const { X11StrutBar } = require('../dist/src/main/dock/X11StrutBar.js');
+const { loadX11Api, encodeCardinals, strutPartialValues, strutValues } = require('../dist/src/main/dock/x11Api.js');
 
 // #region computeLayout
 
@@ -282,6 +284,136 @@ test('loadAppBarApi : décrit les structures et les fonctions natives attendues'
   assert.deepEqual(declared.map(([dll]) => dll), ['shell32.dll', 'user32.dll']);
   assert.match(declared[0][1], /SHAppBarMessage/);
   assert.match(declared[1][1], /RegisterWindowMessageW/);
+});
+
+// #endregion
+
+// #region X11StrutBar
+
+/** Fenêtre factice dont l'identifiant X11 est 0x2a. */
+function fakeX11Window() {
+  const handle = Buffer.alloc(8);
+  handle.writeUInt32LE(0x2a, 0);
+  return { destroyed: false, isDestroyed() { return this.destroyed; }, getNativeWindowHandle: () => handle };
+}
+
+/** API X11 factice qui enregistre les appels. */
+function fakeX11Api() {
+  const calls = [];
+  return {
+    calls,
+    setStrut: (windowId, strut) => calls.push(['set', windowId, strut]),
+    clearStrut: (windowId) => calls.push(['clear', windowId]),
+  };
+}
+
+/** Conversion factice : densité x2. */
+const x2 = {
+  dipToScreenRect: (_w, r) => ({ x: r.x * 2, y: r.y * 2, width: r.width * 2, height: r.height * 2 }),
+  screenToDipRect: (_w, r) => r,
+};
+
+/** Zone de travail factice : 27 px pris en haut par la barre du système. */
+const workArea = () => ({ x: 0, y: 27, width: 1920, height: 1000 });
+
+test('X11StrutBar : setPos réserve la bande en pixels physiques et rend la zone demandée', () => {
+  const api = fakeX11Api();
+  const bar = new X11StrutBar(api, x2, workArea);
+  assert.equal(bar.register(fakeX11Window()), true);
+
+  const granted = bar.setPos({ x: 0, y: 40, width: 40, height: 500 });
+  assert.deepEqual(granted, { x: 0, y: 40, width: 40, height: 500 });
+  assert.deepEqual(api.calls, [['set', 0x2a, { width: 80, startY: 80, endY: 1079 }]]);
+});
+
+test('X11StrutBar : la zone accordée est restreinte par le haut à la zone de travail, le bas va au bord de l\'écran', () => {
+  const api = fakeX11Api();
+  const bar = new X11StrutBar(api, x2, workArea);
+  bar.register(fakeX11Window());
+
+  assert.deepEqual(bar.setPos({ x: 0, y: 0, width: 40, height: 1200 }), { x: 0, y: 27, width: 40, height: 1173 });
+});
+
+test('X11StrutBar : setPos sans enregistrement ne fait rien', () => {
+  const api = fakeX11Api();
+  const bar = new X11StrutBar(api, x2, workArea);
+  assert.equal(bar.setPos({ x: 0, y: 0, width: 40, height: 100 }), null);
+  assert.equal(api.calls.length, 0);
+});
+
+test('X11StrutBar : une fenêtre détruite ne s\'enregistre pas', () => {
+  const win = fakeX11Window();
+  win.destroyed = true;
+  const bar = new X11StrutBar(fakeX11Api(), x2, workArea);
+  assert.equal(bar.register(win), false);
+  assert.equal(bar.registered, false);
+});
+
+test('X11StrutBar : unregister libère la bande, et seulement si la fenêtre existe', () => {
+  const api = fakeX11Api();
+  const bar = new X11StrutBar(api, x2, workArea);
+  const win = fakeX11Window();
+  bar.register(win);
+  bar.unregister();
+  assert.deepEqual(api.calls, [['clear', 0x2a]]);
+  assert.equal(bar.registered, false);
+
+  bar.register(win);
+  win.destroyed = true;
+  bar.unregister();
+  assert.equal(api.calls.length, 1);
+});
+
+// #endregion
+
+// #region loadX11Api
+
+test('loadX11Api : hors Linux, sans DISPLAY ou sous Wayland, aucune API et koffi n\'est pas chargé', () => {
+  const loader = () => { throw new Error('ne doit pas être appelé'); };
+  assert.equal(loadX11Api('win32', { DISPLAY: ':0' }, loader), null);
+  assert.equal(loadX11Api('linux', {}, loader), null);
+  assert.equal(loadX11Api('linux', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }, loader), null);
+});
+
+test('loadX11Api : si koffi ne se charge pas, aucune API', (t) => {
+  t.mock.method(console, 'error', () => {});
+  assert.equal(loadX11Api('linux', { DISPLAY: ':0' }, () => { throw new Error('koffi absent'); }), null);
+});
+
+test('loadX11Api : pas d\'affichage X11 joignable, aucune API', () => {
+  const lib = { func: (signature) => (signature.includes('XOpenDisplay') ? () => null : () => 0) };
+  assert.equal(loadX11Api('linux', { DISPLAY: ':0' }, () => ({ load: () => lib, sizeof: () => 8 })), null);
+});
+
+test('loadX11Api : pose les deux propriétés puis les retire', () => {
+  const calls = [];
+  const lib = {
+    func: (signature) => {
+      const name = /(X\w+)\(/.exec(signature)[1];
+      return (...args) => {
+        calls.push([name, ...args]);
+        if (name === 'XOpenDisplay') return {};
+        if (name === 'XInternAtom') return args[1] === '_NET_WM_STRUT_PARTIAL' ? 100 : 101;
+        return 0;
+      };
+    },
+  };
+  const api = loadX11Api('linux', { DISPLAY: ':0' }, () => ({ load: () => lib, sizeof: () => 8 }));
+  api.setStrut(42, { width: 80, startY: 0, endY: 99 });
+
+  const changes = calls.filter(([name]) => name === 'XChangeProperty');
+  assert.deepEqual(changes.map((c) => [c[2], c[3], c[4], c[5], c[6], c[8]]), [[42, 100, 6, 32, 0, 12], [42, 101, 6, 32, 0, 4]]);
+  assert.equal(changes[0][7].readBigUInt64LE(0), 80n);
+
+  api.clearStrut(42);
+  assert.deepEqual(calls.filter(([name]) => name === 'XDeleteProperty').map((c) => [c[2], c[3]]), [[42, 100], [42, 101]]);
+});
+
+test('encodeCardinals / strutPartialValues : un long par valeur, bande au bord gauche', () => {
+  assert.equal(encodeCardinals([1, 2], 8).length, 16);
+  assert.equal(encodeCardinals([1, 2], 4).readUInt32LE(4), 2);
+  assert.deepEqual(strutPartialValues({ width: 80, startY: 5, endY: 99 }), [80, 0, 0, 0, 5, 99, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(strutValues({ width: 80, startY: 5, endY: 99 }), [80, 0, 0, 0]);
 });
 
 // #endregion

@@ -8,8 +8,7 @@
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import type { BrowserWindow } from 'electron';
 // [AppBar.ts] Barre ancrée au bord gauche de l'écran (AppBar Windows) : enregistrement et réservation d'espace
-import type { AppBar } from '../dock/AppBar.js';
-import type { AppBarCallbacks } from '../dock/AppBar.js';
+import type { AppBarCallbacks, DockBar } from '../dock/AppBar.js';
 // [dockGeometry.ts] Géométrie de la barre : disposition des fenêtres, bande réservée et masquage automatique
 import { computeLayout, dockRequest, dockRequestKey, isPointInside, stepAutoHide } from '../dock/dockGeometry.js';
 import type { Layout, Point, Rect } from '../dock/dockGeometry.js';
@@ -75,7 +74,7 @@ export interface ToolbarControllerDeps {
   /** La barre ancrée est utilisable sur ce système. */
   readonly appBarSupported: () => boolean;
   /** Crée l'AppBar (réservation d'espace à l'écran) quand elle devient nécessaire. */
-  readonly createAppBar: (callbacks: AppBarCallbacks) => AppBar<BrowserWindow>;
+  readonly createAppBar: (callbacks: AppBarCallbacks) => DockBar<BrowserWindow>;
   /** Messages vers les pages. */
   readonly messages: ToolbarMessages;
   /** Cache les fenêtres flottantes (morceau, infobulle). */
@@ -92,7 +91,7 @@ export class ToolbarController {
   private opened = false;
   private pageReadyHandled = false;
   private pageReadyBound = false;
-  private appBar: AppBar<BrowserWindow> | null = null;
+  private appBar: DockBar<BrowserWindow> | null = null;
   private appBarKey: string | null = null;
   private grantedArea: Rect | null = null;
   private autoHideTimer: unknown = null;

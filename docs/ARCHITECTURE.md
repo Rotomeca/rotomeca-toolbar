@@ -13,7 +13,7 @@ Une application Electron a deux mondes qui ne partagent aucune mémoire :
 
 | Monde | Rôle | Où |
 |---|---|---|
-| **Processus principal** (Node.js) | Crée les fenêtres, parle au système (zone de notification, mises à jour, fichiers, barre ancrée Windows). C'est lui qui décide. | `main.ts`, `src/main/`, `src/scripts/` (parties « principal ») |
+| **Processus principal** (Node.js) | Crée les fenêtres, parle au système (zone de notification, mises à jour, fichiers, barre ancrée Windows et X11). C'est lui qui décide. | `main.ts`, `src/main/`, `src/scripts/` (parties « principal ») |
 | **Pages** (Chromium) | Affichent l'interface (barre, paramètres, fenêtre d'ajout...). Elles ne peuvent rien faire seules : elles demandent au processus principal. | `src/page.*/`, `index.html`, `src/scripts/` (parties « page »), `src/index/` |
 | **Preload** | Petit pont sécurisé entre les deux : expose `window.api` aux pages (`invoke`, `on`, `t`). | `preload.ts`, `src/scripts/media/media-preload.ts` |
 
@@ -61,8 +61,10 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `toolbar/displayMode.ts` | Déduit le mode d'affichage (bouton, ancrée, souris, masquage auto) des réglages. La barre ancrée prime. |
 | `dock/dockGeometry.ts` | Calculs purs : disposition des fenêtres, bande à réserver, pas du masquage automatique. |
 | `dock/AppBar.ts` | Barre ancrée Windows (AppBar) : réserve l'espace pour que les fenêtres maximisées ne passent pas dessous. |
-| `dock/appBarApi.ts` | **Seul endroit qui charge koffi** (appels natifs `SHAppBarMessage`...). |
-| `dock/createAppBar.ts` | Branche `AppBar` sur Windows et sur les conversions d'écran d'Electron. |
+| `dock/appBarApi.ts` | Charge koffi côté Windows (appels natifs `SHAppBarMessage`...). |
+| `dock/X11StrutBar.ts` | Barre ancrée Linux X11 : réserve l'espace par les struts EWMH (`_NET_WM_STRUT_PARTIAL`). Même interface `DockBar` que `AppBar`. |
+| `dock/x11Api.ts` | **Seul endroit qui charge `libX11` via koffi** (`XChangeProperty`...). Indisponible sous Wayland. |
+| `dock/createAppBar.ts` | Choisit `AppBar` (Windows) ou `X11StrutBar` (Linux X11) et les branche sur les conversions d'écran d'Electron. |
 
 ### Applications de la barre : `apps/`
 | Fichier | Rôle |

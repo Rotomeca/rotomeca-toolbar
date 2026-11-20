@@ -76,7 +76,7 @@ export function mainWindowSpec(context: WindowSpecContext): WindowOptions {
   };
 }
 
-/** Barre des applications. */
+/** Barre des applications. Sous Linux, de type « dock » : les gestionnaires de fenêtres X11 ne respectent la bande réservée que pour ce type. */
 export function toolbarWindowSpec(context: WindowSpecContext): WindowOptions {
   return {
     ...context.layout.toolbar,
@@ -84,6 +84,7 @@ export function toolbarWindowSpec(context: WindowSpecContext): WindowOptions {
     preload: context.preload,
     file: page(context, 'src', 'page.taskbar', 'taskbar.html'),
     show: false,
+    extra: process.platform === 'linux' ? { type: 'dock' } : {},
   };
 }
 
