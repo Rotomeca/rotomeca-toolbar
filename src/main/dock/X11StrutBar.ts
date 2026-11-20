@@ -24,7 +24,8 @@ const readWindowId = (handle: Buffer): number => handle.readUInt32LE(0);
  * Ancre une fenêtre au bord gauche de l'écran : le gestionnaire de fenêtres retire la bande
  * réservée de la zone de travail, donc les fenêtres maximisées ne passent plus dessous.
  * X11 n'a ni négociation de la zone ni notification : la zone accordée est celle demandée,
- * restreinte en hauteur à la zone de travail (pour ne pas passer sous la barre du haut ou le dock).
+ * restreinte par le haut à la zone de travail (pour ne pas passer sous la barre du haut). Le bas
+ * descend jusqu'au bord de l'écran : la barre recouvre un dock placé en bas.
  */
 export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> {
   /** Fenêtre ancrée, `null` tant que la barre n'est pas enregistrée. */
@@ -58,7 +59,7 @@ export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> 
   /**
    * Réserve une bande sur le bord gauche de l'écran.
    * @param dipBounds Zone souhaitée
-   * @returns La zone demandée, restreinte en hauteur à la zone de travail, ou `null` si la barre n'est pas enregistrée
+   * @returns La zone demandée, restreinte par le haut à la zone de travail, ou `null` si la barre n'est pas enregistrée
    */
   setPos(dipBounds: Rect): Rect | null {
     const { window } = this;
@@ -73,7 +74,7 @@ export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> 
 
     const area = this.workAreaOf(window);
     const top = Math.max(dipBounds.y, area.y);
-    const bottom = Math.min(dipBounds.y + dipBounds.height, area.y + area.height);
+    const bottom = dipBounds.y + dipBounds.height;
     return { ...dipBounds, y: top, height: Math.max(0, bottom - top) };
   }
 

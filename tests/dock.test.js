@@ -326,12 +326,12 @@ test('X11StrutBar : setPos réserve la bande en pixels physiques et rend la zone
   assert.deepEqual(api.calls, [['set', 0x2a, { width: 80, startY: 80, endY: 1079 }]]);
 });
 
-test('X11StrutBar : la zone accordée est restreinte en hauteur à la zone de travail', () => {
+test('X11StrutBar : la zone accordée est restreinte par le haut à la zone de travail, le bas va au bord de l\'écran', () => {
   const api = fakeX11Api();
   const bar = new X11StrutBar(api, x2, workArea);
   bar.register(fakeX11Window());
 
-  assert.deepEqual(bar.setPos({ x: 0, y: 0, width: 40, height: 1200 }), { x: 0, y: 27, width: 40, height: 1000 });
+  assert.deepEqual(bar.setPos({ x: 0, y: 0, width: 40, height: 1200 }), { x: 0, y: 27, width: 40, height: 1173 });
 });
 
 test('X11StrutBar : setPos sans enregistrement ne fait rien', () => {
