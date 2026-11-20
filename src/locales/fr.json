@@ -3,6 +3,7 @@
   "tray.toggle": "Afficher ou cacher la barre",
   "tray.settings": "Paramètres",
   "tray.quit": "Quitter l'application",
+  "tray.debugConsole": "[DEBUG] Ouvrir une console",
   "tray.ignoredPlayers": "Seul le premier lecteur est pris en compte (+{count} ignoré(s))",
   "tray.updateAvailable": "Mise à jour disponible ({version})",
   "tray.updateReady": "Mise à jour prête : redémarrez pour l'installer",
@@ -135,6 +136,8 @@
   "add.iconHint": "Optionnelle : le favicon du site est utilisé par défaut",
   "add.clearIcon": "Retirer l'icône",
   "add.save": "Sauvegarder",
+  "add.edit": "Modifier",
+  "add.editTitle": "Modifier une application",
 
   "settings.mode": "Mode d'activation",
   "settings.modeButton": "Bouton",

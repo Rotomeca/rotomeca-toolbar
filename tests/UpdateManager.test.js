@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { UpdateManager } = require('../src/scripts/UpdateManager.js');
-const { compareVersions } = require('../src/scripts/versions.js');
+const { UpdateManager } = require('../dist/src/scripts/UpdateManager.js');
+const { compareVersions } = require('../dist/src/scripts/versions.js');
 
 const REPO = 'Rotomeca/releases';
 

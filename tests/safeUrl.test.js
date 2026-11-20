@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isSafeUrl } = require('../src/scripts/safeUrl.js');
+const { isSafeUrl } = require('../dist/src/scripts/safeUrl.js');
 
 test('isSafeUrl : accepte http et https', () => {
   assert.equal(isSafeUrl('https://example.com/path?q=1'), true);

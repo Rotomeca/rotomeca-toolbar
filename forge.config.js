@@ -2,8 +2,9 @@ const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('node:path');
 const { version } = require('./package.json');
-const { iconBaseName } = require('./src/scripts/appIcon.js');
-const { isPrerelease } = require('./src/scripts/versions.js');
+// Lus depuis dist/ : `pnpm build` doit avoir été lancé (les scripts start, package et make s'en chargent)
+const { iconBaseName } = require('./dist/src/scripts/appIcon.js');
+const { isPrerelease } = require('./dist/src/scripts/versions.js');
 
 // Une pré-version (X.Y.Z-rcN) a sa propre icône (badge « RC ») : exécutable,
 // installeur et paquets Linux compris.
@@ -25,11 +26,15 @@ const windowsSign = process.env.WINDOWS_CERTIFICATE_FILE
     }
   : undefined;
 
+// Liste blanche : seuls dist/ (le code), package.json et les dépendances sont embarqués.
+// Les sources, tests, scripts et archives de conception restent hors du paquet.
+const EMBEDDED = ['/dist', '/package.json', '/node_modules'];
+const isEmbedded = (file) => EMBEDDED.some((entry) => file === entry || file.startsWith(`${entry}/`));
+
 module.exports = {
   packagerConfig: {
     asar: true,
-    // Les tests n'ont rien à faire dans l'application livrée
-    ignore: [/^\/tests($|\/)/],
+    ignore: (file) => file !== '' && !isEmbedded(file),
     icon: `./src/pictures/${icon}`,
     // Signe l'exécutable, les DLL et les modules natifs de l'application
     ...(windowsSign && { windowsSign }),

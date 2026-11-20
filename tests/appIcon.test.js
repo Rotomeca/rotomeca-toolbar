@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { iconBaseName } = require('../src/scripts/appIcon.js');
+const { iconBaseName } = require('../dist/src/scripts/appIcon.js');
 
 const PICTURES = path.join(__dirname, '..', 'src', 'pictures');
 
