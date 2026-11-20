@@ -11,6 +11,7 @@
  * - `ThemeService` : thème clair/sombre/saison, appliqué aux pages et rediffusé quand les paramètres changent.
  * - `AppViewHost` : vues web des sites lancés (ouverture, cache, son coupé, badges, contrôle des médias).
  * - `AppListService` : liste des applications de la barre, sauvegardée sur disque (`JsonFileStore`).
+ * - `FaviconService` : icônes des sites, cherchées dans leur page et gardées sur disque.
  * - `MediaPopup` et `TooltipPopup` : petites fenêtres flottantes (morceau en cours, infobulle d'un bouton).
  * - `ContextMenuController` : menu contextuel (clic droit) des boutons de la barre.
  * - Zone de notification (`createElectronTray`) : icône, menu, infobulle du morceau et badge de mise à jour.
@@ -24,7 +25,7 @@
 // [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { WebContentsView, app, dialog, ipcMain, screen, shell } from 'electron';
+import { WebContentsView, app, dialog, ipcMain, net, screen, session, shell } from 'electron';
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 // [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { sanitizeMediaState } from '../scripts/AppIndicators.js';
@@ -44,6 +45,8 @@ import type { UpdateManager } from '../scripts/UpdateManager.js';
 import { appEventList, internalChannels, pageEventList } from '../shared/ipc/events.js';
 // [AppListService.ts] Service des applications de la barre : ordre, séparateurs, validation et enregistrement
 import { AppListService } from './apps/AppListService.js';
+// [FaviconService.ts] Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque
+import { CACHE_FILE, FaviconService } from './apps/FaviconService.js';
 // [AppViewHost.ts] Hôte des sites ouverts en arrière-plan : vues, indicateurs (non-lus, son, morceau) et sourdine
 import { AppViewHost } from './apps/AppViewHost.js';
 // [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
@@ -94,6 +97,8 @@ export const TOGGLE_SHORTCUT = 'CommandOrControl+Alt+B';
 
 /** Délai (ms) avant de masquer la fenêtre du morceau quand le pointeur quitte le bouton. */
 const MEDIA_POPUP_HIDE_DELAY_MS = 250;
+/** Délai maximal d'une requête de recherche d'icône (page ou image). */
+const FAVICON_TIMEOUT_MS = 15000;
 
 /** Racine de l'application construite (`dist/`) : ce fichier est dans `dist/src/main/`. */
 const APP_ROOT = path.join(__dirname, '..', '..');
@@ -107,6 +112,9 @@ export interface AppServices {
   /** Vrai en mode développement (`--dev`). */
   readonly isDev: boolean;
 }
+
+/** @returns L'identifiant de navigateur d'Electron sans les mentions « Electron/… » et du nom de l'application */
+const browserUserAgent = (): string => session.defaultSession.getUserAgent().replace(/\s(Electron|rotomecatoolbar)\/\S+/gi, '');
 
 /** Vrai si la valeur reçue d'une page est un objet, ce qui permet d'en lire les champs avant de les vérifier. */
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -128,6 +136,7 @@ export class App {
   private readonly theme: ThemeService;
   private readonly viewHost: AppViewHost<WebContentsView>;
   private readonly appList: AppListService;
+  private readonly favicons: FaviconService;
   private readonly mediaPopup: MediaPopup;
   private readonly tooltipPopup: TooltipPopup;
   private readonly tray: ReturnType<typeof createElectronTray>;
@@ -222,6 +231,19 @@ export class App {
       headerHeight: APPS_HEADER_HEIGHT,
       onChange: (url) => this.sendIndicators(url),
       mediaActionChannel: internalChannels.mediaAction,
+    });
+
+    this.favicons = new FaviconService({
+      repository: new JsonFileStore(dataDirectory(), CACHE_FILE),
+      now: () => Date.now(),
+      // Sans cookies (aucune donnée de l'utilisateur envoyée) et avec l'identifiant d'un navigateur ordinaire :
+      // certains serveurs (Tchap) ne répondent pas à « Electron/x.y.z »
+      fetch: (url) =>
+        net.fetch(url, {
+          credentials: 'omit',
+          headers: { 'user-agent': browserUserAgent() },
+          signal: AbortSignal.timeout(FAVICON_TIMEOUT_MS),
+        }),
     });
 
     const store = new JsonFileStore(dataDirectory(), 'data.rsft');
@@ -598,6 +620,7 @@ export class App {
         if (typeof url === 'string') viewHost.hide(url);
       })
       .handle(appEventList.closeApps, () => this.closeApps())
+      .handle(appEventList.getFavicon, (_, url) => (typeof url === 'string' ? this.favicons.resolve(url) : null))
       .handle(appEventList.appsContextMenu, () =>
         showAppsWindowMenu(windows.apps, buildAppsWindowMenu(t, { resetSize: () => windows.resetAppsSize() })),
       )

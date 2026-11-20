@@ -71,6 +71,8 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 |---|---|
 | `appList.ts` | Règles pures sur la liste : déplacer, séparateurs, supprimer, remplacer. |
 | `AppListService.ts` | La liste vivante : valide ce que les pages envoient, enregistre sur disque, prévient la barre de chaque changement. |
+| `favicon.ts` | Cherche l'icône d'un site : lit sa page, classe les `<link rel="icon">` (la plus grande d'abord), repli sur `/favicon.ico`, contrôle le contenu et renvoie un `data:`. |
+| `FaviconService.ts` | Garde les icônes (mémoire + `favicons.v2.json`, 14 jours, absence d'icône 6 h, site injoignable non mémorisé) ; une seule recherche par site. |
 | `AppViewHost.ts` | Les sites ouverts en arrière-plan : une vue par site, non-lus, son, morceau en cours, son coupé. |
 
 ### Médias, infobulle, zone de notification : `media/`, `tooltip/`, `tray/`

@@ -87,6 +87,7 @@ export interface InvokeContracts {
   closeFrame: { args: [url: string]; result: void };
   openFrame: { args: [url: string]; result: void };
   closeApps: { args: []; result: void };
+  getFavicon: { args: [url: string]; result: string | null };
   appsContextMenu: { args: []; result: void };
   appDelete: { args: [url: string]; result: void };
   appEdit: { args: [app: Partial<EditRequestDto> & { url: string }]; result: void };
