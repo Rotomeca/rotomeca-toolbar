@@ -75,6 +75,17 @@ test('themeCatalog : familyOf retrouve la famille, « base » à défaut', async
   assert.equal(familyOf('inconnu'), 'base');
 });
 
+test('themeCatalog : blanc et noir sont des variantes de clair et de sombre', async () => {
+  const { THEME_FAMILIES, themesOf, familyOf } = await load('src/page.settings/themeCatalog.js');
+  const base = Object.fromEntries(THEME_FAMILIES.base.entries.map((entry) => [entry.name, themesOf(entry)]));
+  assert.deepEqual(base.clair, ['clair', 'blanc']);
+  assert.deepEqual(base.sombre, ['sombre', 'noir']);
+  assert.equal(base.blanc, undefined);
+  assert.equal(base.noir, undefined);
+  assert.equal(familyOf('blanc'), 'base');
+  assert.equal(familyOf('noir'), 'base');
+});
+
 test('themeCatalog : themesOf donne les variantes ou le thème lui-même', async () => {
   const { themesOf } = await load('src/page.settings/themeCatalog.js');
   assert.deepEqual(themesOf({ name: 'rouge' }), ['rouge']);

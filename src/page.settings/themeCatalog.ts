@@ -40,7 +40,23 @@ export type FamilyKey = 'base' | 'colors' | 'seasons';
 export const THEME_FAMILIES: Readonly<Record<FamilyKey, ThemeFamily>> = {
   base: {
     label: 'settings.familyBase',
-    entries: [{ name: 'system' }, { name: 'clair' }, { name: 'sombre' }, { name: 'blanc' }, { name: 'noir' }],
+    entries: [
+      { name: 'system' },
+      {
+        name: 'clair',
+        variants: [
+          { label: 'settings.variantClassic', theme: 'clair' },
+          { label: 'settings.themeWhite', theme: 'blanc' },
+        ],
+      },
+      {
+        name: 'sombre',
+        variants: [
+          { label: 'settings.variantClassic', theme: 'sombre' },
+          { label: 'settings.themeBlack', theme: 'noir' },
+        ],
+      },
+    ],
   },
   colors: {
     label: 'settings.familyColors',
