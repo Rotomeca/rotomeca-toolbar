@@ -38,7 +38,7 @@ export interface AppBarWindow {
 }
 
 /** Conversions entre pixels indépendants de la densité et pixels physiques (`Electron.screen`). */
-export interface DipConverter<W extends AppBarWindow> {
+export interface DipConverter<W> {
   dipToScreenRect(window: W, rect: Rect): Rect;
   screenToDipRect(window: W, rect: Rect): Rect;
 }
@@ -51,6 +51,18 @@ export interface AppBarCallbacks {
   onPosChanged?: () => void;
 }
 
+/** Ce que `ToolbarController` attend d'une barre ancrée, quel que soit le système (AppBar Windows, struts X11). */
+export interface DockBar<W> {
+  /** `true` si la barre est actuellement enregistrée auprès du système. */
+  readonly registered: boolean;
+  /** Enregistre la fenêtre comme barre ancrée. @returns `true` si elle l'est (ou l'était déjà) */
+  register(window: W): boolean;
+  /** Réserve une bande sur le bord gauche. @returns La zone accordée, ou `null` si non enregistrée */
+  setPos(dipBounds: Rect): Rect | null;
+  /** Libère l'espace réservé. */
+  unregister(): void;
+}
+
 /** Lit le handle natif de la fenêtre (64 bits ou 32 bits selon la plateforme). */
 const readHandle = (handle: Buffer): bigint | number =>
   handle.length >= 8 ? handle.readBigUInt64LE(0) : handle.readUInt32LE(0);
@@ -60,7 +72,7 @@ const readHandle = (handle: Buffer): bigint | number =>
  * (AppBar) : le système réserve l'espace et les autres fenêtres maximisées ne passent plus dessous.
  * Les appels natifs sont fournis par `api` (`null` : non pris en charge).
  */
-export class AppBar<W extends AppBarWindow = AppBarWindow> {
+export class AppBar<W extends AppBarWindow = AppBarWindow> implements DockBar<W> {
   /** Fenêtre ancrée, `null` tant que la barre n'est pas enregistrée. */
   private window: W | null = null;
   /** Identifiant du message que le système enverra à la fenêtre. */
