@@ -36,6 +36,7 @@ Règles générales importées depuis `.claude/claude-config/` (copie locale de 
 | `pnpm test` | Construit puis lance les tests `node:test` (`tests/*.test.js`, qui lisent `dist/`) |
 | `pnpm smoke` | Construit puis démarre l'app en mode « fumée » (pages, preloads, koffi, et sous Windows l'application complète sur des données temporaires) |
 | `pnpm package` / `pnpm make` | Construit puis empaquette / crée les installeurs |
+| `pnpm make:appimage` | Linux : construit l'AppImage et `latest-linux.yml` (electron-updater) à partir du paquet de `out/` (lancer `pnpm package` avant) |
 | `pnpm verify:package` / `pnpm smoke:packaged` | Vérifient le paquet de `out/` (contenu) et le font démarrer en mode fumée |
 | `pnpm pre-release X.Y.Z [--push] [--dry-run]` | Crée une pré-version `X.Y.Z-rcN` |
 

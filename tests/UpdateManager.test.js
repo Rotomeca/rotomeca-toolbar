@@ -447,6 +447,31 @@ test('installTest : télécharge et installe comme une mise à jour normale', as
   assert.equal(autoUpdater.installs, 1);
 });
 
+test('installTest : le serveur reçoit la version visée, et une autre version le relance', async () => {
+  const calls = [];
+  let newest = release('3.3.0-rc1', { prerelease: true });
+  const { manager, autoUpdater } = setupAutoTest({
+    setFeed: (channel, version) => calls.push([channel, version]),
+    fetch: async (...args) => githubList([newest])(...args),
+  });
+
+  await manager.checkTest();
+  manager.installTest();
+  autoUpdater.emit('update-not-available');
+
+  // Même version : pas de nouveau réglage ; version plus récente : le serveur est ciblé de nouveau
+  manager.installTest();
+  autoUpdater.emit('update-not-available');
+  newest = release('3.3.0-rc2', { prerelease: true });
+  await manager.checkTest();
+  manager.installTest();
+
+  assert.deepEqual(calls, [
+    ['test', '3.3.0-rc1'],
+    ['test', '3.3.0-rc2'],
+  ]);
+});
+
 test('installTest : la vérification normale suivante revient au serveur normal', async () => {
   const { manager, autoUpdater, feeds } = setupAutoTest();
   await manager.checkTest();
@@ -643,4 +668,30 @@ test('state.prerelease : ne change pas au fil des vérifications', async () => {
   manager.start();
   autoUpdater.emit('update-not-available');
   assert.equal(manager.state.prerelease, true);
+});
+
+test('progression : la barre suit le pourcentage entier du téléchargement, sans bruit', () => {
+  const autoUpdater = fakeAutoUpdater();
+  let listener = null;
+  autoUpdater.onProgress = (fn) => {
+    listener = fn;
+  };
+  const { manager, calls } = setup({ autoUpdater });
+  manager.start();
+
+  // Hors téléchargement : ignoré
+  listener(10);
+  assert.equal(manager.state.pourcentage, null);
+
+  autoUpdater.emit('update-available');
+  const before = calls.changes.length;
+  listener(12.4);
+  listener(12.9);
+  listener(Number.NaN);
+  assert.equal(manager.state.pourcentage, 12);
+  // 12.4 et 12.9 donnent le même entier : un seul changement publié
+  assert.equal(calls.changes.length, before + 1);
+
+  listener(250);
+  assert.equal(manager.state.pourcentage, 100);
 });

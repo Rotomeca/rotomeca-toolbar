@@ -36,8 +36,8 @@ pnpm pre-release 3.4.0 --push       # branche pre-release/3.4.0-rc1, tag 3.4.0-r
 ```
 
 - `--rc N` impose le numéro (sinon, le suivant parmi les tags existants) ; `--dry-run` affiche sans rien faire ; sans `--push`, tout reste en local et la commande à lancer est affichée.
-- Le tag `X.Y.Z-rcN` déclenche le workflow `Release`, qui crée une **pré-version** GitHub. Le serveur de mises à jour et l'avis de nouvelle version sous Linux l'ignorent : personne ne la reçoit automatiquement.
-- Pour la tester : **Paramètres > Général > Version de test > Rechercher**, puis **Installer** (Windows, voir ci-dessous) ou **Télécharger** (Linux, ou serveur de test non configuré : ouvre la page de la release).
+- Le tag `X.Y.Z-rcN` déclenche le workflow `Release`, qui crée une **pré-version** GitHub. Le serveur de mises à jour (Windows), l'avis de nouvelle version (Linux deb/rpm) et la mise à jour automatique de l'AppImage l'ignorent : personne ne la reçoit automatiquement.
+- Pour la tester : **Paramètres > Général > Version de test > Rechercher**, puis **Installer** (Windows, voir ci-dessous, et Linux AppImage : téléchargement avec barre de progression puis redémarrage) ou **Télécharger** (Linux deb/rpm, ou serveur de test non configuré : ouvre la page de la release).
 - Un correctif ? Refaire `pnpm pre-release 3.4.0 --push` : le numéro passe à `-rc2`.
 - Quand elle est validée, publier la vraie release `X.Y.Z` avec le flux git flow ci-dessus. C'est un second build du même code. En ordre de versions, `3.4.0-rc1` est plus ancienne que `3.4.0` : une app qui a installé la pré-version reçoit la release finale automatiquement.
 

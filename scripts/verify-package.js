@@ -33,6 +33,9 @@ const REQUIRED_FROM_BASE = [
   'node_modules/@rotomeca/design-system/out/rotomeca-design-system.js',
 ];
 
+/** Dépendances d'exécution chargées depuis le `node_modules` de la racine de l'archive. */
+const ROOT_MODULES = ['/node_modules/electron-updater/out/main.js'];
+
 /**
  * @param {string} mainFile Champ `main` de package.json (`main.js` ou `dist/main.js`)
  * @returns {string[]} Chemins attendus dans l'archive, en notation `/dossier/fichier`
@@ -42,7 +45,7 @@ function requiredEntries(mainFile) {
   const base = path.posix.dirname(mainPath) === '.' ? '' : path.posix.dirname(mainPath);
   const entries = REQUIRED_FROM_BASE.map((file) => `/${[base, file].filter(Boolean).join('/')}`);
 
-  return [`/${mainPath}`, '/package.json', ...entries];
+  return [`/${mainPath}`, '/package.json', ...ROOT_MODULES, ...entries];
 }
 
 /** Ce que l'archive ne doit pas contenir : sources, tests et outils de développement. */

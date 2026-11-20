@@ -1,5 +1,5 @@
 /**
- * Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions.
+ * Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions.
  *
  * Utilisé par le processus principal, qui injecte Squirrel, le réseau et les
  * notifications (aucune dépendance à `electron`, donc testable).
@@ -7,7 +7,9 @@
  * - Windows / macOS : Squirrel (`autoUpdater`). Le téléchargement démarre dès qu'une
  *   version est trouvée ; Squirrel n'expose aucune progression, la barre est donc
  *   indéterminée.
- * - Linux : pas d'installation automatique ; on compare avec la dernière release GitHub
+ * - Linux, AppImage : electron-updater, branché comme Squirrel (adaptateur `appImageUpdater.ts`),
+ *   avec en plus une barre de progression réelle (`download-progress`).
+ * - Linux, deb / rpm : pas d'installation automatique ; on compare avec la dernière release GitHub
  *   et l'action ouvre la page de téléchargement.
  *
  * - Canal de test (toutes plateformes) : les releases GitHub marquées « pré-version »
@@ -61,6 +63,8 @@ export interface SquirrelUpdater {
   checkForUpdates(): void;
   /** Quitte l'application et installe la version téléchargée. */
   quitAndInstall(): void;
+  /** Écoute la progression du téléchargement (0 à 100) ; absent avec Squirrel, qui n'en donne aucune. */
+  onProgress?(listener: (percent: number) => void): void;
 }
 
 /** Tout ce que le gestionnaire reçoit de l'extérieur (Squirrel, réseau, système, fenêtres). */
@@ -84,7 +88,7 @@ export interface UpdateManagerDependencies {
   /** Sauvegardes avant le redémarrage. */
   readonly beforeInstall: () => void;
   /** Change le serveur interrogé par Squirrel. */
-  readonly setFeed?: ((channel: UpdateChannel) => void) | null;
+  readonly setFeed?: ((channel: UpdateChannel, version?: string | null) => void) | null;
   /** Un serveur de mises à jour pour les pré-versions existe. */
   readonly testFeed?: boolean;
   /** Appelé à chaque changement d'état (renvoyé à la fenêtre Paramètres). */
@@ -107,6 +111,8 @@ export class UpdateManager {
   #testUrl: string | null = null;
   /** Serveur actuellement interrogé par Squirrel. */
   #channel: UpdateChannel = 'stable';
+  /** Pré-version visée quand le serveur interrogé est celui des pré-versions. */
+  #channelVersion: string | null = null;
 
   /**
    * Prépare l'état initial (« à jour ») sans rien lancer ; voir {@link UpdateManager.start}.
@@ -182,7 +188,7 @@ export class UpdateManager {
     }
     if (verification || IN_PROGRESS.includes(etat)) return;
 
-    this.#useChannel('test');
+    this.#useChannel('test', versionTest);
     this.#set({ verification: true, erreur: null, erreurTest: null, versionDisponible: versionTest });
     try {
       this.#requireUpdater().checkForUpdates();
@@ -288,7 +294,20 @@ export class UpdateManager {
 
     autoUpdater.on('update-downloaded', (_event, _notes, releaseName) => this.#onDownloaded(releaseName));
 
+    autoUpdater.onProgress?.((percent) => this.#onProgress(percent));
+
     autoUpdater.on('error', (error) => this.#fail(error));
+  }
+
+  /**
+   * Met à jour la barre de progression ; ignoré hors téléchargement et tant que le pourcentage entier ne change pas.
+   * @param percent Avancement du téléchargement, de 0 à 100
+   */
+  #onProgress(percent: number): void {
+    if (this.#state.etat !== 'downloading' || !Number.isFinite(percent)) return;
+
+    const rounded = Math.min(100, Math.max(0, Math.floor(percent)));
+    if (rounded !== this.#state.pourcentage) this.#set({ pourcentage: rounded });
   }
 
   /** Squirrel ne trouve rien : « à jour », ou erreur dédiée si on cherchait sur le serveur de test. */
@@ -396,12 +415,16 @@ export class UpdateManager {
     this.#set({ etat: next, verification: false, pourcentage: null, ...failure });
   }
 
-  /** @param channel Serveur que Squirrel doit interroger */
-  #useChannel(channel: UpdateChannel): void {
-    if (this.#channel === channel) return;
+  /**
+   * @param channel Serveur que Squirrel doit interroger
+   * @param version Pré-version visée (canal `test`) : une autre version relance le choix du serveur
+   */
+  #useChannel(channel: UpdateChannel, version: string | null = null): void {
+    if (this.#channel === channel && this.#channelVersion === version) return;
 
-    this.#deps.setFeed?.(channel);
+    this.#deps.setFeed?.(channel, version);
     this.#channel = channel;
+    this.#channelVersion = version;
   }
 
   /**

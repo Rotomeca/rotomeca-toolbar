@@ -107,7 +107,8 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | Fichier | Rôle |
 |---|---|
 | `updates/createUpdateManager.ts` | Branche le gestionnaire de mises à jour (`src/scripts/UpdateManager.ts`) sur Squirrel, GitHub et les sauvegardes. |
-| `updates/updateMode.ts` | Choisit le mode (Squirrel, GitHub sous Linux, simulation) et le serveur (stable ou test). |
+| `updates/updateMode.ts` | Choisit le mode (Squirrel, AppImage, GitHub sous Linux deb/rpm, simulation) et le serveur (stable ou test). |
+| `updates/appImageUpdater.ts` | Présente electron-updater (AppImage Linux) comme l'interface de Squirrel, avec la progression réelle du téléchargement et le canal « test » (pré-versions). |
 | `updates/updateNotification.ts` | Notification système « mise à jour prête ». |
 
 ### Menu contextuel : `contextmenu/`
@@ -157,7 +158,7 @@ fenêtre des sites → le site tourne en arrière-plan ; son titre `(3) Boîte` 
 **Changer de mode d'affichage** : la page des paramètres envoie `setting.updated` → `applySettingsUpdate` valide et enregistre
 → `ToolbarController.rebuildForModeChange` détruit/recrée la barre dans le bon mode (bouton, souris, ancrée).
 
-**Mise à jour** : `UpdateManager` vérifie (Squirrel sous Windows, GitHub sous Linux) → l'état est envoyé aux paramètres et à la
+**Mise à jour** : `UpdateManager` vérifie (Squirrel sous Windows, electron-updater pour une AppImage Linux, GitHub pour un deb/rpm) → l'état est envoyé aux paramètres et à la
 barre (`updateState`) → `TrayService` colore l'icône → une notification propose d'installer.
 
 ## 7. Données de l'utilisateur (ne jamais changer ces noms)
