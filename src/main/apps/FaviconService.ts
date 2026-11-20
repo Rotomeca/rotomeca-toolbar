@@ -1,0 +1,107 @@
+/**
+ * Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque.
+ *
+ * Utilisé par `App` pour répondre à la page de la barre. Le réseau, le disque et l'horloge sont injectés.
+ * Une icône trouvée est gardée 14 jours, un échec 1 jour (pour ne pas réinterroger un site sans icône à chaque démarrage).
+ */
+// [favicon.ts] Recherche de l'icône d'un site : lecture de sa page, classement des icônes déclarées, téléchargement
+import { findFavicon } from './favicon.js';
+import type { FaviconFetch } from './favicon.js';
+
+/** Durée de validité d'une icône trouvée. */
+export const FOUND_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+/** Durée de validité d'un échec. */
+export const MISSING_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Ce qui est enregistré pour un site. */
+interface CacheEntry {
+  /** Icône en `data:`, `null` si le site n'en a pas. */
+  readonly icon: string | null;
+  /** Date de la recherche (ms). */
+  readonly at: number;
+}
+
+/** Où le cache est enregistré. */
+export interface FaviconRepository {
+  /** @returns Les données enregistrées, ou `false` s'il n'y en a pas */
+  loadAsync(): Promise<unknown>;
+  /** Enregistre les données. */
+  save(data: unknown): void;
+}
+
+/** Collaborateurs du service. */
+export interface FaviconDeps {
+  readonly fetch: FaviconFetch;
+  readonly repository: FaviconRepository;
+  readonly now: () => number;
+}
+
+/** Garde les icônes des sites : une recherche par site à la fois, résultat réutilisé tant qu'il est valide. */
+export class FaviconService {
+  readonly #deps: FaviconDeps;
+  readonly #entries = new Map<string, CacheEntry>();
+  readonly #pending = new Map<string, Promise<string | null>>();
+  #loaded: Promise<void> | null = null;
+
+  /** @param deps Réseau, enregistrement et horloge */
+  constructor(deps: FaviconDeps) {
+    this.#deps = deps;
+  }
+
+  /**
+   * @param siteUrl Adresse de l'application
+   * @returns L'icône du site en `data:`, `null` si le site n'en a pas ou si l'adresse est invalide
+   */
+  async resolve(siteUrl: string): Promise<string | null> {
+    let origin: string;
+    try {
+      origin = new URL(siteUrl).origin;
+    } catch {
+      return null;
+    }
+    if (origin === 'null') return null;
+
+    await (this.#loaded ??= this.#load());
+
+    const entry = this.#entries.get(origin);
+    if (entry && this.#deps.now() - entry.at < (entry.icon ? FOUND_TTL_MS : MISSING_TTL_MS)) return entry.icon;
+
+    // Plusieurs boutons du même site partagent une seule recherche
+    const running = this.#pending.get(origin);
+    if (running) return running;
+
+    const search = this.#search(origin, siteUrl).finally(() => this.#pending.delete(origin));
+    this.#pending.set(origin, search);
+    return search;
+  }
+
+  /** Cherche l'icône, l'enregistre et la renvoie ; une erreur imprévue est comptée comme un échec. */
+  async #search(origin: string, siteUrl: string): Promise<string | null> {
+    let icon: string | null = null;
+    try {
+      icon = await findFavicon(siteUrl, this.#deps.fetch);
+    } catch (error) {
+      console.error('Favicon lookup failed', error);
+    }
+
+    this.#entries.set(origin, { icon, at: this.#deps.now() });
+    try {
+      this.#deps.repository.save(Object.fromEntries(this.#entries));
+    } catch (error) {
+      console.error('Favicon cache not saved', error);
+    }
+    return icon;
+  }
+
+  /** Lit le cache enregistré ; ce qui n'a pas la bonne forme est ignoré. */
+  async #load(): Promise<void> {
+    const data = await this.#deps.repository.loadAsync();
+    if (typeof data !== 'object' || data === null) return;
+
+    for (const [origin, value] of Object.entries(data)) {
+      const { icon, at } = (value ?? {}) as Partial<CacheEntry>;
+      const validIcon = icon === null || (typeof icon === 'string' && icon.startsWith('data:image/'));
+      if (validIcon && typeof at === 'number') this.#entries.set(origin, { icon, at });
+    }
+  }
+}

@@ -17,6 +17,8 @@ import { StyleComponent } from '../../../lib/RotomecaWebComponents/libs/StyleCom
 import type { Rule } from '../../../lib/RotomecaWebComponents/libs/StyleComponent.js';
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { IndicatorsDto } from '../../shared/dto.js';
+// [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
+import { appEventList } from '../../shared/ipc/events.js';
 // [ToolbarAppData.ts] Données d'une application affichée sur un bouton de la barre : adresse, titre, image
 import { ToolbarAppData } from '../ToolbarAppData.js';
 
@@ -180,7 +182,7 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
    * @returns L'icône de l'application : sa police d'icônes, son image, ou son favicon (puis sa première lettre)
    */
   #createIcon(): HTMLElement {
-    const { picture, path, title } = this.itemData;
+    const { picture, path, link } = this.itemData;
 
     if (picture?.includes('font:')) {
       const icon = document.createElement('i');
@@ -198,17 +200,40 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
     if (picture) {
       image.src = picture;
     } else {
-      image.src = `${path}/favicon.ico`;
-      image.onerror = () => {
-        const initial = document.createElement('p');
-        initial.appendChild(this.createText(title.slice(0, 1)));
-
-        this.root.querySelector('div')?.appendChild(initial);
-        image.remove();
-      };
+      // Le processus principal cherche l'icône dans la page du site (et la garde) ; la première lettre sert de repli
+      this.#loadFavicon(image, link, path);
     }
 
     return image;
+  }
+
+  /**
+   * Affiche l'icône du site, ou sa première lettre si elle n'existe pas.
+   * @param image Élément d'image du bouton
+   * @param link Adresse de l'application
+   * @param path Racine du site, utilisée seulement si le processus principal ne répond pas
+   */
+  #loadFavicon(image: HTMLImageElement, link: string, path: string): void {
+    const showInitial = (): void => {
+      const initial = document.createElement('p');
+      initial.appendChild(this.createText(this.itemData.title.slice(0, 1)));
+
+      this.root.querySelector('div')?.appendChild(initial);
+      image.remove();
+    };
+
+    if (!window.api?.invoke) {
+      image.onerror = showInitial;
+      image.src = `${path}/favicon.ico`;
+      return;
+    }
+
+    window.api.invoke(appEventList.getFavicon, link)
+      .then((icon) => {
+        if (typeof icon === 'string') image.src = icon;
+        else showInitial();
+      })
+      .catch(showInitial);
   }
 
   /** Crée les éléments des indicateurs (pochette, anneau, pastilles) et garde leurs références. */
