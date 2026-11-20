@@ -267,11 +267,13 @@ function checkTranslations() {
 
 /** @returns {CheckResult} */
 function checkKoffi() {
-  const name = 'koffi (barre ancrée Windows)';
-  if (process.platform !== 'win32') return { name, ok: true, detail: 'ignoré hors Windows' };
+  const name = 'koffi (barre ancrée)';
+  const libraries = { win32: 'shell32.dll', linux: 'libX11.so.6' };
+  const library = libraries[process.platform];
+  if (!library) return { name, ok: true, detail: 'ignoré hors Windows et Linux' };
 
   try {
-    require('koffi').load('shell32.dll');
+    require('koffi').load(library);
     return { name, ok: true, detail: 'ok' };
   } catch (error) {
     return { name, ok: false, detail: error.message };
