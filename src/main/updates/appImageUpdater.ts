@@ -8,16 +8,19 @@ import type { SquirrelUpdater } from '../../scripts/UpdateManager.js';
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { UpdateChannel } from '../../shared/dto.js';
 
+/** Où electron-updater cherche `latest-linux.yml` : les releases d'un dépôt GitHub ou un dossier d'adresse connue. */
+export type FeedOptions =
+  | { readonly provider: 'github'; readonly owner: string; readonly repo: string }
+  | { readonly provider: 'generic'; readonly url: string };
+
 /** Ce que l'adaptateur utilise d'electron-updater (`AppImageUpdater` / `autoUpdater` conviennent). */
 export interface ElectronUpdaterLike {
   /** Télécharge la mise à jour dès qu'elle est trouvée. */
   autoDownload: boolean;
   /** Installe la mise à jour à la fermeture : désactivé, l'installation est demandée par l'utilisateur. */
   autoInstallOnAppQuit: boolean;
-  /** Propose aussi les pré-versions GitHub. */
+  /** Propose aussi les pré-versions GitHub (laissé à `false` : le canal « test » cible une release précise). */
   allowPrerelease: boolean;
-  /** Nom du canal (fichier `<canal>-linux.yml` de la release). */
-  channel: string | null;
   /** Écoute un évènement ; seule la version est lue dans l'information transmise. */
   on(event: 'update-available' | 'update-not-available', listener: () => void): unknown;
   on(event: 'update-downloaded', listener: (info: { readonly version: string }) => void): unknown;
@@ -25,6 +28,8 @@ export interface ElectronUpdaterLike {
   on(event: 'download-progress', listener: (progress: { readonly percent: number }) => void): unknown;
   /** Interroge GitHub ; le résultat passe par les évènements. */
   checkForUpdates(): Promise<unknown>;
+  /** Choisit où chercher les mises à jour : une release GitHub ou un dossier de fichiers. */
+  setFeedURL(options: FeedOptions): void;
   /** Quitte l'application et lance la version téléchargée (`isSilent`, `isForceRunAfter`). */
   quitAndInstall(isSilent?: boolean, isForceRunAfter?: boolean): void;
 }
@@ -33,20 +38,24 @@ export interface ElectronUpdaterLike {
 export interface AppImageUpdater {
   /** Interface commune avec Squirrel, utilisée par le gestionnaire. */
   readonly updater: SquirrelUpdater;
-  /** Oriente les vérifications vers les versions publiées (`stable`) ou les pré-versions (`test`). */
-  readonly setChannel: (channel: UpdateChannel) => void;
+  /**
+   * Oriente les vérifications vers les versions publiées (`stable`) ou vers la pré-version `version` (`test`).
+   * Une pré-version `X.Y.Z-rcN` a pour canal `rcN` : electron-updater ne la trouverait pas en parcourant le
+   * flux GitHub depuis le canal des versions publiées, on lui donne donc le dossier exact de la release.
+   */
+  readonly setChannel: (channel: UpdateChannel, version?: string | null) => void;
 }
 
 /**
  * @param source electron-updater (injecté)
+ * @param repo Dépôt GitHub des releases (`propriétaire/dépôt`)
  * @returns L'adaptateur et la fonction qui change de canal
  */
-export function createAppImageUpdater(source: ElectronUpdaterLike): AppImageUpdater {
+export function createAppImageUpdater(source: ElectronUpdaterLike, repo: string): AppImageUpdater {
   source.autoDownload = true;
   source.autoInstallOnAppQuit = false;
-  // Les pré-versions (X.Y.Z-rcN) ont aussi un `latest-linux.yml` : un seul nom de canal
-  source.channel = 'latest';
   source.allowPrerelease = false;
+  const [owner = '', name = ''] = repo.split('/');
 
   const updater: SquirrelUpdater = {
     on(event: string, listener: (...args: never[]) => void): unknown {
@@ -77,8 +86,13 @@ export function createAppImageUpdater(source: ElectronUpdaterLike): AppImageUpda
 
   return {
     updater,
-    setChannel: (channel) => {
-      source.allowPrerelease = channel === 'test';
+    setChannel: (channel, version) => {
+      if (channel === 'test' && version) {
+        // Les pré-versions publient aussi `latest-linux.yml` ; les tags n'ont pas de préfixe `v`
+        source.setFeedURL({ provider: 'generic', url: `https://github.com/${owner}/${name}/releases/download/${version}` });
+      } else {
+        source.setFeedURL({ provider: 'github', owner, repo: name });
+      }
     },
   };
 }

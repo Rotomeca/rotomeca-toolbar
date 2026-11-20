@@ -88,7 +88,7 @@ export interface UpdateManagerDependencies {
   /** Sauvegardes avant le redémarrage. */
   readonly beforeInstall: () => void;
   /** Change le serveur interrogé par Squirrel. */
-  readonly setFeed?: ((channel: UpdateChannel) => void) | null;
+  readonly setFeed?: ((channel: UpdateChannel, version?: string | null) => void) | null;
   /** Un serveur de mises à jour pour les pré-versions existe. */
   readonly testFeed?: boolean;
   /** Appelé à chaque changement d'état (renvoyé à la fenêtre Paramètres). */
@@ -111,6 +111,8 @@ export class UpdateManager {
   #testUrl: string | null = null;
   /** Serveur actuellement interrogé par Squirrel. */
   #channel: UpdateChannel = 'stable';
+  /** Pré-version visée quand le serveur interrogé est celui des pré-versions. */
+  #channelVersion: string | null = null;
 
   /**
    * Prépare l'état initial (« à jour ») sans rien lancer ; voir {@link UpdateManager.start}.
@@ -186,7 +188,7 @@ export class UpdateManager {
     }
     if (verification || IN_PROGRESS.includes(etat)) return;
 
-    this.#useChannel('test');
+    this.#useChannel('test', versionTest);
     this.#set({ verification: true, erreur: null, erreurTest: null, versionDisponible: versionTest });
     try {
       this.#requireUpdater().checkForUpdates();
@@ -413,12 +415,16 @@ export class UpdateManager {
     this.#set({ etat: next, verification: false, pourcentage: null, ...failure });
   }
 
-  /** @param channel Serveur que Squirrel doit interroger */
-  #useChannel(channel: UpdateChannel): void {
-    if (this.#channel === channel) return;
+  /**
+   * @param channel Serveur que Squirrel doit interroger
+   * @param version Pré-version visée (canal `test`) : une autre version relance le choix du serveur
+   */
+  #useChannel(channel: UpdateChannel, version: string | null = null): void {
+    if (this.#channel === channel && this.#channelVersion === version) return;
 
-    this.#deps.setFeed?.(channel);
+    this.#deps.setFeed?.(channel, version);
     this.#channel = channel;
+    this.#channelVersion = version;
   }
 
   /**

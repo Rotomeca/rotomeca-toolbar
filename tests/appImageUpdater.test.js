@@ -10,12 +10,15 @@ function fakeSource() {
     autoDownload: false,
     autoInstallOnAppQuit: true,
     allowPrerelease: true,
-    channel: null,
+    feeds: [],
     checks: 0,
     installs: [],
     checkForUpdates() {
       source.checks += 1;
       return Promise.resolve(null);
+    },
+    setFeedURL(options) {
+      source.feeds.push(options);
     },
     quitAndInstall(...args) {
       source.installs.push(args);
@@ -24,30 +27,39 @@ function fakeSource() {
   return source;
 }
 
-test('createAppImageUpdater : télécharge seul, sans installer à la fermeture, canal « latest », versions publiées', () => {
+test('createAppImageUpdater : télécharge seul, sans installer à la fermeture, sans pré-versions par défaut', () => {
   const source = fakeSource();
-  createAppImageUpdater(source);
+  createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
 
   assert.equal(source.autoDownload, true);
   assert.equal(source.autoInstallOnAppQuit, false);
-  assert.equal(source.channel, 'latest');
   assert.equal(source.allowPrerelease, false);
 });
 
-test('createAppImageUpdater : setChannel propose les pré-versions seulement pour « test »', () => {
+test('createAppImageUpdater : « test » vise le dossier de la pré-version, « stable » les releases GitHub', () => {
   const source = fakeSource();
-  const { setChannel } = createAppImageUpdater(source);
+  const { setChannel } = createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
 
-  setChannel('test');
-  assert.equal(source.allowPrerelease, true);
-
+  setChannel('test', '4.1.0-rc1');
   setChannel('stable');
+
+  assert.deepEqual(source.feeds, [
+    { provider: 'generic', url: 'https://github.com/Rotomeca/rotomeca-toolbar/releases/download/4.1.0-rc1' },
+    { provider: 'github', owner: 'Rotomeca', repo: 'rotomeca-toolbar' },
+  ]);
   assert.equal(source.allowPrerelease, false);
+});
+
+test('createAppImageUpdater : « test » sans version retombe sur les releases GitHub', () => {
+  const source = fakeSource();
+  createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar').setChannel('test');
+
+  assert.deepEqual(source.feeds, [{ provider: 'github', owner: 'Rotomeca', repo: 'rotomeca-toolbar' }]);
 });
 
 test('createAppImageUpdater : transmet les évènements, la version arrive en 3e argument', () => {
   const source = fakeSource();
-  const { updater } = createAppImageUpdater(source);
+  const { updater } = createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
   const seen = [];
 
   updater.on('update-available', () => seen.push('available'));
@@ -65,7 +77,7 @@ test('createAppImageUpdater : transmet les évènements, la version arrive en 3e
 
 test('createAppImageUpdater : onProgress transmet le pourcentage du téléchargement', () => {
   const source = fakeSource();
-  const { updater } = createAppImageUpdater(source);
+  const { updater } = createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
   const seen = [];
 
   updater.onProgress((percent) => seen.push(percent));
@@ -77,7 +89,7 @@ test('createAppImageUpdater : onProgress transmet le pourcentage du télécharge
 
 test('createAppImageUpdater : checkForUpdates lance la vérification, une promesse rejetée ne plante pas', async () => {
   const source = fakeSource();
-  const { updater } = createAppImageUpdater(source);
+  const { updater } = createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
 
   updater.checkForUpdates();
   assert.equal(source.checks, 1);
@@ -97,7 +109,7 @@ test('createAppImageUpdater : checkForUpdates lance la vérification, une promes
 
 test('createAppImageUpdater : quitAndInstall relance l\'application après l\'installation', () => {
   const source = fakeSource();
-  const { updater } = createAppImageUpdater(source);
+  const { updater } = createAppImageUpdater(source, 'Rotomeca/rotomeca-toolbar');
 
   updater.quitAndInstall();
   assert.deepEqual(source.installs, [[false, true]]);

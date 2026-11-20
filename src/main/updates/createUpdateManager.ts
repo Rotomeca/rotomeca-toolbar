@@ -72,8 +72,8 @@ export function createUpdateManager({ isDev, onChange, openSettings }: UpdateWir
   if (mode.squirrel && feedUrl) setFeed('stable');
 
   // Sous Linux (AppImage), electron-updater lit les releases GitHub : pas de second serveur,
-  // le canal « test » active simplement les pré-versions
-  const appImage = mode.appImage ? createAppImageUpdater(electronUpdater) : null;
+  // le canal « test » vise le dossier de la pré-version trouvée
+  const appImage = mode.appImage && releasesRepo ? createAppImageUpdater(electronUpdater, releasesRepo) : null;
 
   return new UpdateManager({
     version: app.getVersion(),
