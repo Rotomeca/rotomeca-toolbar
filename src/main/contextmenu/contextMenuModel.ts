@@ -37,6 +37,24 @@ export interface MenuContext {
   readonly translate: Translate;
 }
 
+/** Une entrée du menu de la fenêtre des applications : libellé et action au clic. */
+export interface AppsWindowMenuEntry {
+  readonly label: string;
+  readonly click: () => void;
+}
+
+/**
+ * @param translate Traduction des textes du menu
+ * @param actions Actions que le menu déclenche
+ * @returns Les entrées du menu (clic droit sur l'en-tête de la fenêtre des applications)
+ */
+export function buildAppsWindowMenu(
+  translate: Translate,
+  actions: { readonly resetSize: () => void },
+): AppsWindowMenuEntry[] {
+  return [{ label: translate('apps.resetSize'), click: actions.resetSize }];
+}
+
 /** Indique si l'élément enregistré est un séparateur. */
 const isSeparator = (entry: SavedEntry | undefined): boolean => entry === 'separator';
 

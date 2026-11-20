@@ -24,6 +24,12 @@ class AppsHeader {
       this.showSite(url);
     });
 
+    // Clic droit sur le bandeau : menu de la fenêtre (le menu natif est ouvert par le processus principal)
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      window.api.invoke(appEventList.appsContextMenu).catch(console.error);
+    });
+
     this.onClick('#close', () => window.api.invoke(appEventList.closeApps));
     this.onClick('#kill', () => this.withUrl((url) => window.api.invoke(appEventList.killApp, url)));
     this.onClick('#open', () => this.withUrl((url) => window.api.invoke(appEventList.killApp, url, true)));

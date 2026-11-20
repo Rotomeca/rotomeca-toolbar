@@ -110,3 +110,14 @@ test('ContextMenuController : l\'état muet est lu à chaque ouverture', () => {
 });
 
 // #endregion
+
+test('buildAppsWindowMenu : une entrée « réinitialiser la taille » qui lance l\'action', () => {
+  const { buildAppsWindowMenu } = require('../dist/src/main/contextmenu/contextMenuModel.js');
+  let resets = 0;
+
+  const entries = buildAppsWindowMenu((key) => `t:${key}`, { resetSize: () => ++resets });
+
+  assert.deepEqual(entries.map((entry) => entry.label), ['t:apps.resetSize']);
+  entries[0].click();
+  assert.equal(resets, 1);
+});

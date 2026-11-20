@@ -20,6 +20,7 @@ export const appEventList = {
   closeFrame: 'closeFrame',
   openFrame: 'openFrame',
   closeApps: 'closeApps',
+  appsContextMenu: 'appsContextMenu',
   appDelete: 'appDelete',
   appEdit: 'appEdit',
   timeoutStopTop: 'timeoutStopTop',

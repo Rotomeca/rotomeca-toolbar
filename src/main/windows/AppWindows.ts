@@ -131,6 +131,15 @@ export class AppWindows {
     return this.registry.get('apps') ?? this.createApps();
   }
 
+  /** Rend à la fenêtre des applications sa place et sa taille d'origine (elle peut avoir été agrandie jusqu'à couvrir l'écran). */
+  resetAppsSize(): void {
+    const window = this.apps;
+
+    if (window.isFullScreen()) window.setFullScreen(false);
+    if (window.isMaximized()) window.unmaximize();
+    window.setBounds(this.deps.appsBounds());
+  }
+
   /**
    * Crée une fenêtre de page locale, y charge sa page, lui injecte la feuille de style de base
    * et l'enregistre.

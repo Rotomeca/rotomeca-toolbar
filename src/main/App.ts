@@ -49,7 +49,9 @@ import { AppViewHost } from './apps/AppViewHost.js';
 // [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
 import { ContextMenuController } from './contextmenu/ContextMenuController.js';
 // [electronContextMenu.ts] Menu contextuel Electron : injecte le script de clic droit et ouvre la fenêtre du menu
-import { startContextMenu } from './contextmenu/electronContextMenu.js';
+import { showAppsWindowMenu, startContextMenu } from './contextmenu/electronContextMenu.js';
+// [contextMenuModel.ts] Contenu du menu contextuel des boutons de la barre (mode normal et mode édition)
+import { buildAppsWindowMenu } from './contextmenu/contextMenuModel.js';
 // [createAppBar.ts] Assemble la barre ancrée : appels natifs Windows et conversions d'écran d'Electron
 import { createAppBar, isAppBarSupported } from './dock/createAppBar.js';
 // [IpcRouter.ts] Routeur des appels IPC des pages vers le processus principal, avec contrôle de l'origine
@@ -596,6 +598,9 @@ export class App {
         if (typeof url === 'string') viewHost.hide(url);
       })
       .handle(appEventList.closeApps, () => this.closeApps())
+      .handle(appEventList.appsContextMenu, () =>
+        showAppsWindowMenu(windows.apps, buildAppsWindowMenu(t, { resetSize: () => windows.resetAppsSize() })),
+      )
       .handle(appEventList.killApp, (_, url, open) => this.killApp(url, open))
       .handle(appEventList.refreshApp, (_, url) => {
         if (typeof url === 'string') viewHost.reload(url);

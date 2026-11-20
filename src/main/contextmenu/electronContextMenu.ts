@@ -9,8 +9,8 @@ import fs from 'node:fs';
 // [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { BrowserWindow, app, ipcMain } from 'electron';
-import type { IpcMainInvokeEvent } from 'electron';
+import { BrowserWindow, Menu, app, ipcMain } from 'electron';
+import type { BaseWindow, IpcMainInvokeEvent } from 'electron';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../../shared/ipc/events.js';
 // [trustedSender.ts] Contrôle de l'origine d'un appel IPC : seule la page principale d'une fenêtre locale est de confiance
@@ -18,7 +18,7 @@ import { isTrustedSender } from '../ipc/trustedSender.js';
 // [windowConfig.ts] Construction des options d'une `BrowserWindow` à partir d'une description sans réglages de sécurité
 import { buildWindowConfig } from '../windows/windowConfig.js';
 // [contextMenuModel.ts] Contenu du menu contextuel des boutons de la barre (mode normal et mode édition)
-import type { ContextMenuEvent, ContextMenuItem } from './contextMenuModel.js';
+import type { AppsWindowMenuEntry, ContextMenuEvent, ContextMenuItem } from './contextMenuModel.js';
 
 /** Ce que le menu contextuel demande à l'application. */
 export interface ContextMenuHooks {
@@ -80,6 +80,15 @@ function openMenu(parent: BrowserWindow, event: ContextMenuEvent, items: readonl
     .executeJavaScript(`window.electron ??= {}; window.electron.menu = ${JSON.stringify(items)}`)
     .catch(console.error);
   menuWindow.on('blur', () => menuWindow.destroy());
+}
+
+/**
+ * Affiche un menu natif à la position de la souris, au-dessus d'une fenêtre.
+ * @param window Fenêtre qui porte le menu
+ * @param entries Entrées du menu
+ */
+export function showAppsWindowMenu(window: BaseWindow, entries: readonly AppsWindowMenuEntry[]): void {
+  Menu.buildFromTemplate(entries.map(({ label, click }) => ({ label, click: () => click() }))).popup({ window });
 }
 
 /** Garde-fou : le canal IPC ne peut être enregistré qu'une fois. */

@@ -122,6 +122,7 @@
   "apps.open": "Stop and open in the browser",
   "apps.kill": "Stop the window",
   "apps.close": "Close the window",
+  "apps.resetSize": "Reset the window size",
 
   "add.popular": "Popular",
   "add.search": "Search for a site",
