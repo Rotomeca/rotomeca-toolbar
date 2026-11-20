@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const {
   PermissionStore,
   normalizeOrigin,
-} = require('../src/scripts/PermissionStore.js');
+} = require('../dist/src/scripts/PermissionStore.js');
 
 /** Stockage en mémoire qui compte les écritures. */
 function memoryStorage(initial = false) {

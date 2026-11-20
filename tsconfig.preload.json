@@ -1,0 +1,19 @@
+{
+  // Preloads (bundlés par esbuild, qui ne vérifie pas les types : c'est ici qu'ils le sont).
+  // Ils tournent dans une page : API du navigateur et module `electron`.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "preload.ts",
+    "src/scripts/media/media-preload.ts",
+    "src/shared/**/*.ts",
+    "src/types/**/*.d.ts"
+  ]
+}

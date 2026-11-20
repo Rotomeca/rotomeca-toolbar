@@ -1,0 +1,47 @@
+name: Smoke
+
+# Construit le paquet, vérifie son contenu et le fait démarrer en mode « fumée »
+# (pages locales, preloads sandboxés, koffi) sur Windows et Linux.
+# Ne publie rien : c'est le garde-fou des changements qui touchent au build ou aux chemins.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Construire le paquet
+        run: pnpm run package
+
+      - name: Vérifier le contenu du paquet
+        run: pnpm run verify:package
+
+      # Sous Linux, Electron a besoin d'un écran : xvfb en fournit un virtuel
+      - name: Test de fumée (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm run smoke:packaged
+
+      - name: Test de fumée (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm run smoke:packaged

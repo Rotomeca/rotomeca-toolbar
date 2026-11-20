@@ -8,7 +8,7 @@ const {
   backupUserData,
   restoreFromBackup,
   keepLoginsAlive,
-} = require('../src/scripts/Persistence.js');
+} = require('../dist/src/scripts/Persistence.js');
 
 const YEAR_SECONDS = 60 * 60 * 24 * 365;
 
