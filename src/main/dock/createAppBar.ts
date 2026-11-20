@@ -38,6 +38,25 @@ function nativeX11Api(): X11Api | null {
   return x11Api;
 }
 
+/**
+ * Conversion pour X11 : `screen.dipToScreenRect` n'existe que sous Windows, et X11 travaille en
+ * pixels physiques, soit les pixels indépendants de la densité multipliés par le facteur d'échelle.
+ * @param factor Donne le facteur d'échelle de l'écran qui porte le rectangle
+ */
+function scaledConverter(factor: (rect: Rect) => number) {
+  const scale = (rect: Rect, by: number): Rect => ({
+    x: Math.round(rect.x * by),
+    y: Math.round(rect.y * by),
+    width: Math.round(rect.width * by),
+    height: Math.round(rect.height * by),
+  });
+
+  return {
+    dipToScreenRect: (_window: BrowserWindow, rect: Rect) => scale(rect, factor(rect)),
+    screenToDipRect: (_window: BrowserWindow, rect: Rect) => scale(rect, 1 / factor(rect)),
+  };
+}
+
 /** @returns `true` si la barre ancrée est utilisable (Windows avec koffi, ou Linux sous X11) */
 export function isAppBarSupported(): boolean {
   return nativeApi() !== null || nativeX11Api() !== null;
@@ -51,5 +70,7 @@ export function createAppBar(callbacks: AppBarCallbacks): DockBar<BrowserWindow>
   };
 
   const x11 = nativeX11Api();
-  return x11 ? new X11StrutBar<BrowserWindow>(x11, converter) : new AppBar<BrowserWindow>(nativeApi(), converter, callbacks);
+  return x11
+    ? new X11StrutBar<BrowserWindow>(x11, scaledConverter((rect) => screen.getDisplayMatching(rect).scaleFactor))
+    : new AppBar<BrowserWindow>(nativeApi(), converter, callbacks);
 }
