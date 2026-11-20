@@ -1,9 +1,9 @@
 /**
- * Choix du mode de mise à jour (simulé, Squirrel, manuel) et de l'adresse du serveur interrogé.
+ * Choix du mode de mise à jour (simulé, Squirrel, AppImage, manuel) et de l'adresse du serveur interrogé.
  *
  * Utilisé par `createUpdateManager.ts`. Pur, sans Electron : testable avec n'importe quelle plateforme.
  */
-// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions
+// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
 import type { UpdateChannel } from '../../scripts/UpdateManager.js';
 
 /** Ce qui détermine comment l'application se met à jour. */
@@ -14,6 +14,8 @@ export interface UpdateEnvironment {
   readonly isPackaged: boolean;
   /** Plateforme d'exécution. */
   readonly platform: NodeJS.Platform;
+  /** Lancée depuis une AppImage (variable `APPIMAGE` renseignée par son lanceur). */
+  readonly appImage?: boolean;
   /** La simulation d'un cycle de mise à jour est demandée (développement seulement). */
   readonly simulateRequested: boolean;
 }
@@ -24,6 +26,8 @@ export interface UpdateMode {
   readonly simulate: boolean;
   /** Squirrel télécharge et installe les mises à jour. */
   readonly squirrel: boolean;
+  /** electron-updater télécharge et remplace l'AppImage (Linux). */
+  readonly appImage: boolean;
   /** Pas d'installation automatique : on compare avec GitHub et on ouvre la page de la release. */
   readonly manual: boolean;
 }
@@ -32,13 +36,21 @@ export interface UpdateMode {
  * @param environment Contexte de lancement (développement, paquet, plateforme).
  * @returns Le mode de mise à jour de cet environnement
  */
-export function resolveUpdateMode({ isDev, isPackaged, platform, simulateRequested }: UpdateEnvironment): UpdateMode {
+export function resolveUpdateMode({
+  isDev,
+  isPackaged,
+  platform,
+  appImage = false,
+  simulateRequested,
+}: UpdateEnvironment): UpdateMode {
   const packaged = !isDev && isPackaged;
+  const linux = packaged && platform === 'linux';
 
   return {
     simulate: isDev && simulateRequested,
     squirrel: packaged && platform === 'win32',
-    manual: packaged && platform === 'linux',
+    appImage: linux && appImage,
+    manual: linux && !appImage,
   };
 }
 

@@ -1,7 +1,7 @@
 name: Release
 
 # Déclenché par un tag poussé. La release contient Windows (Squirrel) et Linux
-# (deb + rpm).
+# (AppImage + latest-linux.yml, lus par electron-updater, puis deb + rpm).
 #
 # Deux sortes de tags :
 #   - X.Y.Z (ex: 2.1.0), typiquement sur main après `git flow release finish` :
@@ -114,6 +114,12 @@ jobs:
       - name: Build
         run: pnpm run make
 
+      # L'AppImage et latest-linux.yml (adresse, taille et empreinte, lus par electron-updater)
+      # sont produits à partir du paquet que `make` vient de construire dans out/
+      - name: Construire l'AppImage
+        if: runner.os == 'Linux'
+        run: pnpm run make:appimage
+
       - name: Supprimer le certificat de signature
         if: always() && runner.os == 'Windows'
         shell: bash
@@ -136,6 +142,8 @@ jobs:
         with:
           name: make-linux
           path: |
+            out/make/appimage/*.AppImage
+            out/make/appimage/latest-linux.yml
             out/make/deb/x64/*.deb
             out/make/rpm/x64/*.rpm
           if-no-files-found: error
@@ -170,7 +178,7 @@ jobs:
 
       - name: Créer la release et envoyer les fichiers
         run: |
-          # Les artefacts Linux gardent leurs sous-dossiers (deb/x64, rpm/x64) :
+          # Les artefacts Linux gardent leurs sous-dossiers (appimage, deb/x64, rpm/x64) :
           # on liste uniquement les fichiers, pas les dossiers.
           mapfile -t FILES < <(find dist -type f)
           printf '%s\n' "${FILES[@]}"

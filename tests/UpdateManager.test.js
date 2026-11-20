@@ -644,3 +644,29 @@ test('state.prerelease : ne change pas au fil des vérifications', async () => {
   autoUpdater.emit('update-not-available');
   assert.equal(manager.state.prerelease, true);
 });
+
+test('progression : la barre suit le pourcentage entier du téléchargement, sans bruit', () => {
+  const autoUpdater = fakeAutoUpdater();
+  let listener = null;
+  autoUpdater.onProgress = (fn) => {
+    listener = fn;
+  };
+  const { manager, calls } = setup({ autoUpdater });
+  manager.start();
+
+  // Hors téléchargement : ignoré
+  listener(10);
+  assert.equal(manager.state.pourcentage, null);
+
+  autoUpdater.emit('update-available');
+  const before = calls.changes.length;
+  listener(12.4);
+  listener(12.9);
+  listener(Number.NaN);
+  assert.equal(manager.state.pourcentage, 12);
+  // 12.4 et 12.9 donnent le même entier : un seul changement publié
+  assert.equal(calls.changes.length, before + 1);
+
+  listener(250);
+  assert.equal(manager.state.pourcentage, 100);
+});

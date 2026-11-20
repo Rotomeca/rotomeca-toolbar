@@ -38,7 +38,7 @@ import type { PermissionStore } from '../scripts/PermissionStore.js';
 import { seasonInfo } from '../scripts/Seasons.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
 import { isSafeUrl } from '../scripts/safeUrl.js';
-// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions
+// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
 import type { UpdateManager } from '../scripts/UpdateManager.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, internalChannels, pageEventList } from '../shared/ipc/events.js';

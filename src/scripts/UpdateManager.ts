@@ -1,5 +1,5 @@
 /**
- * Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions.
+ * Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions.
  *
  * Utilisé par le processus principal, qui injecte Squirrel, le réseau et les
  * notifications (aucune dépendance à `electron`, donc testable).
@@ -7,7 +7,9 @@
  * - Windows / macOS : Squirrel (`autoUpdater`). Le téléchargement démarre dès qu'une
  *   version est trouvée ; Squirrel n'expose aucune progression, la barre est donc
  *   indéterminée.
- * - Linux : pas d'installation automatique ; on compare avec la dernière release GitHub
+ * - Linux, AppImage : electron-updater, branché comme Squirrel (adaptateur `appImageUpdater.ts`),
+ *   avec en plus une barre de progression réelle (`download-progress`).
+ * - Linux, deb / rpm : pas d'installation automatique ; on compare avec la dernière release GitHub
  *   et l'action ouvre la page de téléchargement.
  *
  * - Canal de test (toutes plateformes) : les releases GitHub marquées « pré-version »
@@ -61,6 +63,8 @@ export interface SquirrelUpdater {
   checkForUpdates(): void;
   /** Quitte l'application et installe la version téléchargée. */
   quitAndInstall(): void;
+  /** Écoute la progression du téléchargement (0 à 100) ; absent avec Squirrel, qui n'en donne aucune. */
+  onProgress?(listener: (percent: number) => void): void;
 }
 
 /** Tout ce que le gestionnaire reçoit de l'extérieur (Squirrel, réseau, système, fenêtres). */
@@ -288,7 +292,20 @@ export class UpdateManager {
 
     autoUpdater.on('update-downloaded', (_event, _notes, releaseName) => this.#onDownloaded(releaseName));
 
+    autoUpdater.onProgress?.((percent) => this.#onProgress(percent));
+
     autoUpdater.on('error', (error) => this.#fail(error));
+  }
+
+  /**
+   * Met à jour la barre de progression ; ignoré hors téléchargement et tant que le pourcentage entier ne change pas.
+   * @param percent Avancement du téléchargement, de 0 à 100
+   */
+  #onProgress(percent: number): void {
+    if (this.#state.etat !== 'downloading' || !Number.isFinite(percent)) return;
+
+    const rounded = Math.min(100, Math.max(0, Math.floor(percent)));
+    if (rounded !== this.#state.pourcentage) this.#set({ pourcentage: rounded });
   }
 
   /** Squirrel ne trouve rien : « à jour », ou erreur dédiée si on cherchait sur le serveur de test. */

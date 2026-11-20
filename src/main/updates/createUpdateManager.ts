@@ -8,6 +8,8 @@
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { Notification, app, autoUpdater, net, session, shell } from 'electron';
+// [electron-updater] Mise à jour automatique des AppImage (Linux) depuis les releases GitHub
+import { autoUpdater as electronUpdater } from 'electron-updater';
 // [appConfig.ts] Adresses des serveurs de mises à jour et dépôt des versions
 import { feedUrl, releasesRepo, testFeedUrl } from '../../../configs/appConfig.js';
 // [appIcon.ts] Choisit l'icône de l'application selon que la version est une pré-version ou non
@@ -18,14 +20,16 @@ import { t } from '../../scripts/i18n.js';
 import { backupUserData, flushSession } from '../../scripts/Persistence.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
 import { isSafeUrl } from '../../scripts/safeUrl.js';
-// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, GitHub (Linux) et canal de pré-versions
+// [appImageUpdater.ts] Adaptateur d'electron-updater (AppImage, Linux) vers l'interface de Squirrel
+import { createAppImageUpdater } from './appImageUpdater.js';
+// [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
 import { UpdateManager } from '../../scripts/UpdateManager.js';
 import type { UpdateState } from '../../scripts/UpdateManager.js';
 // [versions.ts] Numéros de version : comparaison et détection des pré-versions (`X.Y.Z-rcN`)
 import { compareVersions } from '../../scripts/versions.js';
 // [JsonFileStore.ts] Fichier JSON sûr : écriture atomique, sauvegarde `.bak`, mise en quarantaine d'un fichier corrompu
 import { dataDirectory } from '../persistence/JsonFileStore.js';
-// [updateMode.ts] Choix du mode de mise à jour (simulé, Squirrel, manuel) et de l'adresse du serveur interrogé
+// [updateMode.ts] Choix du mode de mise à jour (simulé, Squirrel, AppImage, manuel) et de l'adresse du serveur interrogé
 import { createFeedSwitcher, resolveUpdateMode } from './updateMode.js';
 // [updateNotification.ts] Notification système qui prévient qu'une mise à jour est prête ; un clic ouvre les Paramètres
 import { showUpdateNotification } from './updateNotification.js';
@@ -41,7 +45,8 @@ export interface UpdateWiring {
 }
 
 /**
- * @returns Le gestionnaire de mises à jour : Squirrel sous Windows, vérification GitHub sous Linux.
+ * @returns Le gestionnaire de mises à jour : Squirrel sous Windows, electron-updater pour une AppImage,
+ * vérification GitHub pour les autres installations Linux (deb, rpm).
  * La vérification démarre avec `start()`.
  *
  * @param wiring Mode de lancement et rappels vers l'application.
@@ -51,6 +56,7 @@ export function createUpdateManager({ isDev, onChange, openSettings }: UpdateWir
     isDev,
     isPackaged: app.isPackaged,
     platform: process.platform,
+    appImage: Boolean(process.env.APPIMAGE),
     simulateRequested: process.env.RTB_UPDATE_SIMULATE === '1',
   });
 
@@ -65,11 +71,15 @@ export function createUpdateManager({ isDev, onChange, openSettings }: UpdateWir
 
   if (mode.squirrel && feedUrl) setFeed('stable');
 
+  // Sous Linux (AppImage), electron-updater lit les releases GitHub : pas de second serveur,
+  // le canal « test » active simplement les pré-versions
+  const appImage = mode.appImage ? createAppImageUpdater(electronUpdater) : null;
+
   return new UpdateManager({
     version: app.getVersion(),
-    autoUpdater: mode.squirrel && feedUrl ? autoUpdater : null,
-    setFeed,
-    testFeed: !!testFeedUrl,
+    autoUpdater: appImage?.updater ?? (mode.squirrel && feedUrl ? autoUpdater : null),
+    setFeed: appImage ? appImage.setChannel : setFeed,
+    testFeed: Boolean(appImage) || !!testFeedUrl,
     releasesRepo,
     manual: mode.manual,
     simulate: mode.simulate,

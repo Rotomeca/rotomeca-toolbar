@@ -17,6 +17,7 @@
 		"start": "pnpm run build && electron-forge start",
 		"package": "pnpm run build && electron-forge package",
 		"make": "pnpm run build && electron-forge make",
+		"make:appimage": "node scripts/make-appimage.js",
 		"publish": "pnpm run build && electron-forge publish"
 	},
 	"repository": {
@@ -39,6 +40,7 @@
 		"@typescript-eslint/eslint-plugin": "8.72.2",
 		"@typescript-eslint/parser": "8.72.2",
 		"electron": "^42.11.18",
+		"electron-builder": "^26.18.0",
 		"esbuild": "0.28.2",
 		"eslint": "^8.52.0",
 		"lodash": "^4.17.21",
@@ -49,6 +51,7 @@
 	"dependencies": {
 		"@rotomeca/design-system": "^1.1.0",
 		"electron-squirrel-startup": "^1.0.1",
+		"electron-updater": "^6.8.11",
 		"koffi": "^3.3.8"
 	},
 	"pnpm": {
