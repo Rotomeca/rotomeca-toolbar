@@ -1,7 +1,9 @@
 /**
  * Recherche de l'icône d'un site : lecture de sa page, classement des icônes déclarées, téléchargement.
  *
- * Utilisé par `FaviconService`. Pur, sans `electron` : le réseau est injecté (testable). Chaque icône
+ * Utilisé par `FaviconService`. Pur, sans `electron` : le réseau est injecté (testable). Un service d'icônes
+ * répond en un seul appel à partir du nom d'hôte ; à défaut, on lit la page du site. Le mode `fast` essaie d'abord
+ * `/favicon.ico` (comme avant la recherche dans la page), puis le service. Chaque icône
  * candidate est contrôlée (adresse http(s), type image, taille bornée) avant d'être renvoyée en `data:`.
  */
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
@@ -13,6 +15,8 @@ export interface FaviconResponse {
   readonly headers: { get(name: string): string | null };
   arrayBuffer(): Promise<ArrayBuffer>;
   text(): Promise<string>;
+  /** Corps en flux : permet de ne lire que le début d'une page volumineuse. */
+  readonly body?: { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }>; cancel(): Promise<unknown> } } | null;
 }
 
 /** Requête HTTP GET injectée (`net.fetch` avec délai maximal côté Electron). */
@@ -26,12 +30,15 @@ export interface IconCandidate {
   readonly size: number;
 }
 
+/** Service d'icônes interrogé en premier : répond à partir du seul nom d'hôte (404 si le site est inconnu). */
+const quickLookupUrl = (host: string): string => `https://icons.duckduckgo.com/ip3/${host}.ico`;
+
 /** Taille maximale d'une page HTML lue (l'en-tête suffit). */
 const MAX_HTML_LENGTH = 256 * 1024;
 /** Taille maximale d'une icône conservée. */
 const MAX_ICON_BYTES = 128 * 1024;
 /** Nombre maximal d'icônes essayées pour un site. */
-const MAX_ATTEMPTS = 6;
+const MAX_ATTEMPTS = 8;
 /** Taille au-delà de laquelle une icône plus grande n'est plus préférée (le bouton est petit). */
 const PREFERRED_MAX_SIZE = 192;
 /** Taille supposée d'une icône dont la page ne donne pas les dimensions. */
@@ -41,6 +48,33 @@ const VECTOR_SIZE = 512;
 
 /** Relations `rel` qui désignent une icône de site. */
 const ICON_RELS = ['icon', 'shortcut', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
+
+/**
+ * Lit le début d'une page : jusqu'à la fin de son `<head>` ou `MAX_HTML_LENGTH` caractères. Une page
+ * volumineuse (plusieurs Mo) n'est donc jamais téléchargée en entier.
+ *
+ * @param response Réponse de la page
+ * @returns Le début du HTML
+ */
+async function readHead(response: FaviconResponse): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return (await response.text()).slice(0, MAX_HTML_LENGTH);
+
+  const decoder = new TextDecoder();
+  let html = '';
+
+  try {
+    while (html.length < MAX_HTML_LENGTH && !/<\/head\s*>/i.test(html)) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  return html.slice(0, MAX_HTML_LENGTH);
+}
 
 /**
  * @param tag Une balise `<link ...>`
@@ -74,6 +108,24 @@ function largestSize(sizes: string | undefined): number {
  */
 function isPrivateHost(host: string): boolean {
   return /^(localhost|\[?::1\]?|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0)/i.test(host) || host.endsWith('.local');
+}
+
+/**
+ * @param host Nom d'hôte d'une application
+ * @returns `true` si le nom peut être transmis à un service d'icônes : un nom de domaine public, ni adresse IP, ni nom local
+ */
+function isShareableHost(host: string): boolean {
+  return host.includes('.') && !isPrivateHost(host) && !/^[\d.]+$|:/.test(host);
+}
+
+/**
+ * @param a Nom d'hôte
+ * @param b Nom d'hôte
+ * @returns `true` si les deux hôtes partagent leur domaine (les deux derniers libellés, sans tenir compte des suffixes composés)
+ */
+function isSameSite(a: string, b: string): boolean {
+  const domain = (host: string): string => host.split('.').slice(-2).join('.');
+  return domain(a) === domain(b);
 }
 
 /**
@@ -143,38 +195,81 @@ async function download(url: string, fetch: FaviconFetch): Promise<string | null
   return type === null ? null : `data:${type};base64,${Buffer.from(bytes).toString('base64')}`;
 }
 
+/** Le site n'a pas pu être interrogé (réseau coupé, délai dépassé) : l'absence d'icône n'est pas établie. */
+export class FaviconNetworkError extends Error {}
+
 /**
  * Cherche l'icône d'un site : celles que sa page déclare (la plus grande d'abord), puis `/favicon.ico`
  * et `/apple-touch-icon.png`. Une erreur réseau sur une icône passe à la suivante.
  *
  * @param siteUrl Adresse de l'application
  * @param fetch Requête HTTP
- * @returns L'icône en `data:`, `null` si aucune n'est utilisable
+ * @param options `fast` : essaie d'abord `/favicon.ico` du site, puis un service d'icônes qui ne reçoit que le nom d'hôte (jamais un nom privé ou local), avant de lire la page
+ * @returns L'icône en `data:`, `null` si le site n'en a pas
+ * @throws {FaviconNetworkError} Si aucune icône n'a été trouvée et que le site n'a répondu à aucune requête
  */
-export async function findFavicon(siteUrl: string, fetch: FaviconFetch): Promise<string | null> {
+export async function findFavicon(
+  siteUrl: string,
+  fetch: FaviconFetch,
+  { fast = false }: { readonly fast?: boolean } = {},
+): Promise<string | null> {
   if (!isSafeUrl(siteUrl)) return null;
 
-  const { origin } = new URL(siteUrl);
+  const { origin, hostname } = new URL(siteUrl);
   let declared: IconCandidate[] = [];
+  let answered = false;
+
+  // Adresses déjà essayées : la lecture de la page ne les refait pas
+  const tried = new Set<string>();
+  /** Essaie une adresse ; `null` si elle n'est pas une icône utilisable ou ne répond pas. */
+  const attempt = async (url: string): Promise<string | null> => {
+    tried.add(url);
+    try {
+      const icon = await download(url, fetch);
+      answered = true;
+      return icon;
+    } catch {
+      return null;
+    }
+  };
+
+  if (fast) {
+    // 1. L'adresse usuelle du site : une seule requête, rien n'est transmis à un tiers
+    const own = await attempt(`${origin}/favicon.ico`);
+    if (own) return own;
+
+    // 2. Un service d'icônes, qui ne reçoit que le nom d'hôte (jamais un nom privé ou local)
+    const service = isShareableHost(hostname) ? await attempt(quickLookupUrl(hostname)) : null;
+    if (service) return service;
+  }
 
   try {
     const page = await fetch(siteUrl);
+    answered = true;
     const type = page.headers.get('content-type') ?? '';
-    if (page.ok && type.includes('html')) declared = parseIconLinks(await page.text(), siteUrl);
+    if (page.ok && type.includes('html')) declared = parseIconLinks(await readHead(page), siteUrl);
   } catch {
     // Page illisible : on tente quand même les adresses usuelles
   }
 
-  const urls = [...new Set([...declared.map(({ url }) => url), `${origin}/favicon.ico`, `${origin}/apple-touch-icon.png`])];
+  // Les icônes du site lui-même d'abord, puis les adresses usuelles, enfin celles d'un autre site (une page
+  // d'avertissement ou de consentement déclare souvent l'icône de son hébergeur, pas celle du site)
+  const own = declared.filter(({ url }) => isSameSite(new URL(url).hostname, new URL(siteUrl).hostname));
+  const others = declared.filter((icon) => !own.includes(icon));
+  const urls = [
+    ...new Set([
+      ...own.map(({ url }) => url),
+      `${origin}/favicon.ico`,
+      `${origin}/apple-touch-icon.png`,
+      ...others.map(({ url }) => url),
+    ]),
+  ].filter((url) => !tried.has(url));
 
   for (const url of urls.slice(0, MAX_ATTEMPTS)) {
-    try {
-      const icon = await download(url, fetch);
-      if (icon) return icon;
-    } catch {
-      // Icône suivante
-    }
+    const icon = await attempt(url);
+    if (icon) return icon;
   }
 
+  if (!answered) throw new FaviconNetworkError(`Aucune réponse de ${origin}`);
   return null;
 }

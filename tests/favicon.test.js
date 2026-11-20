@@ -121,7 +121,7 @@ test('FaviconService : une seule recherche pour plusieurs demandes du même site
   assert.equal(writes.length, 1);
 });
 
-test('FaviconService : un échec est retenu un jour, une icône trouvée plus longtemps', async () => {
+test('FaviconService : l\'absence d\'icône est retenue 6 h, une icône trouvée plus longtemps', async () => {
   const missing = service({});
   assert.equal(await missing.svc.resolve('https://none.example/'), null);
   const calls = missing.net.calls.length;
@@ -131,7 +131,7 @@ test('FaviconService : un échec est retenu un jour, une icône trouvée plus lo
   assert.equal(missing.net.calls.length, calls);
   missing.clock.now += 2;
   await missing.svc.resolve('https://none.example/');
-  assert.ok(missing.net.calls.length > calls, 'nouvelle recherche après un jour');
+  assert.ok(missing.net.calls.length > calls, 'nouvelle recherche après le délai');
 
   const found = service(SITE);
   await found.svc.resolve('https://example.com/');
@@ -164,4 +164,101 @@ test('FaviconService : une adresse invalide donne null sans réseau', async () =
   assert.equal(await svc.resolve('pas une adresse'), null);
   assert.equal(await svc.resolve('data:text/html,x'), null);
   assert.equal(net.calls.length, 0);
+});
+
+test('findFavicon : les icônes du site passent avant /favicon.ico, celles d\'un autre site en dernier', async () => {
+  const { fetch, calls } = network({
+    'https://music.example.com/': reply(
+      '<link rel="icon" href="https://www.google.com/favicon.ico"><link rel="icon" href="https://static.example.com/m.png" sizes="64x64">',
+      'text/html',
+    ),
+    'https://static.example.com/m.png': new Error('indisponible'),
+    'https://music.example.com/favicon.ico': reply(ICO, 'image/x-icon'),
+    'https://www.google.com/favicon.ico': reply(PNG, 'image/png'),
+  });
+
+  assert.match(await findFavicon('https://music.example.com/', fetch), /^data:image\/x-icon/);
+  assert.deepEqual(calls, [
+    'https://music.example.com/',
+    'https://static.example.com/m.png',
+    'https://music.example.com/favicon.ico',
+  ]);
+});
+
+test('findFavicon : ne lit que le début d\'une page volumineuse, jusqu\'à la fin du <head>', async () => {
+  const chunks = ['<html><head><link rel="icon" href="/logo.png">', '</head><body>', 'x'.repeat(1000), 'y'.repeat(1000)];
+  let read = 0;
+  let cancelled = false;
+  const page = {
+    ...reply('', 'text/html'),
+    text: async () => {
+      throw new Error('toute la page ne doit pas être lue');
+    },
+    body: {
+      getReader: () => ({
+        read: async () => (read < chunks.length ? { done: false, value: new TextEncoder().encode(chunks[read++]) } : { done: true }),
+        cancel: async () => {
+          cancelled = true;
+        },
+      }),
+    },
+  };
+  const { fetch } = network({ 'https://big.example/': page, 'https://big.example/logo.png': reply(PNG, 'image/png') });
+
+  assert.match(await findFavicon('https://big.example/', fetch), /^data:image\/png/);
+  assert.equal(read, 2, 'arrêt dès </head>');
+  assert.equal(cancelled, true);
+});
+
+test('FaviconService : un site injoignable n\'est pas mémorisé, la demande suivante réessaie', async () => {
+  const down = service({ 'https://icons.duckduckgo.com/ip3/down.example.ico': new Error('délai'), 'https://down.example/': new Error('délai'), 'https://down.example/favicon.ico': new Error('délai'), 'https://down.example/apple-touch-icon.png': new Error('délai') });
+
+  assert.equal(await down.svc.resolve('https://down.example/'), null);
+  assert.equal(down.writes.length, 0, 'rien enregistré');
+  const calls = down.net.calls.length;
+
+  await down.svc.resolve('https://down.example/');
+  assert.ok(down.net.calls.length > calls, 'nouvelle recherche');
+});
+
+test('findFavicon : lève FaviconNetworkError seulement si le site ne répond à aucune requête', async () => {
+  const { FaviconNetworkError } = require('../dist/src/main/apps/favicon.js');
+  const { fetch } = network({ 'https://x.example/': new Error('a'), 'https://x.example/favicon.ico': new Error('b'), 'https://x.example/apple-touch-icon.png': new Error('c') });
+
+  await assert.rejects(() => findFavicon('https://x.example/', fetch), FaviconNetworkError);
+  // Une réponse 404 prouve que le site est joignable : pas d'icône, sans erreur
+  assert.equal(await findFavicon('https://y.example/', network({}).fetch), null);
+});
+
+test('findFavicon (fast) : /favicon.ico du site répond seul, ni service ni page', async () => {
+  const { fetch, calls } = network({ 'https://app.example.com/favicon.ico': reply(ICO, 'image/x-icon') });
+
+  assert.match(await findFavicon('https://app.example.com/inbox', fetch, { fast: true }), /^data:image\/x-icon/);
+  assert.deepEqual(calls, ['https://app.example.com/favicon.ico']);
+});
+
+test('findFavicon (fast) : sans /favicon.ico, le service d\'icônes répond seul', async () => {
+  const { fetch, calls } = network({ 'https://icons.duckduckgo.com/ip3/app.example.com.ico': reply(PNG, 'image/png') });
+
+  assert.match(await findFavicon('https://app.example.com/', fetch, { fast: true }), /^data:image\/png/);
+  assert.deepEqual(calls, ['https://app.example.com/favicon.ico', 'https://icons.duckduckgo.com/ip3/app.example.com.ico']);
+});
+
+test('findFavicon (fast) : ni /favicon.ico ni service (404 ou panne) → lecture de la page, sans refaire /favicon.ico', async () => {
+  const site = { 'https://app.example.com/': reply('<link rel="icon" href="/l.png">', 'text/html'), 'https://app.example.com/l.png': reply(PNG, 'image/png') };
+
+  for (const serviceRoute of [undefined, new Error('panne')]) {
+    const { fetch, calls } = network({ ...site, 'https://icons.duckduckgo.com/ip3/app.example.com.ico': serviceRoute });
+    assert.match(await findFavicon('https://app.example.com/', fetch, { fast: true }), /^data:image\/png/);
+    assert.deepEqual(calls.slice(0, 3), ['https://app.example.com/favicon.ico', 'https://icons.duckduckgo.com/ip3/app.example.com.ico', 'https://app.example.com/']);
+    assert.equal(calls.filter((call) => call.endsWith('/favicon.ico')).length, 1);
+  }
+});
+
+test('findFavicon (fast) : aucun nom privé, local ou IP n\'est transmis au service', async () => {
+  for (const url of ['http://intranet/', 'http://wiki.local/', 'http://localhost:3000/', 'http://192.168.1.10/', 'http://8.8.8.8/', 'http://10.0.0.5:8080/']) {
+    const { fetch, calls } = network({});
+    await findFavicon(url, fetch, { fast: true });
+    assert.ok(calls.every((call) => !call.includes('duckduckgo')), url);
+  }
 });

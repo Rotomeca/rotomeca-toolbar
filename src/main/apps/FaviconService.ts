@@ -2,16 +2,17 @@
  * Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque.
  *
  * Utilisé par `App` pour répondre à la page de la barre. Le réseau, le disque et l'horloge sont injectés.
- * Une icône trouvée est gardée 14 jours, un échec 1 jour (pour ne pas réinterroger un site sans icône à chaque démarrage).
+ * Une icône trouvée est gardée 14 jours, l'absence d'icône 6 heures (pour ne pas réinterroger un site sans icône à chaque
+ * démarrage). Un site qui ne répond pas n'est pas mémorisé : la recherche est refaite à la demande suivante.
  */
 // [favicon.ts] Recherche de l'icône d'un site : lecture de sa page, classement des icônes déclarées, téléchargement
-import { findFavicon } from './favicon.js';
+import { FaviconNetworkError, findFavicon } from './favicon.js';
 import type { FaviconFetch } from './favicon.js';
 
 /** Durée de validité d'une icône trouvée. */
 export const FOUND_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-/** Durée de validité d'un échec. */
-export const MISSING_TTL_MS = 24 * 60 * 60 * 1000;
+/** Durée de validité de l'absence d'icône. */
+export const MISSING_TTL_MS = 6 * 60 * 60 * 1000;
 
 /** Ce qui est enregistré pour un site. */
 interface CacheEntry {
@@ -34,7 +35,12 @@ export interface FaviconDeps {
   readonly fetch: FaviconFetch;
   readonly repository: FaviconRepository;
   readonly now: () => number;
+  /** Essaie d'abord `/favicon.ico` puis un service d'icônes (rapide) avant de lire la page du site ; vrai par défaut. */
+  readonly fast?: boolean;
 }
+
+/** Nom du fichier de cache (le suffixe change si la façon de chercher invalide les anciens échecs). */
+export const CACHE_FILE = 'favicons.v2.json';
 
 /** Garde les icônes des sites : une recherche par site à la fois, résultat réutilisé tant qu'il est valide. */
 export class FaviconService {
@@ -79,8 +85,10 @@ export class FaviconService {
   async #search(origin: string, siteUrl: string): Promise<string | null> {
     let icon: string | null = null;
     try {
-      icon = await findFavicon(siteUrl, this.#deps.fetch);
+      icon = await findFavicon(siteUrl, this.#deps.fetch, { fast: this.#deps.fast ?? true });
     } catch (error) {
+      // Site injoignable : ne rien mémoriser, une prochaine demande réessaiera
+      if (error instanceof FaviconNetworkError) return null;
       console.error('Favicon lookup failed', error);
     }
 
