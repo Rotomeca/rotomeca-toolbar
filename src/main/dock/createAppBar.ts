@@ -71,6 +71,10 @@ export function createAppBar(callbacks: AppBarCallbacks): DockBar<BrowserWindow>
 
   const x11 = nativeX11Api();
   return x11
-    ? new X11StrutBar<BrowserWindow>(x11, scaledConverter((rect) => screen.getDisplayMatching(rect).scaleFactor))
+    ? new X11StrutBar<BrowserWindow>(
+        x11,
+        scaledConverter((rect) => screen.getDisplayMatching(rect).scaleFactor),
+        (window) => screen.getDisplayMatching(window.getBounds()).workArea,
+      )
     : new AppBar<BrowserWindow>(nativeApi(), converter, callbacks);
 }

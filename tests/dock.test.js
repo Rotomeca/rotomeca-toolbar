@@ -313,19 +313,30 @@ const x2 = {
   screenToDipRect: (_w, r) => r,
 };
 
+/** Zone de travail factice : 27 px pris en haut par la barre du système. */
+const workArea = () => ({ x: 0, y: 27, width: 1920, height: 1000 });
+
 test('X11StrutBar : setPos réserve la bande en pixels physiques et rend la zone demandée', () => {
   const api = fakeX11Api();
-  const bar = new X11StrutBar(api, x2);
+  const bar = new X11StrutBar(api, x2, workArea);
   assert.equal(bar.register(fakeX11Window()), true);
 
-  const granted = bar.setPos({ x: 0, y: 10, width: 40, height: 500 });
-  assert.deepEqual(granted, { x: 0, y: 10, width: 40, height: 500 });
-  assert.deepEqual(api.calls, [['set', 0x2a, { width: 80, startY: 20, endY: 1019 }]]);
+  const granted = bar.setPos({ x: 0, y: 40, width: 40, height: 500 });
+  assert.deepEqual(granted, { x: 0, y: 40, width: 40, height: 500 });
+  assert.deepEqual(api.calls, [['set', 0x2a, { width: 80, startY: 80, endY: 1079 }]]);
+});
+
+test('X11StrutBar : la zone accordée est restreinte en hauteur à la zone de travail', () => {
+  const api = fakeX11Api();
+  const bar = new X11StrutBar(api, x2, workArea);
+  bar.register(fakeX11Window());
+
+  assert.deepEqual(bar.setPos({ x: 0, y: 0, width: 40, height: 1200 }), { x: 0, y: 27, width: 40, height: 1000 });
 });
 
 test('X11StrutBar : setPos sans enregistrement ne fait rien', () => {
   const api = fakeX11Api();
-  const bar = new X11StrutBar(api, x2);
+  const bar = new X11StrutBar(api, x2, workArea);
   assert.equal(bar.setPos({ x: 0, y: 0, width: 40, height: 100 }), null);
   assert.equal(api.calls.length, 0);
 });
@@ -333,14 +344,14 @@ test('X11StrutBar : setPos sans enregistrement ne fait rien', () => {
 test('X11StrutBar : une fenêtre détruite ne s\'enregistre pas', () => {
   const win = fakeX11Window();
   win.destroyed = true;
-  const bar = new X11StrutBar(fakeX11Api(), x2);
+  const bar = new X11StrutBar(fakeX11Api(), x2, workArea);
   assert.equal(bar.register(win), false);
   assert.equal(bar.registered, false);
 });
 
 test('X11StrutBar : unregister libère la bande, et seulement si la fenêtre existe', () => {
   const api = fakeX11Api();
-  const bar = new X11StrutBar(api, x2);
+  const bar = new X11StrutBar(api, x2, workArea);
   const win = fakeX11Window();
   bar.register(win);
   bar.unregister();

@@ -23,7 +23,8 @@ const readWindowId = (handle: Buffer): number => handle.readUInt32LE(0);
 /**
  * Ancre une fenêtre au bord gauche de l'écran : le gestionnaire de fenêtres retire la bande
  * réservée de la zone de travail, donc les fenêtres maximisées ne passent plus dessous.
- * X11 n'a ni négociation de la zone ni notification : la zone accordée est celle demandée.
+ * X11 n'a ni négociation de la zone ni notification : la zone accordée est celle demandée,
+ * restreinte en hauteur à la zone de travail (pour ne pas passer sous la barre du haut ou le dock).
  */
 export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> {
   /** Fenêtre ancrée, `null` tant que la barre n'est pas enregistrée. */
@@ -32,10 +33,12 @@ export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> 
   /**
    * @param api Appels natifs X11
    * @param converter Conversions entre pixels indépendants de la densité et pixels physiques
+   * @param workAreaOf Zone de travail (hors barres du système) de l'écran qui porte la fenêtre, en pixels indépendants de la densité
    */
   constructor(
     private readonly api: X11Api,
     private readonly converter: DipConverter<W>,
+    private readonly workAreaOf: (window: W) => Rect,
   ) {}
 
   /** @returns `true` si une fenêtre est actuellement ancrée */
@@ -55,7 +58,7 @@ export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> 
   /**
    * Réserve une bande sur le bord gauche de l'écran.
    * @param dipBounds Zone souhaitée
-   * @returns La zone demandée, ou `null` si la barre n'est pas enregistrée
+   * @returns La zone demandée, restreinte en hauteur à la zone de travail, ou `null` si la barre n'est pas enregistrée
    */
   setPos(dipBounds: Rect): Rect | null {
     const { window } = this;
@@ -68,7 +71,10 @@ export class X11StrutBar<W extends X11Window = X11Window> implements DockBar<W> 
       endY: px.y + px.height - 1,
     });
 
-    return dipBounds;
+    const area = this.workAreaOf(window);
+    const top = Math.max(dipBounds.y, area.y);
+    const bottom = Math.min(dipBounds.y + dipBounds.height, area.y + area.height);
+    return { ...dipBounds, y: top, height: Math.max(0, bottom - top) };
   }
 
   /** Libère l'espace réservé. À appeler avant de fermer la fenêtre ou de quitter. */
