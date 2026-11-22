@@ -1,0 +1,77 @@
+/* Moments de la journée et météo — surcouche des thèmes de saison. N'altère pas themes.css / saisons.css. */
+
+/* Été la nuit : la palette claire passe en sombre. */
+[data-palette="ete-nuit"] {
+  --p-bg: #141a2e; --p-variant: #1c2440; --p-strong: #283255; --p-overlay: #1c2440;
+  --p-text: #f3ecdc; --p-muted: #bfc3d9; --p-border-subtle: #283255; --p-border-strong: #7680a8;
+  --p-primary: #f6c629; --p-primary-hover: #f8d55c; --p-primary-active: #d9aa12; --p-on-primary: #141a2e;
+  --p-action-text: #f8d55c; --p-hover: #222b4a; --p-press: #283255;
+  --p-accent: #f28c28; --p-on-accent: #141a2e; --p-accent-soft: #3d2a14; --p-on-accent-soft: #f6b46a;
+  --p-brand-soft: #2a2c3a; --p-on-brand-soft: #f8d55c;
+}
+
+/* Ciel : un voile coloré par moment, sous les particules et les décors. */
+.mo-sky { position: absolute; inset: 0; pointer-events: none; }
+[data-moment="aube"] .mo-sky { background: linear-gradient(to top, rgba(255, 160, 140, 0.32), rgba(255, 200, 170, 0.1) 45%, rgba(170, 190, 255, 0.08) 80%); }
+[data-moment="jour"] .mo-sky { background: none; }
+[data-moment="crepuscule"] .mo-sky { background: linear-gradient(to bottom, rgba(110, 50, 140, 0.38), rgba(230, 100, 70, 0.22) 60%, rgba(255, 150, 70, 0.34)); }
+[data-moment="nuit"] .mo-sky { background: linear-gradient(to bottom, rgba(4, 6, 26, 0.6), rgba(10, 14, 40, 0.38)); }
+
+/* Pluie : voile gris, plus dense la nuit. */
+.mo-veil { position: absolute; inset: 0; pointer-events: none; background: rgba(55, 64, 80, 0.24); }
+[data-moment="nuit"] .mo-veil { background: rgba(10, 12, 22, 0.3); }
+
+/* Gouttes : colonne pleine hauteur qui descend en biais. */
+.mo-drop { position: absolute; top: 0; height: 100%; animation: mo-rain linear infinite; }
+.mo-drop > i { display: block; width: 1.6px; border-radius: 2px; background: linear-gradient(to bottom, rgba(220, 230, 255, 0), rgba(220, 230, 255, 0.75)); transform: rotate(12deg); }
+@keyframes mo-rain { from { transform: translate(0, -8%); } to { transform: translate(-26px, 104%); } }
+
+/* Éclair (pluie d'été) : double flash périodique. */
+.mo-flash { position: absolute; inset: 0; pointer-events: none; background: #ffffff; opacity: 0; animation: mo-flash 9s linear infinite; }
+@keyframes mo-flash { 0%, 86% { opacity: 0; } 87% { opacity: 0.55; } 88% { opacity: 0.05; } 90% { opacity: 0.35; } 92%, 100% { opacity: 0; } }
+[data-moment="nuit"] .mo-flash { animation-name: mo-flash-night; }
+@keyframes mo-flash-night { 0%, 86% { opacity: 0; } 87% { opacity: 0.75; } 88% { opacity: 0.1; } 90% { opacity: 0.5; } 92%, 100% { opacity: 0; } }
+
+/* Nuages de pluie, lents. */
+.mo-cloud { position: absolute; animation: mo-drift 40s linear infinite alternate; }
+@keyframes mo-drift { from { transform: translateX(-20px); } to { transform: translateX(40px); } }
+
+/* Étoiles, lune, lucioles. */
+.mo-star { position: absolute; border-radius: 999px; background: #fff8e6; animation: fx-twinkle 2.2s ease-in-out infinite alternate; }
+.mo-moon { position: absolute; top: 14px; right: 18px; }
+.mo-firefly { position: absolute; width: 4px; height: 4px; border-radius: 999px; background: #f8f07a; box-shadow: 0 0 8px 3px rgba(248, 240, 122, 0.55); animation: mo-firefly 6s ease-in-out infinite alternate; }
+@keyframes mo-firefly { 0% { transform: translate(0, 0); opacity: 0.2; } 30% { opacity: 1; } 60% { transform: translate(24px, -18px); opacity: 0.4; } 100% { transform: translate(-16px, -30px); opacity: 1; } }
+
+/* Soleil bas : à gauche à l'aube, à droite au crépuscule. */
+.mo-lowsun { position: absolute; bottom: 20%; }
+[data-moment="aube"] .mo-lowsun { left: -20px; }
+[data-moment="crepuscule"] .mo-lowsun { right: -20px; }
+
+/* Brume du matin. */
+.mo-mist { position: absolute; left: -10%; width: 120%; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); filter: blur(10px); animation: mo-drift 18s ease-in-out infinite alternate; }
+
+/* Herbe et bourgeons qui ondulent ; yeux du renard visibles la nuit seulement. */
+.mo-grass { transform-origin: 50% 100%; animation: mo-grass 3.4s ease-in-out infinite alternate; }
+@keyframes mo-grass { from { transform: skewX(-3deg); } to { transform: skewX(3deg); } }
+.mo-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: mo-sway 3s ease-in-out infinite alternate; }
+@keyframes mo-sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+.mo-eyes { opacity: 0; }
+[data-moment="nuit"] .mo-eyes, [data-moment="crepuscule"] .mo-eyes { opacity: 1; animation: mo-blink 5s steps(1, end) infinite; }
+@keyframes mo-blink { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-drop, .mo-firefly { display: none; }
+  .mo-flash, .mo-cloud, .mo-star, .mo-mist, .mo-grass, .mo-sway, .mo-eyes { animation: none; }
+}
+
+/* Nuages qui traversent le ciel de gauche à droite, en boucle, à des vitesses différentes. */
+.mo-cloud-track { position: absolute; left: 0; width: 100%; transform: translateX(-30%); animation: mo-cloudpass 48s linear infinite; pointer-events: none; }
+@keyframes mo-cloudpass { from { transform: translateX(-30%); } to { transform: translateX(105%); } }
+@media (prefers-reduced-motion: reduce) { .mo-cloud-track { animation: none; transform: translateX(30%); } }
+
+/* Sous la pluie, les fleurs bougent davantage et piquent du nez quand une goutte les touche. */
+.mo-sway { animation-name: mo-sway-rain; animation-duration: 2.2s; }
+@keyframes mo-sway-rain { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+.mo-nod { transform-box: fill-box; transform-origin: 50% 100%; animation: mo-nod 4s ease-out infinite; }
+@keyframes mo-nod { 0%, 70%, 100% { transform: rotate(0deg); } 74% { transform: rotate(14deg) translateY(1px); } 80% { transform: rotate(-5deg); } 86% { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .mo-nod { animation: none; } }

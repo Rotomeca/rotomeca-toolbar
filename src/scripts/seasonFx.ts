@@ -4,16 +4,18 @@
  * Utilisé par la page de la barre et celle des paramètres. Dépend des SVG de `src/assets/decors/`
  * et de `css/saisons.css` pour les animations. Le calque suit le thème de saison courant.
  *
- * L'état vient de <html> : `data-palette` (le thème), `data-fx` (« on » si les effets sont
+ * L'état vient de <html> : `data-palette` (le thème), `data-moment` et `data-weather` (moment de la
+ * journée et pluie, voir `momentFx.ts`), `data-fx` (« on » si les effets sont
  * actifs) et `data-fx-density` (discrete | normale | abondante), posés par le processus
  * principal. Les animations sont dans `css/saisons.css`, qui les coupe si Windows réduit
  * les animations. Les valeurs « aléatoires » sont déterministes (algorithme des maquettes).
  */
 
-/** Adresse du dossier des SVG de décor. */
-const DECORS = new URL('../assets/decors/', import.meta.url).href;
-/** Espace de noms des éléments SVG. */
-const SVG_NS = 'http://www.w3.org/2000/svg';
+// [decorSvg.ts] Chargement et préparation des SVG de décor des effets de saison et de moments
+import { loadSvg, withRoot } from './decorSvg.js';
+// [momentFx.ts] Moments de la journée et pluie : calques de ciel, de météo et de décor
+import { backLayers, frontLayers, parseMoment, planLayers } from './momentFx.js';
+import type { SkyState } from './momentFx.js';
 
 /** Nombre de particules par densité : [barre étroite, grande fenêtre]. */
 const COUNTS: Readonly<Record<string, readonly [number, number]>> = {
@@ -76,44 +78,6 @@ const SUNFLOWERS: Readonly<Record<'wide' | 'narrow', readonly Sunflower[]>> = {
   ],
   narrow: [['16px', 40, 68, '0s']],
 };
-
-/** Textes des SVG déjà demandés, pour ne les charger qu'une fois. */
-const templates = new Map<string, Promise<string>>();
-
-/**
- * Charge (une seule fois) le texte d'un SVG de décor.
- * @param {string} name Nom du fichier, sans extension
- * @returns {Promise<string>} Le texte du SVG, vide si le chargement échoue
- */
-async function loadSvg(name: string): Promise<string> {
-  if (!templates.has(name)) {
-    templates.set(
-      name,
-      fetch(`${DECORS}${name}.svg`)
-        .then((response) => response.text())
-        .catch((error) => {
-          console.error(`décor ${name}`, error);
-          return '';
-        }),
-    );
-  }
-
-  return templates.get(name) ?? Promise.resolve('');
-}
-
-/**
- * Remplace la balise racine d'un SVG : on garde son viewBox, le reste est posé ici.
- * @param {string} svg Texte du SVG d'origine
- * @param {string} attributes Attributs de la nouvelle racine (classe, taille, style)
- * @returns {string} Le SVG avec sa nouvelle racine
- */
-function withRoot(svg: string, attributes: string): string {
-  const root = /<svg[^>]*>/.exec(svg)?.[0] ?? '';
-  const viewBox = /viewBox="[^"]*"/.exec(root)?.[0] ?? '';
-  const ratio = /preserveAspectRatio="[^"]*"/.exec(root)?.[0] ?? '';
-
-  return svg.replace(root, `<svg xmlns="${SVG_NS}" ${viewBox} ${ratio} ${attributes}>`);
-}
 
 /**
  * Génère une valeur pseudo-aléatoire stable : le même rang donne toujours le même résultat.
@@ -225,24 +189,30 @@ function gifts(count: number): string {
 
 /**
  * Construit le contenu du calque pour une saison.
- * @param {string} kind neige | automne | printemps | cerisier | ete | noel
- * @param {string} density
- * @param {boolean} narrow Hôte étroit (la barre)
- * @returns {Promise<string>}
+ * @param kind neige | automne | printemps | cerisier | ete | noel
+ * @param density Densité des particules
+ * @param narrow Hôte étroit (la barre)
+ * @param sky Moment, pluie et état des effets ; sans effets, seul le voile de ciel est construit
+ * @returns Le balisage du calque
  */
-async function build(kind: string, density: string, narrow: boolean): Promise<string> {
+async function build(kind: string, density: string, narrow: boolean, sky: SkyState): Promise<string> {
+  const plan = planLayers(kind, sky);
+  if (!sky.effects) return backLayers({ ...plan, veil: false, nightSky: false, lowSun: false, mist: false }, narrow);
+
   const [narrowCount, wideCount] = COUNTS[density] ?? COUNTS['normale'] ?? [0, 0];
-  const count = narrow ? narrowCount : wideCount;
-  let html = particles(kind, count);
+  const count = plan.particleCount ?? (narrow ? narrowCount : wideCount);
+  let html = (await backLayers(plan, narrow)) + particles(kind, count);
 
   if (kind === 'ete') {
-    const flower = await loadSvg('tournesol');
-    for (const [left, width, height, delay] of SUNFLOWERS[narrow ? 'narrow' : 'wide'])
-      html += withRoot(
-        flower,
-        `class="fx-sun" style="left:${left};animation-delay:${delay}" width="${width}" height="${height}"`,
-      );
-    html += sun(narrow);
+    if (plan.sunflowers) {
+      const flower = await loadSvg('tournesol');
+      for (const [left, width, height, delay] of SUNFLOWERS[narrow ? 'narrow' : 'wide'])
+        html += withRoot(
+          flower,
+          `class="fx-sun" style="left:${left};animation-delay:${delay}" width="${width}" height="${height}"`,
+        );
+    }
+    if (plan.summerSun) html += sun(narrow);
   }
 
   if (kind === 'noel') {
@@ -252,7 +222,7 @@ async function build(kind: string, density: string, narrow: boolean): Promise<st
   }
 
   const deco = DECO[kind];
-  if (deco) {
+  if (deco && plan.seasonDecor) {
     const [width, height] = narrow ? deco.narrow : deco.wide;
     const svg = await loadSvg(deco.file);
     html += withRoot(
@@ -261,7 +231,7 @@ async function build(kind: string, density: string, narrow: boolean): Promise<st
     );
   }
 
-  return html;
+  return html + (await frontLayers(kind, plan, narrow));
 }
 
 /**
@@ -278,19 +248,25 @@ export function initSeasonFx(host: HTMLElement, { narrow = false }: { narrow?: b
   let current = '';
   let version = 0;
 
-  /** Recalcule le calque d'après le thème, l'interrupteur et la densité ; ignore un résultat périmé. */
+  /** Recalcule le calque d'après le thème, le moment, la pluie, l'interrupteur et la densité ; ignore un résultat périmé. */
   const refresh = async () => {
     const palette = root.dataset.palette ?? '';
     const kind = KINDS[palette];
-    const active = root.dataset.fx === 'on' && kind !== undefined;
+    const sky: SkyState = {
+      moment: parseMoment(root.dataset.moment),
+      rainy: root.dataset.weather === 'pluie',
+      effects: root.dataset.fx === 'on',
+    };
+    // Sans effets, le voile de ciel d'un moment reste : seuls les éléments animés disparaissent
+    const active = kind !== undefined && (sky.effects || sky.moment !== undefined);
     const density = root.dataset.fxDensity ?? 'normale';
-    const key = active ? `${palette}|${density}` : '';
+    const key = active ? `${palette}|${density}|${sky.moment ?? ''}|${sky.rainy}|${sky.effects}` : '';
 
     if (key === current) return;
     current = key;
 
     const mine = ++version;
-    const html = active ? await build(kind, density, narrow) : '';
+    const html = active ? await build(kind, density, narrow, sky) : '';
     // Un changement plus récent est arrivé pendant le chargement des décors
     if (mine !== version) return;
 
@@ -307,7 +283,7 @@ export function initSeasonFx(host: HTMLElement, { narrow = false }: { narrow?: b
 
   new MutationObserver(refresh).observe(root, {
     attributes: true,
-    attributeFilter: ['data-palette', 'data-fx', 'data-fx-density'],
+    attributeFilter: ['data-palette', 'data-moment', 'data-weather', 'data-fx', 'data-fx-density'],
   });
   refresh();
 }

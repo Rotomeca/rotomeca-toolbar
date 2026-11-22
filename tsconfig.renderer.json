@@ -13,6 +13,8 @@
     "src/index/**/*.ts",
     "src/scripts/components/**/*.ts",
     "src/scripts/seasonFx.ts",
+    "src/scripts/decorSvg.ts",
+    "src/scripts/momentFx.ts",
     "src/scripts/ds.ts",
     "src/scripts/dom.ts",
     "src/scripts/WebContentElecrtonContextMenu.ts",
