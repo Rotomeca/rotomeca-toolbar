@@ -76,6 +76,14 @@ function themeSetup(stored = {}) {
     onSystemThemeChanged: (l) => { env.systemListener = l; },
     onResume: (l) => { env.resumeListener = l; },
     every: (ms, cb) => { env.tick = { ms, cb }; },
+    date: new Date(2026, 5, 15, 12),
+    now: () => env.date,
+    timers: [],
+    after: (ms, cb) => {
+      const timer = { ms, cb, cancelled: false };
+      env.timers.push(timer);
+      return () => { timer.cancelled = true; };
+    },
   };
   const service = new ThemeService(settings, env);
   return { service, settings, env, setSeason: (s) => { season = s; } };
@@ -150,6 +158,59 @@ test('ThemeService : la saison n\'est réévaluée que chaque minute et au réve
 
   env.resumeListener();
   assert.equal(local.scripts.length, 1, 'déjà diffusé');
+});
+
+test('ThemeService : pas de moment hors thème automatique, ni si « Moments et météo » est coupé', () => {
+  const manual = themeSetup({ theme: 'sombre' });
+  assert.match(manual.service.script, /delete h\.dataset\.moment/);
+
+  const off = themeSetup({ themeAuto: true, momentsMeteo: false });
+  assert.match(off.service.script, /delete h\.dataset\.moment/);
+
+  const auto = themeSetup({ themeAuto: true });
+  assert.match(auto.service.script, /h\.dataset\.moment = "jour"/);
+});
+
+test('ThemeService : le minuteur vise la prochaine frontière et rediffuse quand le moment change', () => {
+  const { service, env } = themeSetup({ themeAuto: true });
+  const local = page('file:///a.html');
+  env.contents = [local];
+  service.start();
+
+  const [first] = env.timers;
+  assert.equal(first.ms, 5 * 3600 * 1000, '12 h → 17 h');
+
+  env.date = new Date(2026, 5, 15, 17);
+  first.cb();
+  assert.equal(local.scripts.length, 1);
+  assert.match(local.scripts[0], /h\.dataset\.moment = "crepuscule"/);
+  assert.equal(env.timers.length, 2, 'minuteur réarmé');
+  assert.equal(env.timers[1].ms, 2 * 3600 * 1000, '17 h → 19 h');
+});
+
+test('ThemeService : au réveil, le moment est réévalué et le minuteur remplacé', () => {
+  const { service, env } = themeSetup({ themeAuto: true });
+  const local = page('file:///a.html');
+  env.contents = [local];
+  service.start();
+
+  env.date = new Date(2026, 5, 15, 20);
+  env.resumeListener();
+  assert.match(local.scripts[0], /h\.dataset\.moment = "nuit"/);
+  assert.equal(env.timers[0].cancelled, true);
+  assert.equal(env.timers[1].ms, 10 * 3600 * 1000, '20 h → 6 h');
+});
+
+test('ThemeService : l\'été la nuit passe en palette sombre « ete-nuit »', () => {
+  const { service, env, setSeason } = themeSetup({ themeAuto: true });
+  setSeason('ete');
+  env.date = new Date(2026, 6, 15, 22);
+  assert.match(service.script, /h\.dataset\.theme = "dark"/);
+  assert.match(service.script, /h\.dataset\.palette = "ete-nuit"/);
+  assert.match(service.script, /h\.dataset\.fx = "on"/);
+
+  env.date = new Date(2026, 6, 15, 12);
+  assert.match(service.script, /h\.dataset\.palette = "ete"/);
 });
 
 // #endregion

@@ -29,6 +29,7 @@ const KINDS: Readonly<Record<string, string>> = {
   printemps: 'printemps',
   cerisier: 'cerisier',
   ete: 'ete',
+  'ete-nuit': 'ete',
   noel: 'noel',
 };
 

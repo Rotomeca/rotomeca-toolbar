@@ -29,6 +29,8 @@ export interface SettingsFormDto {
   readonly themeAuto: boolean;
   /** Effets de saison activés. */
   readonly effetsSaison: boolean;
+  /** Moments de la journée et météo (thème automatique seulement). */
+  readonly momentsMeteo: boolean;
   /** Densité des effets de saison. */
   readonly densiteEffets: string;
   /** Mode bouton (la barre s'ouvre depuis un bouton). */

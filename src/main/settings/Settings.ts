@@ -105,6 +105,15 @@ export class Settings {
     this.read().effetsSaison = value !== false;
   }
 
+  /** Moments de la journée et météo en thème automatique (par défaut oui). */
+  get momentsMeteo(): boolean {
+    return this.read().momentsMeteo !== false;
+  }
+
+  set momentsMeteo(value: unknown) {
+    this.read().momentsMeteo = value !== false;
+  }
+
   /** Densité des effets de saison (animations de neige, pétales, etc.). */
   get densiteEffets(): EffectDensity {
     return sanitizeDensity(this.read().densiteEffets);
@@ -132,6 +141,7 @@ export class Settings {
       theme: this.theme,
       themeAuto: this.themeAuto,
       effetsSaison: this.effetsSaison,
+      momentsMeteo: this.momentsMeteo,
       densiteEffets: this.densiteEffets,
       displayId: this.displayId,
     });

@@ -122,9 +122,19 @@ test('Settings : save écrit l\'ensemble des réglages validés', () => {
     theme: 'bleu',
     themeAuto: false,
     effetsSaison: true,
+    momentsMeteo: true,
     densiteEffets: 'normale',
     displayId: null,
   });
+});
+
+test('Settings : « Moments et météo » est activé par défaut et ne se coupe que par false', () => {
+  const settings = new Settings(memoryStore(false), seasonal);
+  assert.equal(settings.momentsMeteo, true);
+  settings.momentsMeteo = false;
+  assert.equal(settings.momentsMeteo, false);
+  settings.momentsMeteo = 'non';
+  assert.equal(settings.momentsMeteo, true);
 });
 
 test('Settings : le thème effectif suit la saison en mode automatique seulement', () => {
@@ -154,6 +164,19 @@ test('buildThemeScript : pas d\'effets sur un thème qui n\'est pas de saison', 
 
 test('buildThemeScript : pas d\'effets quand ils sont désactivés', () => {
   assert.match(buildThemeScript(input({ effectiveTheme: 'noel', effectsEnabled: false })), /h\.dataset\.fx = "off"/);
+});
+
+test('buildThemeScript : pose data-moment, ou le retire sans moment', () => {
+  assert.match(buildThemeScript(input({ effectiveTheme: 'hiver', moment: 'aube' })), /h\.dataset\.moment = "aube"/);
+  assert.match(buildThemeScript(input({ effectiveTheme: 'hiver' })), /delete h\.dataset\.moment/);
+});
+
+test('buildThemeScript : seul l\'été la nuit change de palette', () => {
+  const night = buildThemeScript(input({ effectiveTheme: 'ete', moment: 'nuit' }));
+  assert.match(night, /h\.dataset\.palette = "ete-nuit"/);
+  assert.match(night, /h\.dataset\.theme = "dark"/);
+  assert.match(buildThemeScript(input({ effectiveTheme: 'automne', moment: 'nuit' })), /h\.dataset\.palette = "automne"/);
+  assert.match(buildThemeScript(input({ effectiveTheme: 'ete', moment: 'jour' })), /h\.dataset\.palette = "ete"/);
 });
 
 test('buildThemeScript : « system » suit le mode sombre du système', () => {

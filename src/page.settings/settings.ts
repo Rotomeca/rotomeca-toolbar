@@ -51,6 +51,7 @@ const DEFAULT_SETTINGS: EditableSettings = {
   theme: 'system',
   themeAuto: false,
   effetsSaison: true,
+  momentsMeteo: true,
   densiteEffets: 'normale',
   isButtonModeEnabled: true,
   appBarEnabled: false,
