@@ -25,7 +25,7 @@
 // [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { WebContentsView, app, dialog, ipcMain, net, screen, session, shell } from 'electron';
+import { WebContentsView, app, dialog, ipcMain, screen, session, shell } from 'electron';
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 // [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { sanitizeMediaState } from '../scripts/AppIndicators.js';
@@ -51,6 +51,8 @@ import { createRequestThrottle } from '../shared/requestThrottle.js';
 import { AppListService } from './apps/AppListService.js';
 // [FaviconService.ts] Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque
 import { CACHE_FILE, FaviconService } from './apps/FaviconService.js';
+// [electronFaviconFetch.ts] Requête réseau des icônes : adaptateur d'Electron qui contrôle chaque redirection
+import { createFaviconFetch } from './apps/electronFaviconFetch.js';
 // [AppViewHost.ts] Hôte des sites ouverts en arrière-plan : vues, indicateurs (non-lus, son, morceau) et sourdine
 import { AppViewHost } from './apps/AppViewHost.js';
 // [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
@@ -247,14 +249,9 @@ export class App {
     this.favicons = new FaviconService({
       repository: new JsonFileStore(dataDirectory(), CACHE_FILE),
       now: () => Date.now(),
-      // Sans cookies (aucune donnée de l'utilisateur envoyée) et avec l'identifiant d'un navigateur ordinaire :
-      // certains serveurs (Tchap) ne répondent pas à « Electron/x.y.z »
-      fetch: (url) =>
-        net.fetch(url, {
-          credentials: 'omit',
-          headers: { 'user-agent': browserUserAgent() },
-          signal: AbortSignal.timeout(FAVICON_TIMEOUT_MS),
-        }),
+      // Sans cookies (aucune donnée de l'utilisateur envoyée), avec l'identifiant d'un navigateur ordinaire
+      // (certains serveurs, Tchap, ne répondent pas à « Electron/x.y.z ») et en contrôlant chaque redirection
+      fetch: createFaviconFetch({ userAgent: browserUserAgent, timeoutMs: FAVICON_TIMEOUT_MS }),
     });
 
     const store = new JsonFileStore(dataDirectory(), 'data.rsft');

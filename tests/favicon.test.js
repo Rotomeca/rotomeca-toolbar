@@ -262,3 +262,112 @@ test('findFavicon (fast) : aucun nom privé, local ou IP n\'est transmis au serv
     assert.ok(calls.every((call) => !call.includes('duckduckgo')), url);
   }
 });
+
+// #region SSRF et taille (durcissement)
+
+const { isAllowedFaviconRedirect } = require('../dist/src/main/apps/favicon.js');
+
+test('isAllowedFaviconRedirect : une page publique ne peut pas rediriger vers le réseau local', () => {
+  for (const to of [
+    'http://127.0.0.1/admin',
+    'http://localhost:8080/x',
+    'http://localhost./x',
+    'http://10.0.0.5/',
+    'http://100.64.0.1/',
+    'http://169.254.169.254/latest/meta-data',
+    'http://172.20.1.1/',
+    'http://192.168.1.1/',
+    'http://[::1]/',
+    'http://[::ffff:7f00:1]/',
+    'http://[fd00::1]/',
+    'http://[fe80::1]/',
+    'http://2130706433/',
+    'http://0x7f.1/',
+    'http://nas.internal/',
+    'file:///C:/secret',
+    'javascript:alert(1)',
+  ]) {
+    assert.equal(isAllowedFaviconRedirect('https://example.com/', to), false, to);
+  }
+});
+
+test('isAllowedFaviconRedirect : une redirection publique, ou entre adresses privées, est suivie', () => {
+  assert.equal(isAllowedFaviconRedirect('http://example.com/', 'https://www.example.com/favicon.ico'), true);
+  assert.equal(isAllowedFaviconRedirect('http://192.168.1.5/', 'http://192.168.1.6/icon.png'), true);
+  assert.equal(isAllowedFaviconRedirect('https://example.com/', 'pas une url'), false);
+});
+
+/** Réponse en flux : renvoie des blocs de la taille donnée sans fin, et compte les lectures. */
+function endlessReply(chunkBytes, stats) {
+  return {
+    ok: true,
+    headers: { get: () => null },
+    arrayBuffer: async () => { throw new Error('ne doit pas lire le corps entier'); },
+    text: async () => '',
+    body: {
+      getReader: () => ({
+        read: async () => { stats.reads++; return { done: false, value: pngChunk(chunkBytes) }; },
+        cancel: async () => { stats.cancelled = true; },
+      }),
+    },
+  };
+}
+const pngChunk = (size) => {
+  const chunk = new Uint8Array(size);
+  chunk.set([0x89, 0x50, 0x4e, 0x47]);
+  return chunk;
+};
+
+test('findFavicon : un corps sans fin est abandonné dès 128 Ko, sans le lire en entier', async () => {
+  const stats = { reads: 0, cancelled: false };
+  const { fetch } = network({ 'https://big.example/favicon.ico': endlessReply(64 * 1024, stats) });
+
+  assert.equal(await findFavicon('https://big.example/', fetch, { fast: true }), null);
+  assert.equal(stats.cancelled, true);
+  assert.ok(stats.reads <= 4, `${stats.reads} lectures`);
+});
+
+test('findFavicon : une taille annoncée trop grande est refusée sans lire le corps', async () => {
+  const stats = { reads: 0, cancelled: false };
+  const response = endlessReply(16, stats);
+  response.headers = { get: (name) => (name.toLowerCase() === 'content-length' ? String(10 * 1024 * 1024) : null) };
+  const { fetch } = network({ 'https://big.example/favicon.ico': response });
+
+  assert.equal(await findFavicon('https://big.example/', fetch, { fast: true }), null);
+  assert.equal(stats.reads, 0);
+});
+
+test('findFavicon : une petite icône en flux est lue en entier', async () => {
+  let sent = false;
+  const response = {
+    ok: true,
+    headers: { get: () => null },
+    arrayBuffer: async () => new ArrayBuffer(0),
+    text: async () => '',
+    body: {
+      getReader: () => ({
+        read: async () => (sent ? { done: true } : ((sent = true), { done: false, value: new Uint8Array(PNG) })),
+        cancel: async () => {},
+      }),
+    },
+  };
+  const { fetch } = network({ 'https://small.example/favicon.ico': response });
+
+  assert.equal(await findFavicon('https://small.example/', fetch, { fast: true }), `data:image/png;base64,${PNG.toString('base64')}`);
+});
+
+test('FaviconService : une adresse non http(s) ne crée aucune entrée de cache', async () => {
+  const writes = [];
+  const svc = new FaviconService({
+    fetch: async () => { throw new Error('ne doit pas être appelé'); },
+    repository: { loadAsync: async () => false, save: (data) => writes.push(data) },
+    now: () => 1,
+  });
+
+  for (const url of ['blob:https://victime.example/abc', 'file:///C:/x', 'javascript:1', 'pas une url']) {
+    assert.equal(await svc.resolve(url), null, url);
+  }
+  assert.equal(writes.length, 0);
+});
+
+// #endregion

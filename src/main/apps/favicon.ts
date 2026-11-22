@@ -103,11 +103,45 @@ function largestSize(sizes: string | undefined): number {
 }
 
 /**
- * @param host Nom d'hôte d'une adresse
- * @returns `true` pour `localhost` ou une adresse IP privée : une page publique ne doit pas y envoyer l'application
+ * @param host Nom d'hôte d'une adresse (déjà normalisé par `URL` : adresses décimales ou hexadécimales converties)
+ * @returns `true` pour un nom local ou une adresse IP privée, de boucle locale, de lien local ou partagée
+ * (10/8, 100.64/10, 127/8, 169.254/16, 172.16/12, 192.168/16, IPv6 `::1`, `fc00::/7`, `fe80::/10`, IPv4 mappées) :
+ * une page publique ne doit pas y envoyer l'application
  */
 function isPrivateHost(host: string): boolean {
-  return /^(localhost|\[?::1\]?|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0)/i.test(host) || host.endsWith('.local');
+  const name = host.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  if (name === 'localhost' || ['.localhost', '.local', '.internal'].some((suffix) => name.endsWith(suffix))) return true;
+  if (name.includes(':')) return /^(::1?$|fe[89ab]|f[cd]|::ffff:)/.test(name);
+
+  const octets = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(name);
+  if (!octets) return false;
+
+  const [first, second] = [Number(octets[1]), Number(octets[2])];
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+/**
+ * Décide si une redirection peut être suivie : une adresse http(s), et jamais vers le réseau local depuis
+ * un site public (sinon un site pourrait faire émettre des requêtes vers l'intranet de l'utilisateur).
+ *
+ * @param from Adresse qui redirige
+ * @param to Adresse vers laquelle elle redirige
+ * @returns `true` si la redirection peut être suivie
+ */
+export function isAllowedFaviconRedirect(from: string, to: string): boolean {
+  try {
+    return isSafeUrl(to) && !(isPrivateHost(new URL(to).hostname) && !isPrivateHost(new URL(from).hostname));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -180,6 +214,43 @@ function sniffImageType(bytes: Uint8Array): string | null {
 }
 
 /**
+ * Lit le corps d'une icône sans jamais dépasser `MAX_ICON_BYTES` en mémoire : la lecture s'arrête (et la
+ * connexion est coupée) dès que la taille est dépassée, qu'elle soit annoncée ou non.
+ *
+ * @param response Réponse de l'icône
+ * @returns Les octets, `null` si l'icône est trop lourde
+ */
+async function readIcon(response: FaviconResponse): Promise<Uint8Array | null> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_ICON_BYTES) return null;
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return bytes.length > MAX_ICON_BYTES ? null : bytes;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      total += value.length;
+      if (total > MAX_ICON_BYTES) return null;
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  return Buffer.concat(chunks);
+}
+
+/**
  * Télécharge une icône et la renvoie en `data:`.
  * @returns L'icône, `null` si l'adresse ne répond pas, n'est pas une image ou est trop lourde
  */
@@ -187,8 +258,8 @@ async function download(url: string, fetch: FaviconFetch): Promise<string | null
   const response = await fetch(url);
   if (!response.ok) return null;
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length === 0 || bytes.length > MAX_ICON_BYTES) return null;
+  const bytes = await readIcon(response);
+  if (bytes === null || bytes.length === 0) return null;
 
   // Le contenu fait foi : beaucoup de serveurs répondent `text/html` pour une icône absente
   const type = sniffImageType(bytes);

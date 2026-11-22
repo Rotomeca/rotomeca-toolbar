@@ -8,6 +8,8 @@
 // [favicon.ts] Recherche de l'icône d'un site : lecture de sa page, classement des icônes déclarées, téléchargement
 import { FaviconNetworkError, findFavicon } from './favicon.js';
 import type { FaviconFetch } from './favicon.js';
+// [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
+import { isSafeUrl } from '../../scripts/safeUrl.js';
 
 /** Durée de validité d'une icône trouvée. */
 export const FOUND_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -59,13 +61,10 @@ export class FaviconService {
    * @returns L'icône du site en `data:`, `null` si le site n'en a pas ou si l'adresse est invalide
    */
   async resolve(siteUrl: string): Promise<string | null> {
-    let origin: string;
-    try {
-      origin = new URL(siteUrl).origin;
-    } catch {
-      return null;
-    }
-    if (origin === 'null') return null;
+    // Une adresse qui n'est pas http(s) (blob:, file:…) n'a pas d'icône et ne doit pas créer d'entrée de cache
+    if (!isSafeUrl(siteUrl)) return null;
+
+    const { origin } = new URL(siteUrl);
 
     await (this.#loaded ??= this.#load());
 
