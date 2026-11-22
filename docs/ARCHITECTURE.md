@@ -94,8 +94,8 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `settings/themes.ts` | Liste blanche des thèmes, palettes, densités d'effets. |
 | `settings/applySettingsUpdate.ts` | Applique ce que la page des paramètres envoie et dit ce qui a changé. |
 | `settings/defaultSettings.ts` | Fabrique l'unique instance de `Settings` (fichier `settings.rcft`). |
-| `theming/ThemeService.ts` | Applique le thème à toutes les pages locales et le met à jour (mode du système, changement de saison). |
-| `theming/themeScript.ts` | Construit le script qui pose `data-theme` / `data-palette` sur une page. |
+| `theming/ThemeService.ts` | Applique le thème à toutes les pages locales et le met à jour (mode du système, changement de saison, frontières de moment). |
+| `theming/themeScript.ts` | Construit le script qui pose `data-theme` / `data-palette` / `data-moment` / `data-weather` sur une page. |
 | `persistence/JsonFileStore.ts` | Fichier JSON écrit de façon atomique et forcée sur disque (droits réservés à l'utilisateur), avec copie `.bak` ; un fichier corrompu est mis de côté et la sauvegarde `.bak` est relue. |
 
 ### Sécurité et permissions : `security/`, `permissions/`, `ipc/`
@@ -129,6 +129,8 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `src/shared/ipc/contracts.ts` | Arguments et réponse de chaque canal (vérifié à la compilation contre `events.ts`). |
 | `src/shared/dto.ts` | Formes des données échangées entre le processus principal et les pages. |
 | `src/shared/updateLevel.ts`, `src/shared/i18n/interpolate.ts` | Petites règles utilisées des deux côtés. |
+| `src/shared/dayMoment.ts`, `rainDay.ts`, `rainFrequency.ts` | Moment de la journée (aube, journée, crépuscule, nuit) et tirage de la pluie du jour ; la table des jours de pluie par mois est dans `rainFrequency.ts`. |
+| `src/scripts/seasonFx.ts`, `momentFx.ts`, `decorSvg.ts` | Calques des pages : effets de saison, ciel et pluie des moments (`css/moments.css`), chargement des SVG de décor. |
 | `src/shared/requestThrottle.ts`, `src/shared/mediaLimits.ts` | Limiteur de débit et bornes de l'état média : un émetteur non fiable (iframe de recherche, site) ne peut pas inonder son destinataire. |
 | `src/scripts/UpdateManager.ts`, `githubReleases.ts`, `versions.ts` | Logique des mises à jour (injectée : testable sans Electron). |
 | `src/scripts/Persistence.ts` | Dossier de données, sauvegardes, cookies et connexions des sites. |
