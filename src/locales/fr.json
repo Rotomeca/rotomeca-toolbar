@@ -205,6 +205,12 @@
   "settings.weatherRain": "Pluie",
   "settings.weatherClear": "Beau temps",
   "settings.momentsBadge": "{moment} · {weather}",
+  "settings.debugSky": "Debug : ciel",
+  "settings.debugSkyHelp": "Disponible en développement seulement. Force la saison, le moment et la météo, sans toucher aux réglages enregistrés.",
+  "settings.debugSeason": "Saison",
+  "settings.debugMoment": "Moment",
+  "settings.debugWeather": "Météo",
+  "settings.debugAuto": "Automatique",
   "settings.display": "Écran",
   "settings.version": "Version :"
 }

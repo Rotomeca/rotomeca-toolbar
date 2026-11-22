@@ -15,6 +15,7 @@ import type {
   MediaPayload,
   PermissionDecision,
   SeasonInfo,
+  SkyOverrideDto,
   ToolbarEntryDto,
   UpdateState,
 } from '../dto.js';
@@ -123,6 +124,10 @@ export interface InvokeContracts {
   permissionsClear: { args: []; result: PermissionDecision[] };
   updateCheckTest: { args: []; result: void };
   updateInstallTest: { args: []; result: void };
+  /** Mode debug : ciel forcé actuel, `null` hors développement. */
+  debugSkyGet: { args: []; result: SkyOverrideDto | null };
+  /** Mode debug : force le ciel (valeurs non fiables, validées), `null` hors développement. */
+  debugSkySet: { args: [override: SkyOverrideDto]; result: SkyOverrideDto | null };
 }
 
 /** Un envoi du processus principal vers les pages : les arguments reçus par l'écouteur, par canal. */

@@ -95,6 +95,7 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `settings/applySettingsUpdate.ts` | Applique ce que la page des paramètres envoie et dit ce qui a changé. |
 | `settings/defaultSettings.ts` | Fabrique l'unique instance de `Settings` (fichier `settings.rcft`). |
 | `theming/ThemeService.ts` | Applique le thème à toutes les pages locales et le met à jour (mode du système, changement de saison, frontières de moment). |
+| `theming/skyOverride.ts` | Valide le ciel forcé par le mode debug (saison, moment, météo) ; les canaux `debugSkyGet` / `debugSkySet` ne répondent qu'en développement (`--dev`), la carte « Debug : ciel » des paramètres reste cachée sinon. |
 | `theming/themeScript.ts` | Construit le script qui pose `data-theme` / `data-palette` / `data-moment` / `data-weather` sur une page. |
 | `persistence/JsonFileStore.ts` | Fichier JSON écrit de façon atomique et forcée sur disque (droits réservés à l'utilisateur), avec copie `.bak` ; un fichier corrompu est mis de côté et la sauvegarde `.bak` est relue. |
 

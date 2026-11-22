@@ -235,6 +235,40 @@ test('ThemeService : jamais de pluie en hiver, à Noël ou en cerisier, ni si «
   assert.match(off.service.script, /delete h\.dataset\.weather/);
 });
 
+test('ThemeService : le ciel forcé impose saison, moment et pluie, même hors thème automatique', () => {
+  const { service, env } = themeSetup({ theme: 'sombre' });
+  env.contents = [page('file:///a.html')];
+
+  service.setSkyOverride({ season: 'automne', moment: 'crepuscule', weather: 'pluie' });
+  assert.match(service.script, /h\.dataset\.palette = "automne"/);
+  assert.match(service.script, /h\.dataset\.moment = "crepuscule"/);
+  assert.match(service.script, /h\.dataset\.weather = "pluie"/);
+  assert.equal(env.contents[0].scripts.length, 1, 'diffusé aussitôt');
+});
+
+test('ThemeService : le ciel forcé garde le réel pour ce qui n\'est pas forcé, et annule avec null', () => {
+  const { service, env } = themeSetup({ theme: 'sombre' });
+  env.date = new Date(2026, 5, 15, 20);
+
+  service.setSkyOverride({ season: 'ete', moment: null, weather: 'sec' });
+  assert.match(service.script, /h\.dataset\.moment = "nuit"/, 'moment réel');
+  assert.match(service.script, /h\.dataset\.palette = "ete-nuit"/);
+  assert.match(service.script, /delete h\.dataset\.weather/);
+
+  assert.equal(service.setSkyOverride(null), null);
+  assert.match(service.script, /h\.dataset\.palette = ""/);
+  assert.match(service.script, /delete h\.dataset\.moment/);
+});
+
+test('ThemeService : la pluie forcée est ignorée sur une saison sans pluie, et une valeur invalide n\'efface pas le thème', () => {
+  const { service } = themeSetup({ theme: 'sombre' });
+  service.setSkyOverride({ season: 'hiver', moment: 'jour', weather: 'pluie' });
+  assert.match(service.script, /delete h\.dataset\.weather/);
+
+  service.setSkyOverride({ season: 'pirate', moment: 'jour' });
+  assert.match(service.script, /h\.dataset\.palette = ""/);
+});
+
 test('ThemeService : l\'été la nuit passe en palette sombre « ete-nuit »', () => {
   const { service, env, setSeason } = themeSetup({ themeAuto: true });
   setSeason('ete');

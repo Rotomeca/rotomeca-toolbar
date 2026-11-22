@@ -15,7 +15,8 @@ import { initSeasonFx } from '../scripts/seasonFx.js';
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { PermissionDecision, SeasonInfo, UpdateState } from '../shared/dto.js';
 // [dayMoment.ts] Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale
-import { momentFor } from '../shared/dayMoment.js';
+import { DAY_MOMENTS, momentFor } from '../shared/dayMoment.js';
+import type { DayMoment } from '../shared/dayMoment.js';
 // [rainDay.ts] Tirage de la pluie : un jour est pluvieux ou non, de façon déterministe d'après la date
 import { canRain, isRainyDay } from '../shared/rainDay.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
@@ -45,12 +46,15 @@ const logError = (error: unknown): void => console.error(error);
 const REFRESH_INTERVAL_MS = 60_000;
 
 /** Clé de traduction de chaque moment de la journée. */
-const MOMENT_LABELS: Readonly<Record<ReturnType<typeof momentFor>, string>> = {
+const MOMENT_LABELS: Readonly<Record<DayMoment, string>> = {
   aube: 'settings.momentAube',
   jour: 'settings.momentJour',
   crepuscule: 'settings.momentCrepuscule',
   nuit: 'settings.momentNuit',
 };
+
+/** Thèmes de saison proposés par le debug du ciel. */
+const DEBUG_SEASONS = ['hiver', 'noel', 'automne', 'printemps', 'cerisier', 'ete'] as const;
 
 /** Mode d'activation de la barre : bouton, bord de l'écran (souris) ou barre ancrée. */
 type Mode = 'button' | 'mouse' | 'appbar';
@@ -184,6 +188,7 @@ export class SettingsPage {
     await this.initTheme();
     await this.initUpdates();
     await this.initTestChannel();
+    await this.initDebugSky();
     await this.initPermissions();
   }
 
@@ -628,6 +633,52 @@ export class SettingsPage {
 
     window.api.on(pageEventList.updateState, (_, next) => render(next));
     render(await window.api.invoke(appEventList.updateGetState));
+  }
+
+  // #endregion
+
+  // #region Debug du ciel (développement seulement)
+
+  /**
+   * Carte « Debug : ciel » : force saison, moment et météo pour essayer chaque combinaison.
+   * Cachée tant que le processus principal ne la propose pas (jamais dans l'application empaquetée).
+   */
+  private async initDebugSky(): Promise<void> {
+    const current = await window.api.invoke(appEventList.debugSkyGet);
+    if (!current) return;
+
+    const selects = {
+      season: requireElement<RdsSelect>('#debug-season'),
+      moment: requireElement<RdsSelect>('#debug-moment'),
+      weather: requireElement<RdsSelect>('#debug-weather'),
+    };
+    const fill = (select: RdsSelect, values: readonly string[], label: (value: string) => string, selected: string | null): void => {
+      for (const value of ['', ...values]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value ? label(value) : t('settings.debugAuto');
+        select.appendChild(option);
+      }
+      select.value = selected ?? '';
+    };
+
+    fill(selects.season, DEBUG_SEASONS, (value) => themeLabel(value), current.season);
+    fill(selects.moment, DAY_MOMENTS, (value) => t(MOMENT_LABELS[value as DayMoment]), current.moment);
+    fill(selects.weather, ['pluie', 'sec'], (value) => t(value === 'pluie' ? 'settings.weatherRain' : 'settings.weatherClear'), current.weather);
+
+    const send = (): void => {
+      const weather = selects.weather.value;
+      window.api
+        .invoke(appEventList.debugSkySet, {
+          season: selects.season.value || null,
+          moment: selects.moment.value || null,
+          weather: weather === 'pluie' || weather === 'sec' ? weather : null,
+        })
+        .catch(logError);
+    };
+    for (const select of Object.values(selects)) select.addEventListener('rds-select:change', send);
+
+    requireElement('#debug-sky').hidden = false;
   }
 
   // #endregion

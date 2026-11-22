@@ -5,8 +5,11 @@
  * prochaine frontière (sans sondage régulier), et par la page des paramètres pour sa pastille.
  */
 
+/** Tous les moments de la journée, tels qu'écrits dans `data-moment`. */
+export const DAY_MOMENTS = ['aube', 'jour', 'crepuscule', 'nuit'] as const;
+
 /** Moment de la journée, tel qu'écrit dans `data-moment`. */
-export type DayMoment = 'aube' | 'jour' | 'crepuscule' | 'nuit';
+export type DayMoment = (typeof DAY_MOMENTS)[number];
 
 /** Heures locales où le moment change, dans l'ordre : aube, journée, crépuscule, nuit. */
 const BOUNDARY_HOURS = [6, 9, 17, 19] as const;

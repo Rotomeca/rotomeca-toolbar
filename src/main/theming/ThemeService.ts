@@ -13,6 +13,10 @@ import { momentFor, nextMomentBoundary } from '../../shared/dayMoment.js';
 import type { DayMoment } from '../../shared/dayMoment.js';
 // [rainDay.ts] Tirage de la pluie : un jour est pluvieux ou non, de façon déterministe d'après la date
 import { canRain, isRainyDay } from '../../shared/rainDay.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
+import type { SkyOverrideDto } from '../../shared/dto.js';
+// [skyOverride.ts] Ciel forcé par le mode debug : validation de ce que la page envoie
+import { sanitizeSkyOverride } from './skyOverride.js';
 
 /** Une page de l'application (un sous-ensemble de `WebContents`). */
 export interface ThemedContents {
@@ -50,6 +54,8 @@ export class ThemeService {
   private lastAppearance: string | null = null;
   /** Annule le minuteur de la prochaine frontière de moment. */
   private cancelBoundaryTimer: (() => void) | null = null;
+  /** Ciel forcé par le mode debug (développement seulement), `null` en usage normal. */
+  private override: SkyOverrideDto | null = null;
 
   /**
    * @param settings Réglages qui fournissent le thème et les effets
@@ -63,7 +69,7 @@ export class ThemeService {
   /** Le script qui applique le thème courant sur la racine d'une page. */
   get script(): string {
     return buildThemeScript({
-      effectiveTheme: this.settings.effectiveTheme,
+      effectiveTheme: this.effectiveTheme(),
       effectsEnabled: this.settings.effetsSaison,
       effectsDensity: this.settings.densiteEffets,
       systemIsDark: this.environment.systemIsDark(),
@@ -72,21 +78,47 @@ export class ThemeService {
     });
   }
 
-  /** Le moment de la journée, seulement en thème automatique avec « Moments et météo » activé. */
+  /** Le ciel forcé par le mode debug, `null` en usage normal. */
+  get skyOverride(): SkyOverrideDto | null {
+    return this.override;
+  }
+
+  /**
+   * Force le ciel (mode debug) et le diffuse aussitôt aux pages ; ce qui n'est pas forcé reste réel.
+   * @param raw Valeurs non fiables : seules celles de la liste blanche sont gardées ; `null` annule le forçage
+   * @returns Le ciel forcé retenu, `null` si rien n'est forcé
+   */
+  setSkyOverride(raw: unknown): SkyOverrideDto | null {
+    this.override = sanitizeSkyOverride(raw);
+    this.broadcast();
+    return this.override;
+  }
+
+  /** Le thème appliqué : la saison forcée par le mode debug, sinon celui des réglages. */
+  private effectiveTheme(): string {
+    return this.override?.season ?? this.settings.effectiveTheme;
+  }
+
+  /**
+   * Le moment de la journée : forcé ou réel en mode debug (qui force aussi l'affichage du ciel),
+   * sinon seulement en thème automatique avec « Moments et météo » activé.
+   */
   private currentMoment(): DayMoment | undefined {
+    if (this.override) return (this.override.moment as DayMoment | null) ?? momentFor(this.environment.now());
     if (!this.settings.themeAuto || !this.settings.momentsMeteo) return undefined;
     return momentFor(this.environment.now());
   }
 
-  /** Il pleut : « Moments et météo » actif, saison pluvieuse et jour de pluie tiré. */
+  /** Il pleut : météo forcée, sinon jour de pluie tiré ; seulement sur une saison pluvieuse et avec un moment. */
   private isRaining(): boolean {
-    if (this.currentMoment() === undefined) return false;
-    return canRain(this.settings.effectiveTheme) && isRainyDay(this.environment.now());
+    if (this.currentMoment() === undefined || !canRain(this.effectiveTheme())) return false;
+    if (this.override?.weather) return this.override.weather === 'pluie';
+    return isRainyDay(this.environment.now());
   }
 
   /** Thème effectif, moment et météo, comparés pour savoir si l'apparence a changé. */
   private appearance(): string {
-    return `${this.settings.effectiveTheme}|${this.currentMoment() ?? ''}|${this.isRaining()}`;
+    return `${this.effectiveTheme()}|${this.currentMoment() ?? ''}|${this.isRaining()}`;
   }
 
   /** Applique le thème courant à toutes les pages locales ouvertes. */

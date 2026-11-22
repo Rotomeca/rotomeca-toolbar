@@ -660,6 +660,18 @@
           <span class="helper" data-i18n="settings.effectsHelp">Neige, feuilles, pétales, tournesols ou traîneau selon la saison. Coupés si Windows réduit les animations.</span>
         </div>
       </section>
+
+      <section id="debug-sky" aria-labelledby="sec-debug-sky" hidden>
+        <div class="card-head">
+          <h2 id="sec-debug-sky" data-i18n="settings.debugSky">Debug : ciel</h2>
+          <span class="helper" data-i18n="settings.debugSkyHelp">Disponible en développement seulement. Force la saison, le moment et la météo, sans toucher aux réglages enregistrés.</span>
+          <div class="season-row">
+            <rds-select id="debug-season" label="Saison" data-i18n-label="settings.debugSeason"></rds-select>
+            <rds-select id="debug-moment" label="Moment" data-i18n-label="settings.debugMoment"></rds-select>
+            <rds-select id="debug-weather" label="Météo" data-i18n-label="settings.debugWeather"></rds-select>
+          </div>
+        </div>
+      </section>
           </div>
         </rds-tab-panel>
 
