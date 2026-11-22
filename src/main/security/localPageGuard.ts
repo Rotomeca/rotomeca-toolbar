@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import type { WebContents } from 'electron';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
-import { isSafeUrl } from '../../scripts/safeUrl.js';
+import { toSafeHref } from '../../scripts/safeUrl.js';
 
 /** Ce que le verrou lit d'un `WebContents` : de quoi poser des gardes, simple à simuler. */
 type LockableContents = Pick<WebContents, 'setWindowOpenHandler' | 'on'>;
@@ -55,7 +55,8 @@ export function isLocalPageUrl(url: string, appRoot: string): boolean {
  */
 export function lockLocalContents(contents: LockableContents, { appRoot, openExternal }: LocalPageLock): void {
   contents.setWindowOpenHandler(({ url }) => {
-    if (isSafeUrl(url)) openExternal(url);
+    const href = toSafeHref(url);
+    if (href) openExternal(href);
 
     return { action: 'deny' };
   });

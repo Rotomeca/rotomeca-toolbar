@@ -11,6 +11,8 @@
 import { ipcRenderer, webFrame } from 'electron';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { internalChannels } from '../../shared/ipc/events.js';
+// [mediaLimits.ts] Bornes de l'état média envoyé par un site (taille du message, débit)
+import { MAX_MEDIA_STATE_LENGTH } from '../../shared/mediaLimits.js';
 
 /**
  * Nom de l'évènement DOM par lequel le script injecté publie l'état média ; le même
@@ -142,7 +144,11 @@ webFrame.executeJavaScript(PAGE_SCRIPT).catch((error: unknown) => {
 });
 
 window.addEventListener(MEDIA_STATE_EVENT, (event) => {
-  ipcRenderer.send(internalChannels.mediaState, (event as CustomEvent<string>).detail);
+  // La page peut émettre elle-même cet évènement : on n'envoie que du texte de taille raisonnable
+  const detail: unknown = (event as CustomEvent<unknown>).detail;
+  if (typeof detail !== 'string' || detail.length > MAX_MEDIA_STATE_LENGTH) return;
+
+  ipcRenderer.send(internalChannels.mediaState, detail);
 });
 
 ipcRenderer.on(internalChannels.mediaAction, (_event, action: unknown) => {

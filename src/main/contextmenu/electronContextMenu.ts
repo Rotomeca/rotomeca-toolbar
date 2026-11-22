@@ -20,6 +20,7 @@ import { isLocalPageUrl, lockLocalContents } from '../security/localPageGuard.js
 // [windowConfig.ts] Construction des options d'une `BrowserWindow` à partir d'une description sans réglages de sécurité
 import { buildWindowConfig } from '../windows/windowConfig.js';
 // [contextMenuModel.ts] Contenu du menu contextuel des boutons de la barre (mode normal et mode édition)
+import { parseContextMenuEvent } from './contextMenuModel.js';
 import type { AppsWindowMenuEntry, ContextMenuEvent, ContextMenuItem } from './contextMenuModel.js';
 
 /** Ce que le menu contextuel demande à l'application. */
@@ -120,8 +121,11 @@ export function startContextMenu(hooks: ContextMenuHooks, appRoot: string): void
     if (!window.getParentWindow()) injectPageScript(window, appRoot);
   });
 
-  ipcMain.handle(appEventList.rotomecaContextMenu, (ipcEvent: IpcMainInvokeEvent, event: ContextMenuEvent) => {
+  ipcMain.handle(appEventList.rotomecaContextMenu, (ipcEvent: IpcMainInvokeEvent, raw: unknown) => {
     if (!isTrustedSender(ipcEvent, appRoot)) return;
+
+    const event = parseContextMenuEvent(raw);
+    if (!event) return;
 
     const window = BrowserWindow.fromWebContents(ipcEvent.sender);
     if (!window || !window.isVisible() || !hooks.shouldShow(event, window.id)) return;

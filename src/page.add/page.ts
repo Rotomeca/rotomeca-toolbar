@@ -12,6 +12,11 @@ import { requireElement } from '../scripts/dom.js';
 import type { PopularApp } from '../types/window-electron.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../shared/ipc/events.js';
+// [requestThrottle.ts] Limiteur de débit : une demande par intervalle, les autres sont ignorées
+import { createRequestThrottle } from '../shared/requestThrottle.js';
+
+/** Délai minimal entre deux demandes d'ajout venant de l'iframe (un clic humain est plus lent). */
+const FRAME_REQUEST_INTERVAL_MS = 750;
 
 /** Jetons du thème recopiés dans l'iframe de recherche (qui n'hérite pas des --ds-*). */
 const THEME_TOKENS = [
@@ -90,6 +95,8 @@ class AddPage {
   private frameReady = false;
   /** Icône d'origine d'un bouton populaire marqué « Ajouté » (remplacée par une coche). */
   private readonly previousIcons = new WeakMap<HTMLElement, Node[]>();
+  /** Les demandes d'ajout de l'iframe (code distant) sont espacées : une rafale est ignorée. */
+  private readonly allowFrameRequest = createRequestThrottle(FRAME_REQUEST_INTERVAL_MS);
 
   /** L'iframe de recherche. */
   private get frame(): HTMLIFrameElement {
@@ -162,7 +169,7 @@ class AddPage {
       return;
     }
 
-    if (!isAddRequestType(type) || !isWebUrl(url)) return;
+    if (!isAddRequestType(type) || !isWebUrl(url) || !this.allowFrameRequest()) return;
 
     await this.request(type, { name: typeof name === 'string' ? name : url, url, picture: null });
   }

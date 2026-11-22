@@ -43,6 +43,9 @@ export interface AppListDeps {
   readonly onSaveError: (error: Error) => void;
 }
 
+/** Nombre maximal d'éléments (applications et séparateurs) qu'un ajout peut porter la barre : borne une rafale de demandes. */
+const MAX_ENTRIES = 500;
+
 /** Indique si la valeur reçue d'une page est un sens de déplacement valide. */
 const isMoveDirection = (value: unknown): value is MoveDirection => value === 'up' || value === 'down';
 
@@ -90,6 +93,7 @@ export class AppListService {
     const clean = sanitizeAppData(raw);
     if (!clean) return false;
     if (this.indexOf(clean.url) >= 0) return true;
+    if (this.list.length >= MAX_ENTRIES) return false;
 
     this.append(clean);
     return true;
@@ -101,7 +105,7 @@ export class AppListService {
    */
   addForEdit(raw: unknown): (AppData & { readonly index: number }) | null {
     const clean = sanitizeAppData(raw);
-    if (!clean) return null;
+    if (!clean || this.list.length >= MAX_ENTRIES) return null;
 
     this.append(clean);
     return { ...clean, index: this.list.length - 1 };

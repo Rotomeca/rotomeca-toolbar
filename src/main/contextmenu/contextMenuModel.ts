@@ -24,6 +24,37 @@ export interface ContextMenuEvent {
 
 export type { ContextMenuAction, ContextMenuItem };
 
+/** @returns true si la valeur est un objet non nul (donc lisible par clé) */
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+/** @returns true si la valeur est un nombre fini (ni NaN ni infini) */
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * Valide un clic droit reçu d'une page : seule la forme attendue est conservée, rien d'autre ne passe.
+ * @param raw Donnée non fiable reçue par l'IPC
+ * @returns Le clic droit validé, ou `null` si la forme ou les nombres sont invalides
+ */
+export function parseContextMenuEvent(raw: unknown): ContextMenuEvent | null {
+  if (!isRecord(raw) || !isRecord(raw['target'])) return null;
+
+  const { nodeName, attribs, classes } = raw['target'];
+  const { button, x, y } = raw;
+  if (typeof nodeName !== 'string' || !isRecord(attribs) || !Array.isArray(classes)) return null;
+  if (!isFiniteNumber(button) || !isFiniteNumber(x) || !isFiniteNumber(y)) return null;
+
+  return {
+    target: {
+      nodeName,
+      attribs: Object.fromEntries(Object.entries(attribs).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+      classes: classes.filter((name): name is string => typeof name === 'string'),
+    },
+    button,
+    x,
+    y,
+  };
+}
+
 /** Un élément enregistré de la barre : une application (avec son adresse) ou un séparateur. */
 export type SavedEntry = 'separator' | { readonly url: string; readonly picture?: string | null };
 

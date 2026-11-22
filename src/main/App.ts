@@ -38,11 +38,15 @@ import type { PermissionStore } from '../scripts/PermissionStore.js';
 // [Seasons.ts] Saisons : dates officielles des équinoxes et des solstices, et thème de saison du jour
 import { seasonInfo } from '../scripts/Seasons.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
-import { isSafeUrl } from '../scripts/safeUrl.js';
+import { isSafeUrl, toSafeHref } from '../scripts/safeUrl.js';
 // [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
 import type { UpdateManager } from '../scripts/UpdateManager.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, internalChannels, pageEventList } from '../shared/ipc/events.js';
+// [mediaLimits.ts] Bornes de l'état média envoyé par un site (taille du message, débit)
+import { MIN_MEDIA_STATE_INTERVAL_MS } from '../shared/mediaLimits.js';
+// [requestThrottle.ts] Limiteur de débit : une demande par intervalle, les autres sont ignorées
+import { createRequestThrottle } from '../shared/requestThrottle.js';
 // [AppListService.ts] Service des applications de la barre : ordre, séparateurs, validation et enregistrement
 import { AppListService } from './apps/AppListService.js';
 // [FaviconService.ts] Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque
@@ -131,6 +135,9 @@ export class App {
 
   /** Applications qui jouent un morceau mais ne pilotent pas la barre des tâches. */
   private taskbarIgnored = new Set<string>();
+
+  /** Un site ne peut pas inonder le processus principal d'états média (le script légitime en publie un par seconde). */
+  private readonly allowMediaState = createRequestThrottle(MIN_MEDIA_STATE_INTERVAL_MS);
 
   private readonly contextMenu: ContextMenuController;
   private readonly windows: AppWindows;
@@ -482,7 +489,7 @@ export class App {
    * @param raw État média brut, non fiable.
    */
   private onMediaState(event: IpcMainEvent, raw: unknown): void {
-    if (event.senderFrame !== event.sender.mainFrame) return;
+    if (event.senderFrame !== event.sender.mainFrame || !this.allowMediaState(event.sender.id)) return;
 
     const url = this.viewHost.urlOfWebContents(event.sender.id);
     if (url) this.viewHost.update(url, { media: sanitizeMediaState(raw) });
@@ -542,7 +549,9 @@ export class App {
     if (this.toolbar.mode.button) this.windows.main.webContents.postMessage(pageEventList.toolbarClosed, true);
     else this.windows.toolbar.hide();
 
-    if (isSafeUrl(url)) void shell.openExternal(url);
+    // La forme normalisée, pas la chaîne brute : le système ne doit lire que ce que le contrôle a compris
+    const href = toSafeHref(url);
+    if (href) void shell.openExternal(href);
   }
 
   /** Masque la zone des applications et prévient la barre pour qu'elle désélectionne le bouton actif. */
