@@ -2,8 +2,9 @@ name: Promote release
 
 # À lancer à la main (onglet Actions). Les vraies releases X.Y.Z sont publiées
 # directement par le workflow Release ; les pré-versions X.Y.Z-rcN ne passent pas
-# par ici. Hazel (mises à jour Windows) et « releases/latest » (avis Linux) ne
-# voient que les releases qui ne sont pas des pré-versions :
+# par ici. Hazel (mises à jour Windows), « releases/latest » (avis Linux deb/rpm)
+# et electron-updater (AppImage Linux) ne voient que les releases qui ne sont pas
+# des pré-versions :
 #   - demote  : retire une release publiée trop vite en la repassant en
 #               pré-version : elle n'est plus proposée à ceux qui n'ont pas encore
 #               mis à jour (ceux qui l'ont installée la gardent) ;

@@ -2,10 +2,11 @@
 // package.json, commit et tag `X.Y.Z-rcN`. Le push du tag déclenche le workflow
 // `Release`, qui construit les installeurs et publie une pré-version GitHub.
 //
-// Usage : pnpm pre-release X.Y.Z [--rc N] [--push] [--dry-run]
+// Usage : pnpm pre-release X.Y.Z [--rc N] [--from BRANCH] [--push] [--dry-run]
 //
-// - Part de `develop` (propre), sans jamais fusionner dans `main` : seules les
-//   vraies releases (git flow, branche `release/`) y vont.
+// - Part de `develop` (propre), ou de la branche donnée par `--from` (ex. une feature à
+//   tester avant fusion), sans jamais fusionner dans `develop` ni dans `main` : seules les
+//   vraies releases (git flow, branche `release/`) vont dans `main`.
 // - `N` est le numéro suivant parmi les tags `X.Y.Z-rc*` existants (locaux et distants).
 // - Sans `--push`, tout reste local : la commande à lancer est affichée.
 // - `--dry-run` n'écrit rien : il affiche seulement ce qui serait fait.
@@ -36,12 +37,13 @@ function nextRc(tags, base) {
 
 /**
  * @param {string[]} argv Arguments après le nom du script
- * @returns {{base: string, rc: ?number, push: boolean, dryRun: boolean}}
+ * @returns {{base: string, rc: ?number, from: string, push: boolean, dryRun: boolean}}
  * @throws {Error} Si les arguments sont invalides
  */
 function parseArgs(argv) {
   let base = null;
   let rc = null;
+  let from = SOURCE_BRANCH;
   let push = false;
   let dryRun = false;
 
@@ -55,13 +57,16 @@ function parseArgs(argv) {
       if (!/^[1-9]\d*$/.test(value ?? ''))
         throw new Error('--rc attend un entier positif (ex: --rc 2)');
       rc = parseInt(value, 10);
+    } else if (arg === '--from') {
+      from = argv[++i] ?? '';
+      if (!/^[\w./-]+$/.test(from)) throw new Error('--from attend un nom de branche (ex: --from feature/x)');
     } else if (BASE_VERSION.test(arg) && base === null) base = arg;
     else throw new Error(`Argument inattendu : ${arg}`);
   }
 
   if (!base) throw new Error('Version de base attendue au format X.Y.Z (ex: 3.4.0)');
 
-  return { base, rc, push, dryRun };
+  return { base, rc, from, push, dryRun };
 }
 
 /**
@@ -107,11 +112,11 @@ function existingTags() {
 }
 
 function main() {
-  const { base, rc, push, dryRun } = parseArgs(process.argv.slice(2));
+  const { base, rc, from, push, dryRun } = parseArgs(process.argv.slice(2));
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
-  if (branch !== SOURCE_BRANCH)
-    throw new Error(`À lancer depuis ${SOURCE_BRANCH} (branche actuelle : ${branch})`);
+  if (branch !== from)
+    throw new Error(`À lancer depuis ${from} (branche actuelle : ${branch})`);
   if (git(['status', '--porcelain']) !== '')
     throw new Error('Des modifications ne sont pas commitées : commitez ou mettez-les de côté');
 
@@ -125,7 +130,7 @@ function main() {
     throw new Error(`La branche ${preBranch} existe déjà`);
 
   console.log(`Pré-version : ${version}`);
-  console.log(`  branche   : ${preBranch} (depuis ${SOURCE_BRANCH})`);
+  console.log(`  branche   : ${preBranch} (depuis ${from})`);
   console.log(`  tag       : ${version}`);
 
   if (dryRun) {
@@ -133,7 +138,7 @@ function main() {
     return;
   }
 
-  git(['checkout', '-b', preBranch, SOURCE_BRANCH]);
+  git(['checkout', '-b', preBranch, from]);
   try {
     const file = path.join(process.cwd(), 'package.json');
     fs.writeFileSync(file, setVersion(fs.readFileSync(file, 'utf8'), version));
@@ -141,7 +146,7 @@ function main() {
     git(['commit', '-m', `build: :bookmark: ${version}`]);
     git(['tag', '-a', version, '-m', version]);
   } finally {
-    git(['checkout', SOURCE_BRANCH]);
+    git(['checkout', from]);
   }
 
   if (push) {

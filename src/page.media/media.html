@@ -80,6 +80,35 @@
         text-overflow: ellipsis;
       }
 
+      /* Texte trop long : l'ellipse laisse place au défilement (voir marquee.ts) */
+      #title.scrolling,
+      #artist.scrolling {
+        text-overflow: clip;
+      }
+
+      .scrolling .marquee-text {
+        display: inline-block;
+        animation: marquee var(--marquee-duration, 6s) ease-in-out infinite alternate;
+      }
+
+      /* Pause à chaque extrémité, défilement entre les deux ; `alternate` ramène le texte au début */
+      @keyframes marquee {
+        0%,
+        20% {
+          transform: translateX(0);
+        }
+        80%,
+        100% {
+          transform: translateX(var(--marquee-shift, 0));
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .scrolling .marquee-text {
+          animation: none;
+        }
+      }
+
       #title {
         font: var(--text-label);
         font-size: 1rem;

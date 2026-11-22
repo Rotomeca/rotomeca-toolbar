@@ -135,3 +135,7 @@ data.rsft
 settings.rcft
 
 plan-refonte/
+
+# Claude Code : configuration locale (claude-config, hooks, worktrees, réglages perso)
+.claude/
+CLAUDE.local.md

@@ -3,6 +3,7 @@
   "tray.toggle": "Show or hide the toolbar",
   "tray.settings": "Settings",
   "tray.quit": "Quit the application",
+  "tray.debugConsole": "[DEBUG] Open a console",
   "tray.ignoredPlayers": "Only the first player is taken into account (+{count} ignored)",
   "tray.updateAvailable": "Update available ({version})",
   "tray.updateReady": "Update ready: restart to install it",
@@ -121,6 +122,7 @@
   "apps.open": "Stop and open in the browser",
   "apps.kill": "Stop the window",
   "apps.close": "Close the window",
+  "apps.resetSize": "Reset the window size",
 
   "add.popular": "Popular",
   "add.search": "Search for a site",
@@ -135,6 +137,8 @@
   "add.iconHint": "Optional: the site's favicon is used by default",
   "add.clearIcon": "Remove the icon",
   "add.save": "Save",
+  "add.edit": "Edit",
+  "add.editTitle": "Edit an application",
 
   "settings.mode": "Activation mode",
   "settings.modeButton": "Button",

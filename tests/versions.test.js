@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { compareVersions, isPrerelease } = require('../src/scripts/versions.js');
+const { compareVersions, isPrerelease } = require('../dist/src/scripts/versions.js');
 
 test('compareVersions : plus récente / plus ancienne / égale', () => {
   assert.ok(compareVersions('3.2.1', '3.2.0') > 0);
