@@ -10,6 +10,8 @@ import type { AppData } from '../security/sanitizeAppData.js';
 // [appList.ts] Liste des applications de la barre : ajout, déplacement, suppression, séparateurs
 import { indexOfApp, insertSeparatorAfter, moveApp, removeApp, replaceApp, savedUrls } from './appList.js';
 import type { AppEntry, MoveDirection, SeparatorRef } from './appList.js';
+// [storedApps.ts] Relecture tolérante de la liste des applications enregistrée (`data.rsft`)
+import { readStoredApps } from './storedApps.js';
 
 /** Où la liste est enregistrée. */
 export interface AppListRepository {
@@ -17,6 +19,8 @@ export interface AppListRepository {
   loadAsync(): Promise<unknown>;
   /** Enregistre la liste ; peut lever une erreur si l'écriture échoue. */
   save(data: unknown): void;
+  /** Garde une copie du fichier tel qu'il est, avant qu'une version réparée ne le remplace. */
+  keepCopy?(): void;
 }
 
 /** Ce que la page de la barre doit savoir pour rester à jour, message par message. */
@@ -42,6 +46,9 @@ export interface AppListDeps {
   /** L'enregistrement a échoué : la liste reste en mémoire, l'utilisateur est prévenu. */
   readonly onSaveError: (error: Error) => void;
 }
+
+/** Nombre maximal d'éléments (applications et séparateurs) qu'un ajout peut porter la barre : borne une rafale de demandes. */
+const MAX_ENTRIES = 500;
 
 /** Indique si la valeur reçue d'une page est un sens de déplacement valide. */
 const isMoveDirection = (value: unknown): value is MoveDirection => value === 'up' || value === 'down';
@@ -70,14 +77,19 @@ export class AppListService {
   }
 
   /**
-   * Charge la liste enregistrée ; une donnée qui n'est pas un tableau donne une barre vide.
+   * Charge la liste enregistrée de façon tolérante : une entrée inutilisable est écartée, un champ invalide
+   * corrigé, une donnée qui n'est pas un tableau donne une barre vide. Avant d'être corrigé en mémoire, le
+   * fichier d'origine est copié à part (`keepCopy`) : rien n'est définitivement perdu à la prochaine sauvegarde.
    * @returns `true` si une liste enregistrée a été chargée
    */
   async load(): Promise<boolean> {
     const data = await this.deps.repository.loadAsync();
     if (data === false) return false;
 
-    this.list = Array.isArray(data) ? (data as AppEntry[]) : [];
+    const { list, repaired } = readStoredApps(data);
+    if (repaired) this.keepOriginal();
+
+    this.list = list;
     return true;
   }
 
@@ -90,6 +102,7 @@ export class AppListService {
     const clean = sanitizeAppData(raw);
     if (!clean) return false;
     if (this.indexOf(clean.url) >= 0) return true;
+    if (this.list.length >= MAX_ENTRIES) return false;
 
     this.append(clean);
     return true;
@@ -101,7 +114,7 @@ export class AppListService {
    */
   addForEdit(raw: unknown): (AppData & { readonly index: number }) | null {
     const clean = sanitizeAppData(raw);
-    if (!clean) return null;
+    if (!clean || this.list.length >= MAX_ENTRIES) return null;
 
     this.append(clean);
     return { ...clean, index: this.list.length - 1 };
@@ -174,6 +187,15 @@ export class AppListService {
     this.deps.toolbar.appAdded(app);
     this.list = [...this.list, app];
     this.persist();
+  }
+
+  /** Garde une copie du fichier qui va être réparé ; un échec est journalisé sans empêcher le chargement. */
+  private keepOriginal(): void {
+    try {
+      this.deps.repository.keepCopy?.();
+    } catch (error) {
+      console.error('Copie du fichier des applications impossible', error);
+    }
   }
 
   /** Enregistre la liste ; en cas d'échec elle reste en mémoire et `onSaveError` est appelé. */

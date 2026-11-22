@@ -22,8 +22,11 @@ on:
         description: 'Tag à publier (doit exister)'
         required: true
 
+# Lecture seule par défaut : seul le job `release`, qui publie, reçoit le droit d'écrire.
+# Les jobs `lint` et `build` exécutent du code installé par pnpm (dépendances tierces) : ils ne
+# doivent pas disposer d'un jeton capable de pousser du code, des tags ou de remplacer une release.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Garde-fou : aucune release n'est construite si le lint ou les tests échouent.
@@ -32,13 +35,24 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      # Le tag vient d'une saisie manuelle (workflow_dispatch) ou du nom du tag poussé : on n'accepte que
+      # les deux formes de release (X.Y.Z et X.Y.Z-rcN) avant d'en faire quoi que ce soit
+      - name: Valider le format du tag
+        shell: bash
+        run: |
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]]; then
+            echo "Tag invalide : $TAG (attendu X.Y.Z ou X.Y.Z-rcN)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.TAG }}
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -67,13 +81,14 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.TAG }}
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -127,7 +142,7 @@ jobs:
 
       - name: Envoyer les fichiers Windows
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: make-windows
           path: |
@@ -138,7 +153,7 @@ jobs:
 
       - name: Envoyer les fichiers Linux
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: make-linux
           path: |
@@ -151,17 +166,20 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.TAG }}
+          persist-credentials: false
           fetch-depth: 0 # git-cliff a besoin de l'historique et des tags
 
       - name: Générer les notes de release (git-cliff)
-        uses: orhun/git-cliff-action@v4
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
         with:
           config: cliff.toml
           # Release finale : du tag final précédent à ce tag. Pré-version : son tag
@@ -171,7 +189,7 @@ jobs:
         env:
           OUTPUT: RELEASE_NOTES.md
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true

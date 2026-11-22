@@ -276,7 +276,14 @@ class ToolbarPage {
     });
 
     window.api.on(pageEventList.init, (_, { saves, settings }) => {
-      for (const entry of saves) this.add(entry);
+      for (const entry of saves) {
+        // Une entrée qui échoue ne doit pas empêcher d'afficher les suivantes
+        try {
+          this.add(entry);
+        } catch (error) {
+          console.error('Bouton impossible à créer', error);
+        }
+      }
 
       if (!settings.isButton) this.addHideButton();
     });

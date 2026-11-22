@@ -71,6 +71,8 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 |---|---|
 | `appList.ts` | Règles pures sur la liste : déplacer, séparateurs, supprimer, remplacer. |
 | `AppListService.ts` | La liste vivante : valide ce que les pages envoient, enregistre sur disque, prévient la barre de chaque changement. |
+| `storedApps.ts` | Relit `data.rsft` sans jamais le rejeter en bloc : entrée inutilisable écartée, champ invalide corrigé, entrée valide conservée telle quelle (une copie `.invalid` est gardée avant toute réparation). |
+| `electronFaviconFetch.ts` | Requête réseau des icônes (`net.request`) : chaque redirection est contrôlée (jamais vers le réseau local depuis un site public). |
 | `favicon.ts` | Cherche l'icône d'un site : lit sa page, classe les `<link rel="icon">` (la plus grande d'abord), repli sur `/favicon.ico`, contrôle le contenu et renvoie un `data:`. |
 | `FaviconService.ts` | Garde les icônes (mémoire + `favicons.v2.json`, 14 jours, absence d'icône 6 h, site injoignable non mémorisé) ; une seule recherche par site. |
 | `AppViewHost.ts` | Les sites ouverts en arrière-plan : une vue par site, non-lus, son, morceau en cours, son coupé. |
@@ -94,13 +96,15 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `settings/defaultSettings.ts` | Fabrique l'unique instance de `Settings` (fichier `settings.rcft`). |
 | `theming/ThemeService.ts` | Applique le thème à toutes les pages locales et le met à jour (mode du système, changement de saison). |
 | `theming/themeScript.ts` | Construit le script qui pose `data-theme` / `data-palette` sur une page. |
-| `persistence/JsonFileStore.ts` | Fichier JSON écrit de façon atomique, avec copie `.bak` et mise de côté d'un fichier corrompu. |
+| `persistence/JsonFileStore.ts` | Fichier JSON écrit de façon atomique et forcée sur disque (droits réservés à l'utilisateur), avec copie `.bak` ; un fichier corrompu est mis de côté et la sauvegarde `.bak` est relue. |
 
 ### Sécurité et permissions : `security/`, `permissions/`, `ipc/`
 | Fichier | Rôle |
 |---|---|
 | `ipc/IpcRouter.ts` | Porte d'entrée unique des appels des pages : refuse tout ce qui ne vient pas de la page principale d'une fenêtre locale. |
-| `ipc/trustedSender.ts` | La règle « d'où peut venir un appel IPC ». |
+| `ipc/trustedSender.ts` | La règle « d'où peut venir un appel IPC » : la page principale d'une page de l'application. |
+| `security/localPageGuard.ts` | Ce qu'est une page locale (un fichier de `dist/`, pas un `file:` quelconque) et le verrou posé sur chacune : ni popup, ni navigation hors de l'application. |
+| `security/launchArguments.ts` | Refuse, dans l'application empaquetée, les options de débogage distant (`--remote-debugging-*`, `--inspect*`). |
 | `security/sanitizeAppData.ts` | Valide une application reçue d'une page (adresse http(s), nom, image). |
 | `security/webContentsHardener.ts` | Durcit les pages des sites tiers : popups, navigation, `<webview>` interdits. |
 | `permissions/` | Demande de permission (caméra, micro, position) : dialogue, mémorisation, révocation. |
@@ -124,6 +128,7 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 | `src/shared/ipc/contracts.ts` | Arguments et réponse de chaque canal (vérifié à la compilation contre `events.ts`). |
 | `src/shared/dto.ts` | Formes des données échangées entre le processus principal et les pages. |
 | `src/shared/updateLevel.ts`, `src/shared/i18n/interpolate.ts` | Petites règles utilisées des deux côtés. |
+| `src/shared/requestThrottle.ts`, `src/shared/mediaLimits.ts` | Limiteur de débit et bornes de l'état média : un émetteur non fiable (iframe de recherche, site) ne peut pas inonder son destinataire. |
 | `src/scripts/UpdateManager.ts`, `githubReleases.ts`, `versions.ts` | Logique des mises à jour (injectée : testable sans Electron). |
 | `src/scripts/Persistence.ts` | Dossier de données, sauvegardes, cookies et connexions des sites. |
 | `src/scripts/PermissionStore.ts`, `permissionPolicy.ts` | Mémoire et règles des permissions des sites. |
@@ -172,7 +177,7 @@ perdre cookies et connexions.
 ## 8. Sécurité en une page
 
 - Toutes les fenêtres : `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` (imposé par `windowConfig.ts`).
-- Un appel IPC n'est accepté que de la page principale d'une fenêtre locale `file://` (`ipc/trustedSender.ts`).
+- Un appel IPC n'est accepté que de la page principale d'une page de l'application, c'est-à-dire un fichier de `dist/` (`ipc/trustedSender.ts`, `security/localPageGuard.ts`). Les fenêtres locales ne peuvent ni ouvrir de popup ni naviguer hors de l'application.
 - Les pages ne reçoivent que `window.api`, limité aux canaux de `events.ts` (le preload dérive sa liste blanche de ce fichier).
 - Tout ce qui vient d'une page ou d'un site est non fiable : validé (`sanitizeAppData`, `isSafeUrl`, `sanitizeMediaState`), jamais inséré en `innerHTML`.
 

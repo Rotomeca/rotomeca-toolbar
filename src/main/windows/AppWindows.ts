@@ -13,6 +13,8 @@ import { BaseWindow, BrowserWindow, WebContentsView } from 'electron';
 import type { WebContents } from 'electron';
 // [dockGeometry.ts] Géométrie de la barre : disposition des fenêtres, bande réservée et masquage automatique
 import type { Rect } from '../dock/dockGeometry.js';
+// [localPageGuard.ts] Garde des pages locales de l'application : seules les pages du paquet sont de confiance
+import { lockLocalContents } from '../security/localPageGuard.js';
 // [WindowRegistry.ts] Registre des fenêtres ouvertes, indexées par nom
 import { WindowRegistry } from './WindowRegistry.js';
 // [windowConfig.ts] Construction des options d'une `BrowserWindow` à partir d'une description sans réglages de sécurité
@@ -40,6 +42,10 @@ export interface AppWindowsDeps {
   readonly specContext: () => WindowSpecContext;
   /** Position de la fenêtre des applications. */
   readonly appsBounds: () => Rect;
+  /** Racine de l'application construite : seules ses pages sont locales (voir `lockLocalContents`). */
+  readonly appRoot: string;
+  /** Ouvre une adresse http(s) dans le navigateur du système. */
+  readonly openExternal: (url: string) => void;
   /** Chemin du preload des pages locales. */
   readonly preload: string;
   /** Page de l'en-tête de la fenêtre des applications. */
@@ -149,6 +155,7 @@ export class AppWindows {
    */
   private create(name: Exclude<WindowName, 'apps'>, options: WindowOptions): BrowserWindow {
     const window = new BrowserWindow(buildWindowConfig(name, options));
+    lockLocalContents(window.webContents, this.deps);
 
     if (options.file) window.loadFile(options.file).catch(console.error);
 
@@ -186,6 +193,7 @@ export class AppWindows {
       webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, preload: this.deps.preload },
     });
     window.contentView.addChildView(header);
+    lockLocalContents(header.webContents, this.deps);
     header.webContents.loadFile(this.deps.appsHeaderPage).catch(console.error);
     header.setBounds(appsChildBounds(0, window.getBounds()));
     header.webContents.addListener('dom-ready', () => this.deps.onAppsHeaderReady(header.webContents));

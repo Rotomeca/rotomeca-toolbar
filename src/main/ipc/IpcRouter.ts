@@ -18,22 +18,24 @@ export type IpcHandler<E> = (event: E, ...args: unknown[]) => unknown;
 
 /**
  * Point d'entrée unique des appels des pages vers le processus principal : un appel ne
- * parvient à son traitement que s'il vient de la page principale d'une fenêtre locale.
+ * parvient à son traitement que s'il vient de la page principale d'une page de l'application.
  */
 export class IpcRouter<E extends IpcOrigin> {
   /**
    * @param ipc Port `ipcMain` sur lequel enregistrer les canaux
+   * @param appRoot Racine de l'application construite : seules ses pages peuvent appeler l'IPC
    * @param warn Journalise un appel refusé (message et origine de l'appelant)
    */
   constructor(
     private readonly ipc: IpcMainPort<E>,
+    private readonly appRoot: string,
     private readonly warn: (message: string, origin: string | undefined) => void = console.warn,
   ) {}
 
   /** Traite les appels sur ce canal ; un appel refusé reçoit `undefined`. */
   handle(channel: string, handler: IpcHandler<E>): this {
     this.ipc.handle(channel, (event, ...args) => {
-      if (!isTrustedSender(event)) {
+      if (!isTrustedSender(event, this.appRoot)) {
         this.warn(`IPC '${channel}' refusé depuis`, event.senderFrame?.url);
         return undefined;
       }

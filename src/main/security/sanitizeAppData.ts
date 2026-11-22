@@ -5,7 +5,7 @@
  * et l'adresse et l'image finissent affichées ou chargées par la barre.
  */
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
-import { isSafeUrl } from '../../scripts/safeUrl.js';
+import { isPlainWebUrl } from '../../scripts/safeUrl.js';
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { AppDto } from '../../shared/dto.js';
 
@@ -41,13 +41,15 @@ function safePicture(picture: unknown): string | null {
 /**
  * Valide et nettoie les données d'une application reçues d'une page (IPC).
  * @param data Donnée non fiable
- * @returns Les données nettoyées, ou `null` si l'adresse n'est pas une URL http(s)
+ * @returns Les données nettoyées, ou `null` si l'adresse n'est pas une URL http(s) nette (sans espace ni identifiants)
  */
 export function sanitizeAppData(data: unknown): AppData | null {
   if (!isRecord(data)) return null;
 
-  const { name, url, picture } = data;
-  if (typeof url !== 'string' || !isSafeUrl(url)) return null;
+  const { name, picture } = data;
+  // Les espaces autour d'une adresse collée sont retirés ; ceux du milieu la rendent refusée
+  const url = typeof data['url'] === 'string' ? data['url'].trim() : null;
+  if (url === null || !isPlainWebUrl(url)) return null;
 
   return {
     name: typeof name === 'string' && name.trim() !== '' ? name.slice(0, MAX_NAME_LENGTH) : url,

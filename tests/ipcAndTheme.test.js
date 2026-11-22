@@ -1,4 +1,6 @@
 const test = require('node:test');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const assert = require('node:assert/strict');
 const { IpcRouter } = require('../dist/src/main/ipc/IpcRouter.js');
 const { ThemeService } = require('../dist/src/main/theming/ThemeService.js');
@@ -11,6 +13,9 @@ function fakeIpc() {
   return { handlers, handle: (channel, listener) => handlers.set(channel, listener) };
 }
 
+const APP_ROOT = path.resolve('app-root');
+const pageUrl = (file) => pathToFileURL(path.join(APP_ROOT, file)).href;
+
 const origin = (url, same = true) => {
   const mainFrame = { url };
   return { senderFrame: same ? mainFrame : { url }, sender: { mainFrame } };
@@ -18,15 +23,15 @@ const origin = (url, same = true) => {
 
 test('IpcRouter : un appel de la page principale locale est traité avec ses arguments', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc).handle('canal', (_, a, b) => `${a}+${b}`);
-  assert.equal(ipc.handlers.get('canal')(origin('file:///app/index.html'), 1, 2), '1+2');
+  new IpcRouter(ipc, APP_ROOT).handle('canal', (_, a, b) => `${a}+${b}`);
+  assert.equal(ipc.handlers.get('canal')(origin(pageUrl('index.html')), 1, 2), '1+2');
 });
 
 test('IpcRouter : un site distant est refusé, signalé, et le traitement n\'est pas appelé', () => {
   const ipc = fakeIpc();
   const warnings = [];
   let called = false;
-  new IpcRouter(ipc, (message, url) => warnings.push([message, url])).handle('canal', () => { called = true; });
+  new IpcRouter(ipc, APP_ROOT, (message, url) => warnings.push([message, url])).handle('canal', () => { called = true; });
   assert.equal(ipc.handlers.get('canal')(origin('https://exemple.fr')), undefined);
   assert.equal(called, false);
   assert.deepEqual(warnings, [['IPC \'canal\' refusé depuis', 'https://exemple.fr']]);
@@ -35,21 +40,21 @@ test('IpcRouter : un site distant est refusé, signalé, et le traitement n\'est
 test('IpcRouter : un sous-cadre local est refusé', () => {
   const ipc = fakeIpc();
   let called = false;
-  new IpcRouter(ipc, () => {}).handle('canal', () => { called = true; });
-  ipc.handlers.get('canal')(origin('file:///app/index.html', false));
+  new IpcRouter(ipc, APP_ROOT, () => {}).handle('canal', () => { called = true; });
+  ipc.handlers.get('canal')(origin(pageUrl('index.html'), false));
   assert.equal(called, false);
 });
 
 test('IpcRouter : handle se chaîne', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc).handle('a', () => 1).handle('b', () => 2);
+  new IpcRouter(ipc, APP_ROOT).handle('a', () => 1).handle('b', () => 2);
   assert.deepEqual([...ipc.handlers.keys()], ['a', 'b']);
 });
 
 test('IpcRouter : une erreur du traitement remonte à l\'appelant', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc).handle('canal', () => { throw new Error('échec'); });
-  assert.throws(() => ipc.handlers.get('canal')(origin('file:///x.html')), /échec/);
+  new IpcRouter(ipc, APP_ROOT).handle('canal', () => { throw new Error('échec'); });
+  assert.throws(() => ipc.handlers.get('canal')(origin(pageUrl('x.html'))), /échec/);
 });
 
 // #endregion

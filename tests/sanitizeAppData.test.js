@@ -84,3 +84,14 @@ test('sanitizeAppData : ne renvoie que les trois champs connus', () => {
   const clean = sanitizeAppData({ ...valid, admin: true, __proto__: { polluted: true }, onclick: 'x' });
   assert.deepEqual(Object.keys(clean).sort(), ['name', 'picture', 'url']);
 });
+
+test('sanitizeAppData : les espaces autour de l\'adresse sont retirés, ceux du milieu la font refuser', () => {
+  assert.equal(sanitizeAppData({ ...valid, url: '  https://x.test/a  ' }).url, 'https://x.test/a');
+  assert.equal(sanitizeAppData({ ...valid, url: 'https://x .test/a' }), null);
+});
+
+test('sanitizeAppData : une adresse avec identifiants (hôte trompeur) est refusée', () => {
+  for (const url of ['https://google.com@evil.example', 'https://user:pass@x.test']) {
+    assert.equal(sanitizeAppData({ ...valid, url }), null, url);
+  }
+});

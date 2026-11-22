@@ -19,7 +19,7 @@ import { t } from '../../scripts/i18n.js';
 // [Persistence.ts] Données de l'utilisateur : dossier userData figé, migration, sauvegardes et cookies de session
 import { backupUserData, flushSession } from '../../scripts/Persistence.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
-import { isSafeUrl } from '../../scripts/safeUrl.js';
+import { toSafeHref } from '../../scripts/safeUrl.js';
 // [appImageUpdater.ts] Adaptateur d'electron-updater (AppImage, Linux) vers l'interface de Squirrel
 import { createAppImageUpdater } from './appImageUpdater.js';
 // [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
@@ -85,7 +85,8 @@ export function createUpdateManager({ isDev, onChange, openSettings }: UpdateWir
     simulate: mode.simulate,
     fetch: (url, init) => net.fetch(url, init),
     openExternal: (url) => {
-      if (isSafeUrl(url)) void shell.openExternal(url);
+      const href = toSafeHref(url);
+      if (href) void shell.openExternal(href);
     },
     compareVersions,
     beforeInstall: () => {

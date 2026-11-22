@@ -9,15 +9,18 @@ import fs from 'node:fs';
 // [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { BrowserWindow, Menu, app, ipcMain } from 'electron';
+import { BrowserWindow, Menu, app, ipcMain, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent } from 'electron';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList } from '../../shared/ipc/events.js';
 // [trustedSender.ts] Contrôle de l'origine d'un appel IPC : seule la page principale d'une fenêtre locale est de confiance
 import { isTrustedSender } from '../ipc/trustedSender.js';
+// [localPageGuard.ts] Garde des pages locales de l'application : seules les pages du paquet sont de confiance
+import { isLocalPageUrl, lockLocalContents } from '../security/localPageGuard.js';
 // [windowConfig.ts] Construction des options d'une `BrowserWindow` à partir d'une description sans réglages de sécurité
 import { buildWindowConfig } from '../windows/windowConfig.js';
 // [contextMenuModel.ts] Contenu du menu contextuel des boutons de la barre (mode normal et mode édition)
+import { parseContextMenuEvent } from './contextMenuModel.js';
 import type { AppsWindowMenuEntry, ContextMenuEvent, ContextMenuItem } from './contextMenuModel.js';
 
 /** Ce que le menu contextuel demande à l'application. */
@@ -42,9 +45,15 @@ const ITEM_HEIGHT = 30;
 /** Marge verticale totale autour des boutons, en pixels. */
 const MENU_PADDING = 4;
 
-/** Injecte dans la page le script qui transmet le clic droit au processus principal. */
-function injectPageScript(window: BrowserWindow): void {
+/**
+ * Injecte dans la page le script qui transmet le clic droit au processus principal.
+ * Une fenêtre qui affiche autre chose qu'une page de l'application (popup d'un site) n'en reçoit pas :
+ * le script n'a rien à y faire et ne doit pas s'exécuter dans une page tierce.
+ */
+function injectPageScript(window: BrowserWindow, appRoot: string): void {
   window.webContents.on('dom-ready', () => {
+    if (!isLocalPageUrl(window.webContents.getURL(), appRoot)) return;
+
     window.webContents.executeJavaScript(fs.readFileSync(PAGE_SCRIPT).toString()).catch(console.error);
   });
 }
@@ -53,7 +62,7 @@ function injectPageScript(window: BrowserWindow): void {
  * Ouvre la fenêtre du menu à l'endroit du clic, au-dessus de sa fenêtre parente ; elle se détruit
  * dès qu'elle perd le focus. Les boutons sont transmis à la page par une variable globale.
  */
-function openMenu(parent: BrowserWindow, event: ContextMenuEvent, items: readonly ContextMenuItem[]): void {
+function openMenu(parent: BrowserWindow, event: ContextMenuEvent, items: readonly ContextMenuItem[], appRoot: string): void {
   const bounds = parent.getBounds();
   const longest = Math.max(...items.map((item) => item.text.length));
 
@@ -75,6 +84,7 @@ function openMenu(parent: BrowserWindow, event: ContextMenuEvent, items: readonl
     }),
   );
 
+  lockLocalContents(menuWindow.webContents, { appRoot, openExternal: (url) => void shell.openExternal(url) });
   menuWindow.webContents.loadFile(MENU_PAGE).catch(console.error);
   menuWindow.webContents
     .executeJavaScript(`window.electron ??= {}; window.electron.menu = ${JSON.stringify(items)}`)
@@ -97,25 +107,30 @@ let started = false;
 /**
  * Active le menu contextuel sur les fenêtres de l'application (une seule fois).
  * Le menu s'ouvre quand `shouldShow` l'accepte et que `menu` donne au moins un bouton.
+ * @param hooks Ce que le menu demande à l'application
+ * @param appRoot Racine de l'application construite : seules ses pages portent le menu et peuvent l'ouvrir
  */
-export function startContextMenu(hooks: ContextMenuHooks): void {
+export function startContextMenu(hooks: ContextMenuHooks, appRoot: string): void {
   if (started) return;
   started = true;
 
-  for (const window of BrowserWindow.getAllWindows()) injectPageScript(window);
+  for (const window of BrowserWindow.getAllWindows()) injectPageScript(window, appRoot);
 
   app.on('browser-window-created', (_, window) => {
     // Les fenêtres de menu ont un parent : elles n'ont pas de menu contextuel
-    if (!window.getParentWindow()) injectPageScript(window);
+    if (!window.getParentWindow()) injectPageScript(window, appRoot);
   });
 
-  ipcMain.handle(appEventList.rotomecaContextMenu, (ipcEvent: IpcMainInvokeEvent, event: ContextMenuEvent) => {
-    if (!isTrustedSender(ipcEvent)) return;
+  ipcMain.handle(appEventList.rotomecaContextMenu, (ipcEvent: IpcMainInvokeEvent, raw: unknown) => {
+    if (!isTrustedSender(ipcEvent, appRoot)) return;
+
+    const event = parseContextMenuEvent(raw);
+    if (!event) return;
 
     const window = BrowserWindow.fromWebContents(ipcEvent.sender);
     if (!window || !window.isVisible() || !hooks.shouldShow(event, window.id)) return;
 
     const items = hooks.menu(event);
-    if (items.length > 0) openMenu(window, event, items);
+    if (items.length > 0) openMenu(window, event, items, appRoot);
   });
 }

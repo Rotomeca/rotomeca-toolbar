@@ -25,7 +25,7 @@
 // [node:path] manipulation de chemins de fichiers (Node.js)
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { WebContentsView, app, dialog, ipcMain, net, screen, session, shell } from 'electron';
+import { WebContentsView, app, dialog, ipcMain, screen, session, shell } from 'electron';
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 // [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { sanitizeMediaState } from '../scripts/AppIndicators.js';
@@ -38,15 +38,21 @@ import type { PermissionStore } from '../scripts/PermissionStore.js';
 // [Seasons.ts] Saisons : dates officielles des équinoxes et des solstices, et thème de saison du jour
 import { seasonInfo } from '../scripts/Seasons.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
-import { isSafeUrl } from '../scripts/safeUrl.js';
+import { isSafeUrl, toSafeHref } from '../scripts/safeUrl.js';
 // [UpdateManager.ts] Gestionnaire de mises à jour : Squirrel, AppImage, GitHub (Linux) et canal de pré-versions
 import type { UpdateManager } from '../scripts/UpdateManager.js';
 // [events.ts] Noms de tous les canaux IPC : appels des pages, envois vers les pages, canaux internes
 import { appEventList, internalChannels, pageEventList } from '../shared/ipc/events.js';
+// [mediaLimits.ts] Bornes de l'état média envoyé par un site (taille du message, débit)
+import { MIN_MEDIA_STATE_INTERVAL_MS } from '../shared/mediaLimits.js';
+// [requestThrottle.ts] Limiteur de débit : une demande par intervalle, les autres sont ignorées
+import { createRequestThrottle } from '../shared/requestThrottle.js';
 // [AppListService.ts] Service des applications de la barre : ordre, séparateurs, validation et enregistrement
 import { AppListService } from './apps/AppListService.js';
 // [FaviconService.ts] Service des icônes de sites : cherche, garde en mémoire et enregistre sur disque
 import { CACHE_FILE, FaviconService } from './apps/FaviconService.js';
+// [electronFaviconFetch.ts] Requête réseau des icônes : adaptateur d'Electron qui contrôle chaque redirection
+import { createFaviconFetch } from './apps/electronFaviconFetch.js';
 // [AppViewHost.ts] Hôte des sites ouverts en arrière-plan : vues, indicateurs (non-lus, son, morceau) et sourdine
 import { AppViewHost } from './apps/AppViewHost.js';
 // [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
@@ -59,6 +65,8 @@ import { buildAppsWindowMenu } from './contextmenu/contextMenuModel.js';
 import { createAppBar, isAppBarSupported } from './dock/createAppBar.js';
 // [IpcRouter.ts] Routeur des appels IPC des pages vers le processus principal, avec contrôle de l'origine
 import { IpcRouter } from './ipc/IpcRouter.js';
+// [trustedSender.ts] Contrôle de l'origine d'un appel IPC : seule la page principale d'une page de l'application est de confiance
+import { isTrustedSender } from './ipc/trustedSender.js';
 // [mediaState.ts] Calculs purs autour de l'état média des applications : avancée, contenu du popup, lecteurs ignorés
 import { describeNowPlaying, changedIgnored, mediaPayload, mediaProgress, splitTaskbarPlayers } from './media/mediaState.js';
 // [MediaPopup.ts] Popup de contrôle du morceau en cours, affiché au survol d'un bouton de la barre
@@ -130,6 +138,9 @@ export class App {
   /** Applications qui jouent un morceau mais ne pilotent pas la barre des tâches. */
   private taskbarIgnored = new Set<string>();
 
+  /** Un site ne peut pas inonder le processus principal d'états média (le script légitime en publie un par seconde). */
+  private readonly allowMediaState = createRequestThrottle(MIN_MEDIA_STATE_INTERVAL_MS);
+
   private readonly contextMenu: ContextMenuController;
   private readonly windows: AppWindows;
   private readonly toolbar: ToolbarController;
@@ -164,6 +175,8 @@ export class App {
         translate: t,
       }),
       appsBounds: () => this.toolbar.layout.apps,
+      appRoot: APP_ROOT,
+      openExternal: (url) => void shell.openExternal(url),
       preload: this.preload,
       appsHeaderPage: path.join(APP_ROOT, 'src', 'page.apps', 'apps.html'),
       baseCssPath: path.join(APP_ROOT, 'src', 'css', 'app.css'),
@@ -236,14 +249,9 @@ export class App {
     this.favicons = new FaviconService({
       repository: new JsonFileStore(dataDirectory(), CACHE_FILE),
       now: () => Date.now(),
-      // Sans cookies (aucune donnée de l'utilisateur envoyée) et avec l'identifiant d'un navigateur ordinaire :
-      // certains serveurs (Tchap) ne répondent pas à « Electron/x.y.z »
-      fetch: (url) =>
-        net.fetch(url, {
-          credentials: 'omit',
-          headers: { 'user-agent': browserUserAgent() },
-          signal: AbortSignal.timeout(FAVICON_TIMEOUT_MS),
-        }),
+      // Sans cookies (aucune donnée de l'utilisateur envoyée), avec l'identifiant d'un navigateur ordinaire
+      // (certains serveurs, Tchap, ne répondent pas à « Electron/x.y.z ») et en contrôlant chaque redirection
+      fetch: createFaviconFetch({ userAgent: browserUserAgent, timeoutMs: FAVICON_TIMEOUT_MS }),
     });
 
     const store = new JsonFileStore(dataDirectory(), 'data.rsft');
@@ -253,11 +261,8 @@ export class App {
           store.save(data);
           this.contextMenu.updateSaves(data);
         },
-        loadAsync: async () => {
-          const data = await store.loadAsync();
-          if (data !== false) this.contextMenu.updateSaves(data);
-          return data;
-        },
+        loadAsync: () => store.loadAsync(),
+        keepCopy: () => store.keepCopy('invalid'),
       },
       toolbar: {
         appAdded: (entry) => this.toolbarMessage(pageEventList.appAdded, entry),
@@ -313,7 +318,7 @@ export class App {
   start(): void {
     this.theme.start();
     this.services.updater.start();
-    startContextMenu(this.contextMenu);
+    startContextMenu(this.contextMenu, APP_ROOT);
     this.tray.start();
 
     // Les routes IPC existent avant la première page : le preload demande les traductions dès son chargement
@@ -393,6 +398,8 @@ export class App {
   /** Charge les applications dans la barre et envoie les indicateurs des sites déjà ouverts. */
   private async sendInitialState(): Promise<void> {
     const loaded = await this.appList.load();
+    // Le menu contextuel reçoit la liste relue (et réparée), pas le contenu brut du fichier
+    if (loaded) this.contextMenu.updateSaves(this.appList.entries);
 
     this.toolbarMessage(loaded ? pageEventList.init : 'init', {
       saves: loaded ? this.appList.entries : [],
@@ -478,7 +485,7 @@ export class App {
    * @param raw État média brut, non fiable.
    */
   private onMediaState(event: IpcMainEvent, raw: unknown): void {
-    if (event.senderFrame !== event.sender.mainFrame) return;
+    if (event.senderFrame !== event.sender.mainFrame || !this.allowMediaState(event.sender.id)) return;
 
     const url = this.viewHost.urlOfWebContents(event.sender.id);
     if (url) this.viewHost.update(url, { media: sanitizeMediaState(raw) });
@@ -538,7 +545,9 @@ export class App {
     if (this.toolbar.mode.button) this.windows.main.webContents.postMessage(pageEventList.toolbarClosed, true);
     else this.windows.toolbar.hide();
 
-    if (isSafeUrl(url)) void shell.openExternal(url);
+    // La forme normalisée, pas la chaîne brute : le système ne doit lire que ce que le contrôle a compris
+    const href = toSafeHref(url);
+    if (href) void shell.openExternal(href);
   }
 
   /** Masque la zone des applications et prévient la barre pour qu'elle désélectionne le bouton actif. */
@@ -575,7 +584,7 @@ export class App {
    */
   private registerIpcRoutes(): void {
     const { toolbar, appList, viewHost, windows, services } = this;
-    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain);
+    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain, APP_ROOT);
 
     router
       .handle(appEventList.toggleToolbar, () => toolbar.toggle())
@@ -669,11 +678,7 @@ export class App {
 
     // Traductions demandées (de façon synchrone) par le preload de nos pages
     ipcMain.on(internalChannels.i18n, (event) => {
-      const frame = event.senderFrame;
-      event.returnValue =
-        frame && frame === event.sender.mainFrame && frame.url.startsWith('file://')
-          ? { locale: getLocale(), dict: getDictionary() }
-          : {};
+      event.returnValue = isTrustedSender(event, APP_ROOT) ? { locale: getLocale(), dict: getDictionary() } : {};
     });
   }
 

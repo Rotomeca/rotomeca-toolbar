@@ -6,6 +6,8 @@
  */
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { MediaAction, MediaState } from '../shared/dto.js';
+// [mediaLimits.ts] Bornes de l'état média envoyé par un site (taille du message, débit)
+import { MAX_MEDIA_STATE_LENGTH } from '../shared/mediaLimits.js';
 
 export type { MediaAction, MediaState };
 
@@ -40,9 +42,9 @@ export function parseUnreadCount(title: string | null | undefined): number {
   return match?.[1] ? parseInt(match[1], 10) : 0;
 }
 
-/** @returns Le JSON décodé, ou `null` si la valeur n'est pas une chaîne JSON valide */
+/** @returns Le JSON décodé, ou `null` si la valeur n'est pas une chaîne JSON valide ou dépasse la taille permise (refusée avant tout décodage) */
 function parseJson(raw: unknown): unknown {
-  if (typeof raw !== 'string') return null;
+  if (typeof raw !== 'string' || raw.length > MAX_MEDIA_STATE_LENGTH) return null;
 
   try {
     return JSON.parse(raw);

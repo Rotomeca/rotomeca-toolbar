@@ -42,7 +42,7 @@ export function parseTooltipRequest(args: unknown): TooltipRequest | null {
   if (typeof args !== 'object' || args === null) return null;
 
   const { text, badge, y } = args as Record<string, unknown>;
-  if (typeof text !== 'string' || text === '' || typeof y !== 'number') return null;
+  if (typeof text !== 'string' || text === '' || typeof y !== 'number' || !Number.isFinite(y)) return null;
 
   return {
     content: {

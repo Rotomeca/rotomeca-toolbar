@@ -75,7 +75,7 @@ export class MediaPopup {
       }
 
       // Une entrée invalide est ignorée sans toucher au masquage déjà programmé
-      if (typeof centerY !== 'number') return;
+      if (typeof centerY !== 'number' || !Number.isFinite(centerY)) return;
 
       this.deps.scheduler.clearTimeout(this.hideTimer);
       this.show(url, centerY);
