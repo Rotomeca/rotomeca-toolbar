@@ -5,7 +5,7 @@
  * mises à jour), puis instancie `App` et gère le cycle de vie Electron (prêt, avant de quitter, fenêtres fermées).
  */
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import { app, dialog, globalShortcut, session } from 'electron';
+import { Menu, app, dialog, globalShortcut, session } from 'electron';
 // [Persistence.ts] Données de l'utilisateur : dossier userData figé, migration, sauvegardes et cookies de session
 import {
   flushSession,
@@ -23,6 +23,8 @@ import { installPermissionHandlers } from './permissions/installPermissionHandle
 import { PermissionStore } from '../scripts/PermissionStore.js';
 // [safeUrl.ts] Contrôle qu'une adresse est une URL http(s) avant de l'ouvrir ou de la charger
 import { isSafeUrl } from '../scripts/safeUrl.js';
+// [launchArguments.ts] Arguments de lancement refusés dans l'application empaquetée : ceux qui ouvrent un accès de débogage
+import { hasDebuggingSwitch } from './security/launchArguments.js';
 // [i18n.ts] Traductions du processus principal : langue du système, dictionnaire et fonction `t`
 import { t } from '../scripts/i18n.js';
 // [App.ts] Assemblage du processus principal : crée les services de la barre et route les appels des pages
@@ -32,8 +34,8 @@ import { JsonFileStore, dataDirectory } from './persistence/JsonFileStore.js';
 // [createUpdateManager.ts] Construit le gestionnaire de mises à jour en le reliant à Electron (Squirrel, réseau, notifications)
 import { createUpdateManager } from './updates/createUpdateManager.js';
 
-/** Lancé par `npm run debug` : `electron . --dev`. */
-const isDev = process.argv[2] === '--dev';
+/** Lancé par `npm run debug` : `electron . --dev`. Jamais dans l'application empaquetée (mises à jour simulées, outils de débogage). */
+const isDev = !app.isPackaged && process.argv[2] === '--dev';
 
 /**
  * Restaure les données, installe les permissions, puis crée et démarre l'application.
@@ -75,6 +77,13 @@ function createApp(onInstance: (instance: App) => void): App {
 
 /** Démarre l'application : un seul exemplaire, données protégées, raccourci global. */
 export function bootstrap(): void {
+  // Un accès de débogage distant donnerait le contrôle de toutes les pages : refusé en production
+  if (app.isPackaged && hasDebuggingSwitch(process.argv)) {
+    console.error('Option de débogage refusée : application empaquetée');
+    app.exit(1);
+    return;
+  }
+
   // Le dossier userData ne doit jamais changer (sessions, cookies, localStorage)
   pinUserData(app);
 
@@ -97,6 +106,9 @@ export function bootstrap(): void {
 
   app.on('ready', () => {
     if (!hasSingleInstanceLock) return;
+
+    // Le menu par défaut d'Electron donne rechargement et outils de développement sur chaque fenêtre
+    if (app.isPackaged) Menu.setApplicationMenu(null);
 
     try {
       const instance = createApp((created) => {

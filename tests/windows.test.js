@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { buildWindowConfig } = require('../dist/src/main/windows/windowConfig.js');
 const { WindowRegistry } = require('../dist/src/main/windows/WindowRegistry.js');
 const { pickDisplay, describeDisplays } = require('../dist/src/main/windows/displays.js');
@@ -139,27 +141,37 @@ test('describeDisplays : des écrans de même nom sont distingués par résoluti
 
 // #region isTrustedSender
 
+const APP_ROOT = path.resolve('app-root');
+const pageUrl = (file) => pathToFileURL(path.join(APP_ROOT, file)).href;
+
 const origin = (url, same = true) => {
   const mainFrame = { url };
   return { senderFrame: same ? mainFrame : { url }, sender: { mainFrame } };
 };
 
 test('isTrustedSender : page principale locale acceptée', () => {
-  assert.equal(isTrustedSender(origin('file:///app/index.html')), true);
+  assert.equal(isTrustedSender(origin(pageUrl('index.html')), APP_ROOT), true);
 });
 
 test('isTrustedSender : sous-cadre refusé', () => {
-  assert.equal(isTrustedSender(origin('file:///app/index.html', false)), false);
+  assert.equal(isTrustedSender(origin(pageUrl('index.html'), false), APP_ROOT), false);
 });
 
 test('isTrustedSender : site distant refusé', () => {
   for (const url of ['https://exemple.fr', 'http://localhost', 'data:text/html,x', 'about:blank']) {
-    assert.equal(isTrustedSender(origin(url)), false, url);
+    assert.equal(isTrustedSender(origin(url), APP_ROOT), false, url);
+  }
+});
+
+test('isTrustedSender : un autre fichier local que les pages de l\'application est refusé', () => {
+  const elsewhere = pathToFileURL(path.resolve('ailleurs', 'page.html')).href;
+  for (const url of [elsewhere, 'file://serveur/partage/page.html', pageUrl('../evil.html')]) {
+    assert.equal(isTrustedSender(origin(url), APP_ROOT), false, url);
   }
 });
 
 test('isTrustedSender : sans cadre émetteur refusé', () => {
-  assert.equal(isTrustedSender({ senderFrame: null, sender: { mainFrame: {} } }), false);
+  assert.equal(isTrustedSender({ senderFrame: null, sender: { mainFrame: {} } }, APP_ROOT), false);
 });
 
 // #endregion

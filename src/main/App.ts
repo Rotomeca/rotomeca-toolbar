@@ -59,6 +59,8 @@ import { buildAppsWindowMenu } from './contextmenu/contextMenuModel.js';
 import { createAppBar, isAppBarSupported } from './dock/createAppBar.js';
 // [IpcRouter.ts] Routeur des appels IPC des pages vers le processus principal, avec contrôle de l'origine
 import { IpcRouter } from './ipc/IpcRouter.js';
+// [trustedSender.ts] Contrôle de l'origine d'un appel IPC : seule la page principale d'une page de l'application est de confiance
+import { isTrustedSender } from './ipc/trustedSender.js';
 // [mediaState.ts] Calculs purs autour de l'état média des applications : avancée, contenu du popup, lecteurs ignorés
 import { describeNowPlaying, changedIgnored, mediaPayload, mediaProgress, splitTaskbarPlayers } from './media/mediaState.js';
 // [MediaPopup.ts] Popup de contrôle du morceau en cours, affiché au survol d'un bouton de la barre
@@ -164,6 +166,8 @@ export class App {
         translate: t,
       }),
       appsBounds: () => this.toolbar.layout.apps,
+      appRoot: APP_ROOT,
+      openExternal: (url) => void shell.openExternal(url),
       preload: this.preload,
       appsHeaderPage: path.join(APP_ROOT, 'src', 'page.apps', 'apps.html'),
       baseCssPath: path.join(APP_ROOT, 'src', 'css', 'app.css'),
@@ -313,7 +317,7 @@ export class App {
   start(): void {
     this.theme.start();
     this.services.updater.start();
-    startContextMenu(this.contextMenu);
+    startContextMenu(this.contextMenu, APP_ROOT);
     this.tray.start();
 
     // Les routes IPC existent avant la première page : le preload demande les traductions dès son chargement
@@ -575,7 +579,7 @@ export class App {
    */
   private registerIpcRoutes(): void {
     const { toolbar, appList, viewHost, windows, services } = this;
-    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain);
+    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain, APP_ROOT);
 
     router
       .handle(appEventList.toggleToolbar, () => toolbar.toggle())
@@ -669,11 +673,7 @@ export class App {
 
     // Traductions demandées (de façon synchrone) par le preload de nos pages
     ipcMain.on(internalChannels.i18n, (event) => {
-      const frame = event.senderFrame;
-      event.returnValue =
-        frame && frame === event.sender.mainFrame && frame.url.startsWith('file://')
-          ? { locale: getLocale(), dict: getDictionary() }
-          : {};
+      event.returnValue = isTrustedSender(event, APP_ROOT) ? { locale: getLocale(), dict: getDictionary() } : {};
     });
   }
 
