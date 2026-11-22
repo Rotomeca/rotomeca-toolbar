@@ -10,7 +10,7 @@
  */
 
 /** Permissions qui demandent une confirmation (et donc qu'on mémorise). */
-export const ASKABLE_PERMISSIONS = ['media', 'geolocation'] as const;
+export const ASKABLE_PERMISSIONS = ['media', 'geolocation', 'fullscreen'] as const;
 
 // [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
 import type { AskablePermission, PermissionDecision } from '../shared/dto.js';

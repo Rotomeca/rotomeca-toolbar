@@ -48,6 +48,31 @@ test('permissionDialog : le refus est la réponse par défaut et celle de la fer
   assert.equal(options.type, 'question');
 });
 
+test('permissionDialog : le plein écran est décrit par son propre texte', async () => {
+  const dialog = fakeDialog(1);
+  await createPermissionDialog({ dialog, translate })('https://video.example.com', 'fullscreen');
+
+  assert.equal(dialog.calls[0].message, 'permission.message(origin=https://video.example.com,action=permission.fullscreen)');
+});
+
+test('permissionDialog : la question se rattache à la fenêtre parente quand elle existe', async () => {
+  const received = [];
+  const dialog = {
+    showMessageBox: async (...args) => {
+      received.push(args);
+      return { response: 0 };
+    },
+  };
+  const parent = { id: 'fenêtre des sites' };
+
+  assert.equal(await createPermissionDialog({ dialog, translate, parent: () => parent })('https://x.test', 'fullscreen'), true);
+  assert.equal(received[0].length, 2);
+  assert.equal(received[0][0], parent);
+
+  await createPermissionDialog({ dialog, translate, parent: () => undefined })('https://x.test', 'fullscreen');
+  assert.equal(received[1].length, 1, 'sans fenêtre ouverte, la boîte s\'affiche seule');
+});
+
 test('permissionDialog : affiche le site, la permission demandée et la mémorisation', async () => {
   const dialog = fakeDialog(1);
   const ask = createPermissionDialog({ dialog, translate });

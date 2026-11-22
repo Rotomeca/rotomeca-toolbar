@@ -5,7 +5,7 @@
  * pour pouvoir tester la question sans Electron.
  */
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
-import type { Dialog } from 'electron';
+import type { BaseWindow, Dialog } from 'electron';
 
 /** Fonction de traduction : clé, variables facultatives, texte. */
 type Translate = (key: string, variables?: Readonly<Record<string, string | number>>) => string;
@@ -14,6 +14,11 @@ type Translate = (key: string, variables?: Readonly<Record<string, string | numb
 export interface PermissionDialogDependencies {
   /** Affichage d'une boîte de message (module `dialog` d'Electron). */
   readonly dialog: Pick<Dialog, 'showMessageBox'>;
+  /**
+   * Fenêtre à laquelle rattacher la question, si elle est ouverte : sans parent, la boîte peut s'ouvrir derrière
+   * la fenêtre du site (qui reste au premier plan) et la demande paraîtrait sans réponse.
+   */
+  readonly parent?: () => BaseWindow | undefined;
   /** Traduit les textes de la boîte. */
   readonly translate: Translate;
 }
@@ -22,6 +27,7 @@ export interface PermissionDialogDependencies {
 const ACTION_LABELS: Readonly<Record<string, string>> = {
   media: 'permission.media',
   geolocation: 'permission.geolocation',
+  fullscreen: 'permission.fullscreen',
 };
 
 /** Position du bouton « Autoriser » dans la boîte. */
@@ -33,16 +39,17 @@ const DENY_BUTTON = 1;
 /**
  * Crée la question posée à l'utilisateur quand un site demande une permission sensible.
  * La réponse par défaut (Entrée, ou fermeture de la boîte) est un refus.
- * @param dependencies Dialogue Electron et traduction.
+ * @param dependencies Dialogue Electron, traduction et fenêtre parente.
  * @returns Une fonction qui renvoie `true` si l'utilisateur autorise
  */
 export function createPermissionDialog({
   dialog,
   translate,
+  parent,
 }: PermissionDialogDependencies): (origin: string, permission: string) => Promise<boolean> {
   return async (origin, permission) => {
-    const { response } = await dialog.showMessageBox({
-      type: 'question',
+    const options = {
+      type: 'question' as const,
       buttons: [translate('permission.allow'), translate('permission.deny')],
       defaultId: DENY_BUTTON,
       cancelId: DENY_BUTTON,
@@ -52,7 +59,10 @@ export function createPermissionDialog({
         action: translate(ACTION_LABELS[permission] ?? permission),
       }),
       detail: translate('permission.remembered'),
-    });
+    };
+
+    const owner = parent?.();
+    const { response } = await (owner ? dialog.showMessageBox(owner, options) : dialog.showMessageBox(options));
 
     return response === ALLOW_BUTTON;
   };

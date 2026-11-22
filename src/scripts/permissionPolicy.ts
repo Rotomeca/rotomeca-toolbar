@@ -5,7 +5,7 @@
  * session des sites. Sans `electron` : le registre, la question à l'utilisateur
  * et le contrôle d'URL sont injectés.
  *
- * - `ALLOWED` : accordées sans question (notifications, plein écran, DRM...).
+ * - `ALLOWED` : accordées sans question (notifications, DRM...).
  * - `ASKABLE_PERMISSIONS` : demandent une confirmation, mémorisée durablement
  *   dans le `PermissionStore`.
  * - Tout le reste est refusé.
@@ -18,7 +18,6 @@ import type { PermissionStore } from './PermissionStore.js';
 /** Permissions accordées sans question à tous les sites. */
 export const ALLOWED: ReadonlySet<string> = new Set([
   'notifications',
-  'fullscreen',
   'pointerLock',
   'clipboard-sanitized-write',
   'mediaKeySystem', // DRM (Spotify, Netflix...)

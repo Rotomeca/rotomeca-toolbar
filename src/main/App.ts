@@ -26,7 +26,7 @@
 import path from 'node:path';
 // [electron] API d'Electron (fenêtres, IPC, zone de notification, sessions...)
 import { WebContentsView, app, dialog, ipcMain, screen, session, shell } from 'electron';
-import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron';
+import type { BaseWindow, IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 // [AppIndicators.ts] Indicateurs d'une application : nombre de non-lus du titre et état média validé
 import { sanitizeMediaState } from '../scripts/AppIndicators.js';
 // [appIcon.ts] Choisit l'icône de l'application selon que la version est une pré-version ou non
@@ -550,6 +550,11 @@ export class App {
     // La forme normalisée, pas la chaîne brute : le système ne doit lire que ce que le contrôle a compris
     const href = toSafeHref(url);
     if (href) void shell.openExternal(href);
+  }
+
+  /** @returns La fenêtre des sites si elle est ouverte : c'est elle que concerne une demande de permission, la question s'y rattache */
+  permissionDialogParent(): BaseWindow | undefined {
+    return this.windows.get('apps');
   }
 
   /** @returns La page (fenêtre de l'application ou menu contextuel) à laquelle appartient ce contenu web, `undefined` sinon */

@@ -43,7 +43,7 @@ test('installPermissionHandlers : les permissions sûres sont accordées sans qu
   const { session, asked } = setup();
 
   assert.equal(session.check(null, 'notifications', 'https://x.test'), true);
-  assert.equal(await request(session, 'fullscreen', 'https://x.test'), true);
+  assert.equal(await request(session, 'mediaKeySystem', 'https://x.test'), true);
   assert.deepEqual(asked, []);
 });
 

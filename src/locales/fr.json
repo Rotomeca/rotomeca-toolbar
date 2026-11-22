@@ -22,6 +22,7 @@
   "permission.message": "{origin} souhaite {action}.",
   "permission.media": "utiliser votre caméra ou votre micro",
   "permission.geolocation": "accéder à votre position",
+  "permission.fullscreen": "passer en plein écran",
   "permission.allow": "Autoriser",
   "permission.deny": "Refuser",
   "permission.remembered": "Votre choix est mémorisé. Vous pourrez le révoquer dans les Paramètres.",
@@ -35,6 +36,7 @@
   "permissions.revokeLabel": "Révoquer : {kind} pour {origin}",
   "permissions.kind.media": "Caméra et micro",
   "permissions.kind.geolocation": "Position",
+  "permissions.kind.fullscreen": "Plein écran",
 
   "update.title": "Mise à jour de l'application",
   "update.restart": "Redémarrer",

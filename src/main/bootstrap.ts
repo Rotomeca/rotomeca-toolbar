@@ -44,6 +44,9 @@ const isDev = !app.isPackaged && process.argv[2] === '--dev';
  * @returns L'application démarrée
  */
 function createApp(onInstance: (instance: App) => void): App {
+  // Déclarée d'abord : la question de permission se rattache à une fenêtre de l'application, qui n'existe qu'après
+  let instance: App | null = null;
+
   migrateLegacyData(app, dataDirectory());
   restoreFromBackup(dataDirectory());
   keepLoginsAlive(session.defaultSession, app);
@@ -56,12 +59,11 @@ function createApp(onInstance: (instance: App) => void): App {
   installPermissionHandlers(session.defaultSession, {
     store: permissions,
     isSafeUrl,
-    ask: createPermissionDialog({ dialog, translate: t }),
+    ask: createPermissionDialog({ dialog, translate: t, parent: () => instance?.permissionDialogParent() }),
   });
 
   // Le gestionnaire de mises à jour est créé avant l'application, qui l'utilise ; ses rappels
   // n'ont d'effet qu'une fois l'application créée
-  let instance: App | null = null;
   const updater = createUpdateManager({
     isDev,
     onChange: (state) => instance?.onUpdateChanged(state),

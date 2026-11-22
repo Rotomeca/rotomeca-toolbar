@@ -36,10 +36,10 @@ function requestPermission(policy, permission, url, { viaContents = false } = {}
 
 test('check : les permissions sûres sont accordées, les inconnues refusées', () => {
   const { policy } = setup();
-  for (const permission of ['notifications', 'fullscreen', 'mediaKeySystem', 'clipboard-sanitized-write']) {
+  for (const permission of ['notifications', 'mediaKeySystem', 'clipboard-sanitized-write']) {
     assert.equal(policy.check(null, permission, 'https://example.com'), true, permission);
   }
-  for (const permission of ['openExternal', 'clipboard-read', 'midiSysex', 'usb', 'unknown']) {
+  for (const permission of ['openExternal', 'clipboard-read', 'midiSysex', 'usb', 'unknown', 'fullscreen']) {
     assert.equal(policy.check(null, permission, 'https://example.com'), false, permission);
   }
 });
@@ -54,6 +54,15 @@ test('check : caméra/micro et position suivent la décision mémorisée', () =>
   assert.equal(policy.check(null, 'geolocation', 'https://maps.example.com'), false);
   // Autre origine : toujours refusée
   assert.equal(policy.check(null, 'media', 'https://autre.example.com'), false);
+});
+
+test('check : le plein écran est refusé tant que l\'utilisateur ne l\'a pas autorisé pour ce site', () => {
+  const { policy, store } = setup();
+  assert.equal(policy.check(null, 'fullscreen', 'https://video.example.com'), false);
+
+  store.set('https://video.example.com', 'fullscreen', true);
+  assert.equal(policy.check(null, 'fullscreen', 'https://video.example.com'), true);
+  assert.equal(policy.check(null, 'fullscreen', 'https://autre.example.com'), false);
 });
 
 test('check : après révocation, l\'accès est de nouveau refusé', () => {

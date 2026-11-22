@@ -127,7 +127,7 @@ export interface SeasonInfo {
 }
 
 /** Permissions qui demandent une confirmation (et donc qu'on mémorise). */
-export type AskablePermission = 'media' | 'geolocation';
+export type AskablePermission = 'media' | 'geolocation' | 'fullscreen';
 
 /** Décision mémorisée pour un site et une permission. */
 export interface PermissionDecision {

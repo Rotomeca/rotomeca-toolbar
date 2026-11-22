@@ -22,6 +22,7 @@
   "permission.message": "{origin} wants to {action}.",
   "permission.media": "use your camera or microphone",
   "permission.geolocation": "access your location",
+  "permission.fullscreen": "go fullscreen",
   "permission.allow": "Allow",
   "permission.deny": "Deny",
   "permission.remembered": "Your choice is remembered. You can revoke it in Settings.",
@@ -35,6 +36,7 @@
   "permissions.revokeLabel": "Revoke: {kind} for {origin}",
   "permissions.kind.media": "Camera and microphone",
   "permissions.kind.geolocation": "Location",
+  "permissions.kind.fullscreen": "Fullscreen",
 
   "update.title": "Application update",
   "update.restart": "Restart",
