@@ -11,6 +11,8 @@ import { buildThemeScript } from './themeScript.js';
 // [dayMoment.ts] Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale
 import { momentFor, nextMomentBoundary } from './dayMoment.js';
 import type { DayMoment } from './dayMoment.js';
+// [rainDay.ts] Tirage de la pluie : un jour est pluvieux ou non, de façon déterministe d'après la date
+import { canRain, isRainyDay } from '../../shared/rainDay.js';
 
 /** Une page de l'application (un sous-ensemble de `WebContents`). */
 export interface ThemedContents {
@@ -66,6 +68,7 @@ export class ThemeService {
       effectsDensity: this.settings.densiteEffets,
       systemIsDark: this.environment.systemIsDark(),
       moment: this.currentMoment(),
+      rainy: this.isRaining(),
     });
   }
 
@@ -75,9 +78,15 @@ export class ThemeService {
     return momentFor(this.environment.now());
   }
 
-  /** Thème effectif et moment, comparés pour savoir si l'apparence a changé. */
+  /** Il pleut : « Moments et météo » actif, saison pluvieuse et jour de pluie tiré. */
+  private isRaining(): boolean {
+    if (this.currentMoment() === undefined) return false;
+    return canRain(this.settings.effectiveTheme) && isRainyDay(this.environment.now());
+  }
+
+  /** Thème effectif, moment et météo, comparés pour savoir si l'apparence a changé. */
   private appearance(): string {
-    return `${this.settings.effectiveTheme}|${this.currentMoment() ?? ''}`;
+    return `${this.settings.effectiveTheme}|${this.currentMoment() ?? ''}|${this.isRaining()}`;
   }
 
   /** Applique le thème courant à toutes les pages locales ouvertes. */

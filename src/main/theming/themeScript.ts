@@ -22,6 +22,8 @@ export interface ThemeScriptInput {
   readonly systemIsDark: boolean;
   /** Moment de la journée ; absent hors thème automatique ou si « Moments et météo » est coupé. */
   readonly moment?: DayMoment | undefined;
+  /** Il pleut aujourd'hui (jour tiré, saison pluvieuse, « Moments et météo » activé). */
+  readonly rainy?: boolean | undefined;
 }
 
 /** Palette de l'été la nuit : le seul cas où un moment change la palette. */
@@ -38,9 +40,9 @@ function withMoment(attrs: ThemeAttributes, moment: DayMoment | undefined): Them
 }
 
 /**
- * @returns Le script qui applique le thème (`data-theme`, `data-palette`, `data-moment`, `data-fx`,
- * `data-fx-density`) sur la racine d'une page. Les effets ne sont actifs que sur un thème de saison ;
- * `data-moment` est retiré quand il n'y a pas de moment.
+ * @returns Le script qui applique le thème (`data-theme`, `data-palette`, `data-moment`, `data-weather`,
+ * `data-fx`, `data-fx-density`) sur la racine d'une page. Les effets ne sont actifs que sur un thème de saison ;
+ * `data-moment` et `data-weather` sont retirés quand il n'y a ni moment ni pluie.
  */
 export function buildThemeScript(input: ThemeScriptInput): string {
   const base = resolveTheme(input.effectiveTheme, input.systemIsDark);
@@ -49,6 +51,7 @@ export function buildThemeScript(input: ThemeScriptInput): string {
   const moment = input.moment
     ? `h.dataset.moment = ${JSON.stringify(input.moment)};`
     : 'delete h.dataset.moment;';
+  const weather = input.rainy ? 'h.dataset.weather = "pluie";' : 'delete h.dataset.weather;';
 
-  return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; ${moment} h.dataset.fx = ${JSON.stringify(fx ? 'on' : 'off')}; h.dataset.fxDensity = ${JSON.stringify(input.effectsDensity)}; }`;
+  return `{ const h = document.documentElement; h.dataset.theme = ${JSON.stringify(attrs.theme)}; h.dataset.palette = ${JSON.stringify(attrs.palette)}; ${moment} ${weather} h.dataset.fx = ${JSON.stringify(fx ? 'on' : 'off')}; h.dataset.fxDensity = ${JSON.stringify(input.effectsDensity)}; }`;
 }

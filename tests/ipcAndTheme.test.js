@@ -201,6 +201,40 @@ test('ThemeService : au réveil, le moment est réévalué et le minuteur rempla
   assert.equal(env.timers[1].ms, 10 * 3600 * 1000, '20 h → 6 h');
 });
 
+/** Cherche un jour de pluie et un jour sec en mai, d'après le tirage lui-même. */
+function findMayDays() {
+  const { isRainyDay } = require('../dist/src/shared/rainDay.js');
+  const days = Array.from({ length: 28 }, (_, n) => new Date(2026, 4, n + 1, 12));
+  return { rainy: days.find((d) => isRainyDay(d)), dry: days.find((d) => !isRainyDay(d)) };
+}
+
+test('ThemeService : data-weather suit le tirage de la saison pluvieuse', () => {
+  const { service, env, setSeason } = themeSetup({ themeAuto: true });
+  const { rainy, dry } = findMayDays();
+  setSeason('printemps');
+
+  env.date = rainy;
+  assert.match(service.script, /h\.dataset\.weather = "pluie"/);
+  env.date = dry;
+  assert.match(service.script, /delete h\.dataset\.weather/);
+});
+
+test('ThemeService : jamais de pluie en hiver, à Noël ou en cerisier, ni si « Moments et météo » est coupé', () => {
+  const { rainy } = findMayDays();
+
+  for (const season of ['hiver', 'noel', 'cerisier']) {
+    const { service, env, setSeason } = themeSetup({ themeAuto: true });
+    setSeason(season);
+    env.date = rainy;
+    assert.match(service.script, /delete h\.dataset\.weather/, season);
+  }
+
+  const off = themeSetup({ themeAuto: true, momentsMeteo: false });
+  off.setSeason('ete');
+  off.env.date = rainy;
+  assert.match(off.service.script, /delete h\.dataset\.weather/);
+});
+
 test('ThemeService : l\'été la nuit passe en palette sombre « ete-nuit »', () => {
   const { service, env, setSeason } = themeSetup({ themeAuto: true });
   setSeason('ete');
