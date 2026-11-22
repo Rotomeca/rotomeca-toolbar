@@ -38,6 +38,7 @@ export function applySettingsUpdate(settings: Settings, raw: unknown): SettingsU
   settings.theme = received.theme;
   settings.themeAuto = received.themeAuto === true;
   settings.effetsSaison = received.effetsSaison;
+  settings.momentsMeteo = received.momentsMeteo;
   settings.densiteEffets = received.densiteEffets;
   settings.isButtonModeEnabled = isButtonModeEnabled;
   settings.appBarEnabled = appBarEnabled;

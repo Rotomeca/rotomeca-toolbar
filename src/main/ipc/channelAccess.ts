@@ -70,6 +70,8 @@ const CALLERS: Readonly<Record<RestrictedChannel, readonly PageName[]>> = {
   permissionsClear: ['settings'],
   updateCheckTest: ['settings'],
   updateInstallTest: ['settings'],
+  debugSkyGet: ['settings'],
+  debugSkySet: ['settings'],
 };
 
 /** Canal (valeur envoyée sur le fil) → pages autorisées. Plusieurs noms peuvent différer de leur valeur (`setting.updated`). */

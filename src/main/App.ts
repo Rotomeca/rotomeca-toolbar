@@ -83,6 +83,8 @@ import { applySettingsUpdate } from './settings/applySettingsUpdate.js';
 import { getSettings } from './settings/defaultSettings.js';
 // [ThemeService.ts] Application du thème de l'utilisateur aux pages locales, et mise à jour quand il change
 import { ThemeService } from './theming/ThemeService.js';
+// [skyOverride.ts] Ciel forcé par le mode debug : validation de ce que la page envoie
+import { NO_SKY_OVERRIDE } from './theming/skyOverride.js';
 // [electronThemeEnvironment.ts] Branchement du thème sur Electron (nativeTheme, powerMonitor, webContents)
 import { createElectronThemeEnvironment } from './theming/electronThemeEnvironment.js';
 // [ToolbarController.ts] Contrôleur de la barre : dépliée ou repliée, ancrée ou flottante, modes bouton, souris et masquage automatique
@@ -665,6 +667,8 @@ export class App {
       .handle(appEventList.settingsUpdated, (_, settings) => this.onSettingsUpdated(settings))
       .handle(appEventList.openSettings, () => this.openSettings())
       .handle(appEventList.getSeasonInfo, () => seasonInfo())
+      .handle(appEventList.debugSkyGet, () => (services.isDev ? (this.theme.skyOverride ?? NO_SKY_OVERRIDE) : null))
+      .handle(appEventList.debugSkySet, (_, raw) => (services.isDev ? (this.theme.setSkyOverride(raw) ?? NO_SKY_OVERRIDE) : null))
       .handle(appEventList.getVersion, () => app.getVersion())
       .handle(appEventList.isAppBarSupported, () => isAppBarSupported())
       .handle(appEventList.getDisplays, () => describeDisplays(screen.getAllDisplays(), screen.getPrimaryDisplay().id, t))

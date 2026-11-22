@@ -76,6 +76,14 @@ function themeSetup(stored = {}) {
     onSystemThemeChanged: (l) => { env.systemListener = l; },
     onResume: (l) => { env.resumeListener = l; },
     every: (ms, cb) => { env.tick = { ms, cb }; },
+    date: new Date(2026, 5, 15, 12),
+    now: () => env.date,
+    timers: [],
+    after: (ms, cb) => {
+      const timer = { ms, cb, cancelled: false };
+      env.timers.push(timer);
+      return () => { timer.cancelled = true; };
+    },
   };
   const service = new ThemeService(settings, env);
   return { service, settings, env, setSeason: (s) => { season = s; } };
@@ -150,6 +158,127 @@ test('ThemeService : la saison n\'est réévaluée que chaque minute et au réve
 
   env.resumeListener();
   assert.equal(local.scripts.length, 1, 'déjà diffusé');
+});
+
+test('ThemeService : pas de moment hors thème automatique, ni si « Moments et météo » est coupé', () => {
+  const manual = themeSetup({ theme: 'sombre' });
+  assert.match(manual.service.script, /delete h\.dataset\.moment/);
+
+  const off = themeSetup({ themeAuto: true, momentsMeteo: false });
+  assert.match(off.service.script, /delete h\.dataset\.moment/);
+
+  const auto = themeSetup({ themeAuto: true });
+  assert.match(auto.service.script, /h\.dataset\.moment = "jour"/);
+});
+
+test('ThemeService : le minuteur vise la prochaine frontière et rediffuse quand le moment change', () => {
+  const { service, env } = themeSetup({ themeAuto: true });
+  const local = page('file:///a.html');
+  env.contents = [local];
+  service.start();
+
+  const [first] = env.timers;
+  assert.equal(first.ms, 5 * 3600 * 1000, '12 h → 17 h');
+
+  env.date = new Date(2026, 5, 15, 17);
+  first.cb();
+  assert.equal(local.scripts.length, 1);
+  assert.match(local.scripts[0], /h\.dataset\.moment = "crepuscule"/);
+  assert.equal(env.timers.length, 2, 'minuteur réarmé');
+  assert.equal(env.timers[1].ms, 2 * 3600 * 1000, '17 h → 19 h');
+});
+
+test('ThemeService : au réveil, le moment est réévalué et le minuteur remplacé', () => {
+  const { service, env } = themeSetup({ themeAuto: true });
+  const local = page('file:///a.html');
+  env.contents = [local];
+  service.start();
+
+  env.date = new Date(2026, 5, 15, 20);
+  env.resumeListener();
+  assert.match(local.scripts[0], /h\.dataset\.moment = "nuit"/);
+  assert.equal(env.timers[0].cancelled, true);
+  assert.equal(env.timers[1].ms, 10 * 3600 * 1000, '20 h → 6 h');
+});
+
+/** Cherche un jour de pluie et un jour sec en mai, d'après le tirage lui-même. */
+function findMayDays() {
+  const { isRainyDay } = require('../dist/src/shared/rainDay.js');
+  const days = Array.from({ length: 28 }, (_, n) => new Date(2026, 4, n + 1, 12));
+  return { rainy: days.find((d) => isRainyDay(d)), dry: days.find((d) => !isRainyDay(d)) };
+}
+
+test('ThemeService : data-weather suit le tirage de la saison pluvieuse', () => {
+  const { service, env, setSeason } = themeSetup({ themeAuto: true });
+  const { rainy, dry } = findMayDays();
+  setSeason('printemps');
+
+  env.date = rainy;
+  assert.match(service.script, /h\.dataset\.weather = "pluie"/);
+  env.date = dry;
+  assert.match(service.script, /delete h\.dataset\.weather/);
+});
+
+test('ThemeService : jamais de pluie en hiver, à Noël ou en cerisier, ni si « Moments et météo » est coupé', () => {
+  const { rainy } = findMayDays();
+
+  for (const season of ['hiver', 'noel', 'cerisier']) {
+    const { service, env, setSeason } = themeSetup({ themeAuto: true });
+    setSeason(season);
+    env.date = rainy;
+    assert.match(service.script, /delete h\.dataset\.weather/, season);
+  }
+
+  const off = themeSetup({ themeAuto: true, momentsMeteo: false });
+  off.setSeason('ete');
+  off.env.date = rainy;
+  assert.match(off.service.script, /delete h\.dataset\.weather/);
+});
+
+test('ThemeService : le ciel forcé impose saison, moment et pluie, même hors thème automatique', () => {
+  const { service, env } = themeSetup({ theme: 'sombre' });
+  env.contents = [page('file:///a.html')];
+
+  service.setSkyOverride({ season: 'automne', moment: 'crepuscule', weather: 'pluie' });
+  assert.match(service.script, /h\.dataset\.palette = "automne"/);
+  assert.match(service.script, /h\.dataset\.moment = "crepuscule"/);
+  assert.match(service.script, /h\.dataset\.weather = "pluie"/);
+  assert.equal(env.contents[0].scripts.length, 1, 'diffusé aussitôt');
+});
+
+test('ThemeService : le ciel forcé garde le réel pour ce qui n\'est pas forcé, et annule avec null', () => {
+  const { service, env } = themeSetup({ theme: 'sombre' });
+  env.date = new Date(2026, 5, 15, 20);
+
+  service.setSkyOverride({ season: 'ete', moment: null, weather: 'sec' });
+  assert.match(service.script, /h\.dataset\.moment = "nuit"/, 'moment réel');
+  assert.match(service.script, /h\.dataset\.palette = "ete-nuit"/);
+  assert.match(service.script, /delete h\.dataset\.weather/);
+
+  assert.equal(service.setSkyOverride(null), null);
+  assert.match(service.script, /h\.dataset\.palette = ""/);
+  assert.match(service.script, /delete h\.dataset\.moment/);
+});
+
+test('ThemeService : la pluie forcée est ignorée sur une saison sans pluie, et une valeur invalide n\'efface pas le thème', () => {
+  const { service } = themeSetup({ theme: 'sombre' });
+  service.setSkyOverride({ season: 'hiver', moment: 'jour', weather: 'pluie' });
+  assert.match(service.script, /delete h\.dataset\.weather/);
+
+  service.setSkyOverride({ season: 'pirate', moment: 'jour' });
+  assert.match(service.script, /h\.dataset\.palette = ""/);
+});
+
+test('ThemeService : l\'été la nuit passe en palette sombre « ete-nuit »', () => {
+  const { service, env, setSeason } = themeSetup({ themeAuto: true });
+  setSeason('ete');
+  env.date = new Date(2026, 6, 15, 22);
+  assert.match(service.script, /h\.dataset\.theme = "dark"/);
+  assert.match(service.script, /h\.dataset\.palette = "ete-nuit"/);
+  assert.match(service.script, /h\.dataset\.fx = "on"/);
+
+  env.date = new Date(2026, 6, 15, 12);
+  assert.match(service.script, /h\.dataset\.palette = "ete"/);
 });
 
 // #endregion

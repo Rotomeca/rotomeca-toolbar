@@ -53,6 +53,8 @@ export const appEventList = {
   permissionsClear: 'permissionsClear',
   updateCheckTest: 'updateCheckTest',
   updateInstallTest: 'updateInstallTest',
+  debugSkyGet: 'debugSkyGet',
+  debugSkySet: 'debugSkySet',
 } as const;
 
 /** Canaux que le processus principal envoie aux pages (`webContents.send` / `postMessage`). */

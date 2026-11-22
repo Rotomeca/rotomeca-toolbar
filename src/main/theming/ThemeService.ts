@@ -8,6 +8,15 @@
 import type { Settings } from '../settings/Settings.js';
 // [themeScript.ts] Génération du script qui applique le thème sur la racine d'une page locale
 import { buildThemeScript } from './themeScript.js';
+// [dayMoment.ts] Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale
+import { momentFor, nextMomentBoundary } from '../../shared/dayMoment.js';
+import type { DayMoment } from '../../shared/dayMoment.js';
+// [rainDay.ts] Tirage de la pluie : un jour est pluvieux ou non, de façon déterministe d'après la date
+import { canRain, isRainyDay } from '../../shared/rainDay.js';
+// [dto.ts] Données échangées entre le processus principal et les pages (applications, médias, mises à jour, écrans)
+import type { SkyOverrideDto } from '../../shared/dto.js';
+// [skyOverride.ts] Ciel forcé par le mode debug : validation de ce que la page envoie
+import { sanitizeSkyOverride } from './skyOverride.js';
 
 /** Une page de l'application (un sous-ensemble de `WebContents`). */
 export interface ThemedContents {
@@ -28,6 +37,10 @@ export interface ThemeEnvironment {
   onResume(listener: () => void): void;
   /** Appelle `callback` à intervalle régulier (sans empêcher l'application de se fermer). */
   every(intervalMs: number, callback: () => void): void;
+  /** Heure locale actuelle. */
+  now(): Date;
+  /** Appelle `callback` une fois dans `delayMs` (sans empêcher l'application de se fermer) ; renvoie l'annulation. */
+  after(delayMs: number, callback: () => void): () => void;
 }
 
 /** Préfixe des pages locales : les sites tiers ne reçoivent jamais le script de thème. */
@@ -37,8 +50,12 @@ const SEASON_CHECK_INTERVAL_MS = 60 * 1000;
 
 /** Applique le thème de l'utilisateur aux pages locales, et le met à jour quand il change. */
 export class ThemeService {
-  /** Dernier thème appliqué, pour ne rediffuser que s'il change. */
-  private lastEffectiveTheme: string | null = null;
+  /** Dernier thème et moment appliqués, pour ne rediffuser que s'ils changent. */
+  private lastAppearance: string | null = null;
+  /** Annule le minuteur de la prochaine frontière de moment. */
+  private cancelBoundaryTimer: (() => void) | null = null;
+  /** Ciel forcé par le mode debug (développement seulement), `null` en usage normal. */
+  private override: SkyOverrideDto | null = null;
 
   /**
    * @param settings Réglages qui fournissent le thème et les effets
@@ -52,16 +69,61 @@ export class ThemeService {
   /** Le script qui applique le thème courant sur la racine d'une page. */
   get script(): string {
     return buildThemeScript({
-      effectiveTheme: this.settings.effectiveTheme,
+      effectiveTheme: this.effectiveTheme(),
       effectsEnabled: this.settings.effetsSaison,
       effectsDensity: this.settings.densiteEffets,
       systemIsDark: this.environment.systemIsDark(),
+      moment: this.currentMoment(),
+      rainy: this.isRaining(),
     });
+  }
+
+  /** Le ciel forcé par le mode debug, `null` en usage normal. */
+  get skyOverride(): SkyOverrideDto | null {
+    return this.override;
+  }
+
+  /**
+   * Force le ciel (mode debug) et le diffuse aussitôt aux pages ; ce qui n'est pas forcé reste réel.
+   * @param raw Valeurs non fiables : seules celles de la liste blanche sont gardées ; `null` annule le forçage
+   * @returns Le ciel forcé retenu, `null` si rien n'est forcé
+   */
+  setSkyOverride(raw: unknown): SkyOverrideDto | null {
+    this.override = sanitizeSkyOverride(raw);
+    this.broadcast();
+    return this.override;
+  }
+
+  /** Le thème appliqué : la saison forcée par le mode debug, sinon celui des réglages. */
+  private effectiveTheme(): string {
+    return this.override?.season ?? this.settings.effectiveTheme;
+  }
+
+  /**
+   * Le moment de la journée : forcé ou réel en mode debug (qui force aussi l'affichage du ciel),
+   * sinon seulement en thème automatique avec « Moments et météo » activé.
+   */
+  private currentMoment(): DayMoment | undefined {
+    if (this.override) return (this.override.moment as DayMoment | null) ?? momentFor(this.environment.now());
+    if (!this.settings.themeAuto || !this.settings.momentsMeteo) return undefined;
+    return momentFor(this.environment.now());
+  }
+
+  /** Il pleut : météo forcée, sinon jour de pluie tiré ; seulement sur une saison pluvieuse et avec un moment. */
+  private isRaining(): boolean {
+    if (this.currentMoment() === undefined || !canRain(this.effectiveTheme())) return false;
+    if (this.override?.weather) return this.override.weather === 'pluie';
+    return isRainyDay(this.environment.now());
+  }
+
+  /** Thème effectif, moment et météo, comparés pour savoir si l'apparence a changé. */
+  private appearance(): string {
+    return `${this.effectiveTheme()}|${this.currentMoment() ?? ''}|${this.isRaining()}`;
   }
 
   /** Applique le thème courant à toutes les pages locales ouvertes. */
   broadcast(): void {
-    this.lastEffectiveTheme = this.settings.effectiveTheme;
+    this.lastAppearance = this.appearance();
     const script = this.script;
 
     for (const contents of this.environment.allContents()) {
@@ -85,11 +147,30 @@ export class ThemeService {
 
     this.environment.onSystemThemeChanged(() => this.broadcast());
 
-    this.lastEffectiveTheme = this.settings.effectiveTheme;
-    const checkSeason = (): void => {
-      if (this.settings.effectiveTheme !== this.lastEffectiveTheme) this.broadcast();
+    this.lastAppearance = this.appearance();
+    const checkAppearance = (): void => {
+      if (this.appearance() !== this.lastAppearance) this.broadcast();
     };
-    this.environment.every(SEASON_CHECK_INTERVAL_MS, checkSeason);
-    this.environment.onResume(checkSeason);
+    this.environment.every(SEASON_CHECK_INTERVAL_MS, checkAppearance);
+    this.environment.onResume(() => {
+      checkAppearance();
+      this.armBoundaryTimer(checkAppearance);
+    });
+    this.armBoundaryTimer(checkAppearance);
+  }
+
+  /**
+   * Règle le minuteur sur la prochaine frontière de moment (6 h, 9 h, 17 h, 19 h), puis le réarme.
+   * @param onBoundary Réévaluation de l'apparence, appelée à chaque frontière
+   */
+  private armBoundaryTimer(onBoundary: () => void): void {
+    this.cancelBoundaryTimer?.();
+
+    const now = this.environment.now();
+    const delay = nextMomentBoundary(now).getTime() - now.getTime();
+    this.cancelBoundaryTimer = this.environment.after(delay, () => {
+      onBoundary();
+      this.armBoundaryTimer(onBoundary);
+    });
   }
 }

@@ -25,5 +25,11 @@ export function createElectronThemeEnvironment(): ThemeEnvironment {
     every: (intervalMs, callback) => {
       setInterval(callback, intervalMs).unref();
     },
+    now: () => new Date(),
+    after: (delayMs, callback) => {
+      const timer = setTimeout(callback, delayMs);
+      timer.unref();
+      return () => clearTimeout(timer);
+    },
   };
 }

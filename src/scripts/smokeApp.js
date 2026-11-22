@@ -186,7 +186,7 @@ async function checkApplication({ withTimeout }) {
 
     // Mêmes réglages que ceux enregistrés : rien ne doit changer
     await invoke(appEventList.settingsUpdated, {
-      theme: 'system', themeAuto: false, effetsSaison: true, densiteEffets: 'normale',
+      theme: 'system', themeAuto: false, effetsSaison: true, momentsMeteo: true, densiteEffets: 'normale',
       isButtonModeEnabled: true, appBarEnabled: false, appBarAutoHide: false, displayId: null,
     });
 

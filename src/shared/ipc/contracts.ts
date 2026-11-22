@@ -15,6 +15,7 @@ import type {
   MediaPayload,
   PermissionDecision,
   SeasonInfo,
+  SkyOverrideDto,
   ToolbarEntryDto,
   UpdateState,
 } from '../dto.js';
@@ -29,6 +30,8 @@ export interface SettingsFormDto {
   readonly themeAuto: boolean;
   /** Effets de saison activés. */
   readonly effetsSaison: boolean;
+  /** Moments de la journée et météo (thème automatique seulement). */
+  readonly momentsMeteo: boolean;
   /** Densité des effets de saison. */
   readonly densiteEffets: string;
   /** Mode bouton (la barre s'ouvre depuis un bouton). */
@@ -121,6 +124,10 @@ export interface InvokeContracts {
   permissionsClear: { args: []; result: PermissionDecision[] };
   updateCheckTest: { args: []; result: void };
   updateInstallTest: { args: []; result: void };
+  /** Mode debug : ciel forcé actuel, `null` hors développement. */
+  debugSkyGet: { args: []; result: SkyOverrideDto | null };
+  /** Mode debug : force le ciel (valeurs non fiables, validées), `null` hors développement. */
+  debugSkySet: { args: [override: SkyOverrideDto]; result: SkyOverrideDto | null };
 }
 
 /** Un envoi du processus principal vers les pages : les arguments reçus par l'écouteur, par canal. */

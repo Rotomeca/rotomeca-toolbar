@@ -116,6 +116,16 @@ export interface UpdateState {
 /** Thème lié à une saison. */
 export type SeasonTheme = 'cerisier' | 'printemps' | 'ete' | 'automne' | 'hiver' | 'noel';
 
+/** Ciel forcé par le mode debug (développement seulement) ; `null` laisse la valeur réelle. */
+export interface SkyOverrideDto {
+  /** Thème de saison forcé (hiver, noel, automne, printemps, cerisier, ete). */
+  readonly season: string | null;
+  /** Moment forcé (aube, jour, crepuscule, nuit). */
+  readonly moment: string | null;
+  /** Météo forcée : `pluie` ou `sec`. */
+  readonly weather: 'pluie' | 'sec' | null;
+}
+
 /** Saison en cours et prochain changement de thème automatique. */
 export interface SeasonInfo {
   /** Thème de saison du jour. */
