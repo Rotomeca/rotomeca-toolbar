@@ -103,6 +103,7 @@ une logique « pure » (testable sans Electron) d'un côté, un adaptateur Elect
 |---|---|
 | `ipc/IpcRouter.ts` | Porte d'entrée unique des appels des pages : refuse tout ce qui ne vient pas de la page principale d'une fenêtre locale. |
 | `ipc/trustedSender.ts` | La règle « d'où peut venir un appel IPC » : la page principale d'une page de l'application. |
+| `ipc/channelAccess.ts` | Pour chaque canal des pages, les seules fenêtres autorisées à l'appeler (la page du lecteur média ne peut pas installer une mise à jour). Un canal ajouté dans `events.ts` doit y figurer, un test le vérifie. |
 | `security/localPageGuard.ts` | Ce qu'est une page locale (un fichier de `dist/`, pas un `file:` quelconque) et le verrou posé sur chacune : ni popup, ni navigation hors de l'application. |
 | `security/launchArguments.ts` | Refuse, dans l'application empaquetée, les options de débogage distant (`--remote-debugging-*`, `--inspect*`). |
 | `security/sanitizeAppData.ts` | Valide une application reçue d'une page (adresse http(s), nom, image). |
@@ -177,7 +178,7 @@ perdre cookies et connexions.
 ## 8. Sécurité en une page
 
 - Toutes les fenêtres : `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` (imposé par `windowConfig.ts`).
-- Un appel IPC n'est accepté que de la page principale d'une page de l'application, c'est-à-dire un fichier de `dist/` (`ipc/trustedSender.ts`, `security/localPageGuard.ts`). Les fenêtres locales ne peuvent ni ouvrir de popup ni naviguer hors de l'application.
+- Un appel IPC n'est accepté que de la page principale d'une page de l'application, c'est-à-dire un fichier de `dist/` (`ipc/trustedSender.ts`, `security/localPageGuard.ts`), et seulement pour les canaux de sa fenêtre (`ipc/channelAccess.ts`). Les fenêtres locales ne peuvent ni ouvrir de popup ni naviguer hors de l'application.
 - Les pages ne reçoivent que `window.api`, limité aux canaux de `events.ts` (le preload dérive sa liste blanche de ce fichier).
 - Tout ce qui vient d'une page ou d'un site est non fiable : validé (`sanitizeAppData`, `isSafeUrl`, `sanitizeMediaState`), jamais inséré en `innerHTML`.
 

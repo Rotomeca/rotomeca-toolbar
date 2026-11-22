@@ -18,43 +18,46 @@ const pageUrl = (file) => pathToFileURL(path.join(APP_ROOT, file)).href;
 
 const origin = (url, same = true) => {
   const mainFrame = { url };
-  return { senderFrame: same ? mainFrame : { url }, sender: { mainFrame } };
+  return { senderFrame: same ? mainFrame : { url }, sender: { mainFrame, id: 1 } };
 };
+
+/** Toutes les fenêtres sont reconnues comme la barre : ces tests portent sur l'origine, pas sur les pages. */
+const asToolbar = () => 'toolbar';
 
 test('IpcRouter : un appel de la page principale locale est traité avec ses arguments', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc, APP_ROOT).handle('canal', (_, a, b) => `${a}+${b}`);
-  assert.equal(ipc.handlers.get('canal')(origin(pageUrl('index.html')), 1, 2), '1+2');
+  new IpcRouter(ipc, APP_ROOT, asToolbar).handle('requestToggle', (_, a, b) => `${a}+${b}`);
+  assert.equal(ipc.handlers.get('requestToggle')(origin(pageUrl('index.html')), 1, 2), '1+2');
 });
 
 test('IpcRouter : un site distant est refusé, signalé, et le traitement n\'est pas appelé', () => {
   const ipc = fakeIpc();
   const warnings = [];
   let called = false;
-  new IpcRouter(ipc, APP_ROOT, (message, url) => warnings.push([message, url])).handle('canal', () => { called = true; });
-  assert.equal(ipc.handlers.get('canal')(origin('https://exemple.fr')), undefined);
+  new IpcRouter(ipc, APP_ROOT, asToolbar, (message, url) => warnings.push([message, url])).handle('requestToggle', () => { called = true; });
+  assert.equal(ipc.handlers.get('requestToggle')(origin('https://exemple.fr')), undefined);
   assert.equal(called, false);
-  assert.deepEqual(warnings, [['IPC \'canal\' refusé depuis', 'https://exemple.fr']]);
+  assert.deepEqual(warnings, [['IPC \'requestToggle\' refusé depuis', 'https://exemple.fr']]);
 });
 
 test('IpcRouter : un sous-cadre local est refusé', () => {
   const ipc = fakeIpc();
   let called = false;
-  new IpcRouter(ipc, APP_ROOT, () => {}).handle('canal', () => { called = true; });
-  ipc.handlers.get('canal')(origin(pageUrl('index.html'), false));
+  new IpcRouter(ipc, APP_ROOT, asToolbar, () => {}).handle('requestToggle', () => { called = true; });
+  ipc.handlers.get('requestToggle')(origin(pageUrl('index.html'), false));
   assert.equal(called, false);
 });
 
 test('IpcRouter : handle se chaîne', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc, APP_ROOT).handle('a', () => 1).handle('b', () => 2);
-  assert.deepEqual([...ipc.handlers.keys()], ['a', 'b']);
+  new IpcRouter(ipc, APP_ROOT, asToolbar).handle('requestToggle', () => 1).handle('openSettings', () => 2);
+  assert.deepEqual([...ipc.handlers.keys()], ['requestToggle', 'openSettings']);
 });
 
 test('IpcRouter : une erreur du traitement remonte à l\'appelant', () => {
   const ipc = fakeIpc();
-  new IpcRouter(ipc, APP_ROOT).handle('canal', () => { throw new Error('échec'); });
-  assert.throws(() => ipc.handlers.get('canal')(origin(pageUrl('x.html'))), /échec/);
+  new IpcRouter(ipc, APP_ROOT, asToolbar).handle('requestToggle', () => { throw new Error('échec'); });
+  assert.throws(() => ipc.handlers.get('requestToggle')(origin(pageUrl('x.html'))), /échec/);
 });
 
 // #endregion

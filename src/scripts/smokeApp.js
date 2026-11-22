@@ -2,6 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app } = require('electron');
 const { appEventList } = require('../shared/ipc/events.js');
+const { pagesAllowedFor } = require('../main/ipc/channelAccess.js');
+
+/** Racine de l'application construite (`dist/`) : ce fichier est dans `dist/src/scripts/`. */
+const APP_ROOT = path.join(__dirname, '..', '..');
 
 /**
  * Contrôle de l'application complète pour le mode « fumée » : elle démarre avec ses vrais services
@@ -71,6 +75,14 @@ async function checkApplication({ withTimeout }) {
     if (!String(args[0]).startsWith('Chargement de')) logError(...args);
   };
 
+  // Les refus du routeur IPC sont relevés : seuls ceux que ce test provoque exprès sont attendus
+  const refusals = [];
+  const logWarn = console.warn;
+  console.warn = (...args) => {
+    if (/^IPC '.+' refusé/.test(String(args[0]))) refusals.push(String(args[0]));
+    else logWarn(...args);
+  };
+
   const { App } = require('../main/App.js');
   const instance = new App({ updater: fakeUpdater(), permissions: fakePermissions(), isDev: false });
 
@@ -86,10 +98,52 @@ async function checkApplication({ withTimeout }) {
     await instance.sendInitialState();
     await sleep(PAGE_SETTLE_MS);
 
-    const invoke = (channel, ...args) =>
-      toolbar.webContents.executeJavaScript(
-        `window.api.invoke(${JSON.stringify(channel)}, ...${JSON.stringify(args)})`,
-      );
+    /** Appelle un canal depuis le contenu web donné, comme le ferait la page. */
+    const invokeFrom = (contents, channel, args) =>
+      contents.executeJavaScript(`window.api.invoke(${JSON.stringify(channel)}, ...${JSON.stringify(args)})`);
+
+    // Chaque canal est appelé depuis une page autorisée à l'appeler (le routeur refuse les autres) : les pages
+    // sont créées à la demande, comme dans l'application
+    const pageContents = new Map([['toolbar', toolbar.webContents]]);
+    const contentsOf = async (page) => {
+      if (!pageContents.has(page)) {
+        let contents;
+        if (page === 'settings') {
+          contents = instance.windows.createSettings().webContents;
+        } else if (page === 'add_dialog') {
+          const dialog = instance.windows.addDialog;
+          await withTimeout(dialog.loadFile(path.join(APP_ROOT, 'src', 'page.add', 'add.html')), LOAD_TIMEOUT_MS, 'page d\'ajout');
+          contents = dialog.webContents;
+        } else if (page === 'apps') {
+          contents = instance.windows.apps.contentView.children[0].webContents;
+        } else {
+          throw new Error(`page de test inconnue : ${page}`);
+        }
+
+        pageContents.set(page, contents);
+        if (contents.isLoading()) await withTimeout(new Promise((resolve) => contents.once('did-finish-load', resolve)), LOAD_TIMEOUT_MS, `page ${page}`);
+        await sleep(PAGE_SETTLE_MS / 2);
+      }
+      return pageContents.get(page);
+    };
+
+    const invoke = async (channel, ...args) => {
+      const [page] = pagesAllowedFor(channel) ?? [];
+
+      // Le menu contextuel est une fenêtre éphémère (elle se ferme dès qu'elle perd le focus) : pour ses deux
+      // canaux, la page de la barre est reconnue comme telle le temps de l'appel
+      if (page === 'contextmenu') {
+        const original = instance.pageOf.bind(instance);
+        instance.pageOf = (id) => (id === toolbar.webContents.id ? 'contextmenu' : original(id));
+        try {
+          return await invokeFrom(toolbar.webContents, channel, args);
+        } finally {
+          instance.pageOf = original;
+        }
+      }
+
+      return invokeFrom(await contentsOf(page), channel, args);
+    };
     // Nombre d'éléments de la page de la barre qui correspondent au sélecteur
     const count = (selector) =>
       toolbar.webContents.executeJavaScript(`document.querySelectorAll(${JSON.stringify(selector)}).length`);
@@ -97,6 +151,11 @@ async function checkApplication({ withTimeout }) {
       if (JSON.stringify(actual) !== JSON.stringify(expected))
         problems.push(`${label} : ${JSON.stringify(actual)} au lieu de ${JSON.stringify(expected)}`);
     };
+
+    // Garde par page : la barre n'a pas le droit d'installer une mise à jour ni d'effacer les permissions
+    expect('garde IPC : updateInstall refusé à la barre', await invokeFrom(toolbar.webContents, appEventList.updateInstall, []), undefined);
+    expect('garde IPC : permissionsClear refusé à la barre', await invokeFrom(toolbar.webContents, appEventList.permissionsClear, []), undefined);
+    expect('garde IPC : permissionsList accepté aux paramètres', await invoke(appEventList.permissionsList), []);
 
     expect('getVersion', await invoke(appEventList.getVersion), app.getVersion());
     expect('getSavedUrls (liste de la 3.4.1)', await invoke(appEventList.getSavedUrls), SEEDED_URLS);
@@ -145,10 +204,17 @@ async function checkApplication({ withTimeout }) {
       ? SEEDED_LIST.filter((seed) => saved.some((entry) => JSON.stringify(entry) === JSON.stringify(seed))).length
       : 0;
     expect('liste réécrite : entrées de la 3.4.1 conservées', preserved, SEEDED_LIST.length);
+
+    // Aucune page ne doit avoir été refusée à tort : seuls les deux appels de garde provoqués plus haut
+    expect('refus IPC inattendus (page mal associée à un canal)', refusals, [
+      'IPC \'updateInstall\' refusé à la page \'toolbar\'',
+      'IPC \'permissionsClear\' refusé à la page \'toolbar\'',
+    ]);
   } catch (error) {
     problems.push(error.message);
   } finally {
     console.error = logError;
+    console.warn = logWarn;
     instance.releaseDock();
   }
 

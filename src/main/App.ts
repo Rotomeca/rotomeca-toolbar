@@ -58,13 +58,15 @@ import { AppViewHost } from './apps/AppViewHost.js';
 // [ContextMenuController.ts] Contrôleur du menu contextuel : décide où il s'ouvre et ce qu'il contient
 import { ContextMenuController } from './contextmenu/ContextMenuController.js';
 // [electronContextMenu.ts] Menu contextuel Electron : injecte le script de clic droit et ouvre la fenêtre du menu
-import { showAppsWindowMenu, startContextMenu } from './contextmenu/electronContextMenu.js';
+import { isContextMenuContents, showAppsWindowMenu, startContextMenu } from './contextmenu/electronContextMenu.js';
 // [contextMenuModel.ts] Contenu du menu contextuel des boutons de la barre (mode normal et mode édition)
 import { buildAppsWindowMenu } from './contextmenu/contextMenuModel.js';
 // [createAppBar.ts] Assemble la barre ancrée : appels natifs Windows et conversions d'écran d'Electron
 import { createAppBar, isAppBarSupported } from './dock/createAppBar.js';
 // [IpcRouter.ts] Routeur des appels IPC des pages vers le processus principal, avec contrôle de l'origine
 import { IpcRouter } from './ipc/IpcRouter.js';
+// [channelAccess.ts] Qui peut appeler quoi : pour chaque canal IPC des pages, les seules fenêtres autorisées à l'appeler
+import type { PageName } from './ipc/channelAccess.js';
 // [trustedSender.ts] Contrôle de l'origine d'un appel IPC : seule la page principale d'une page de l'application est de confiance
 import { isTrustedSender } from './ipc/trustedSender.js';
 // [mediaState.ts] Calculs purs autour de l'état média des applications : avancée, contenu du popup, lecteurs ignorés
@@ -550,6 +552,11 @@ export class App {
     if (href) void shell.openExternal(href);
   }
 
+  /** @returns La page (fenêtre de l'application ou menu contextuel) à laquelle appartient ce contenu web, `undefined` sinon */
+  private pageOf(webContentsId: number): PageName | undefined {
+    return this.windows.nameOfWebContents(webContentsId) ?? (isContextMenuContents(webContentsId) ? 'contextmenu' : undefined);
+  }
+
   /** Masque la zone des applications et prévient la barre pour qu'elle désélectionne le bouton actif. */
   private closeApps(): void {
     this.windows.apps.hide();
@@ -584,7 +591,7 @@ export class App {
    */
   private registerIpcRoutes(): void {
     const { toolbar, appList, viewHost, windows, services } = this;
-    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain, APP_ROOT);
+    const router = new IpcRouter<IpcMainInvokeEvent>(ipcMain, APP_ROOT, (id) => this.pageOf(id));
 
     router
       .handle(appEventList.toggleToolbar, () => toolbar.toggle())

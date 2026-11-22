@@ -38,6 +38,17 @@ const MENU_PAGE = path.join(__dirname, '..', '..', 'page.contextmenu', 'context.
 /** Preload commun, qui expose à la page du menu la liste blanche des canaux IPC. */
 const MENU_PRELOAD = path.join(__dirname, '..', '..', '..', 'preload.js');
 
+/** Contenus web des fenêtres de menu ouvertes : l'IPC reconnaît ainsi la page du menu (qui n'est pas une fenêtre de `AppWindows`). */
+const menuContentsIds = new Set<number>();
+
+/**
+ * @param webContentsId Identifiant du contenu web qui a émis un appel
+ * @returns `true` si c'est la page d'une fenêtre de menu contextuel actuellement ouverte
+ */
+export function isContextMenuContents(webContentsId: number): boolean {
+  return menuContentsIds.has(webContentsId);
+}
+
 /** Largeur estimée d'un caractère, en pixels : la fenêtre est dimensionnée sur le texte le plus long. */
 const CHAR_WIDTH = 12;
 /** Hauteur d'un bouton du menu, en pixels. */
@@ -85,6 +96,9 @@ function openMenu(parent: BrowserWindow, event: ContextMenuEvent, items: readonl
   );
 
   lockLocalContents(menuWindow.webContents, { appRoot, openExternal: (url) => void shell.openExternal(url) });
+  const contentsId = menuWindow.webContents.id;
+  menuContentsIds.add(contentsId);
+  menuWindow.on('closed', () => menuContentsIds.delete(contentsId));
   menuWindow.webContents.loadFile(MENU_PAGE).catch(console.error);
   menuWindow.webContents
     .executeJavaScript(`window.electron ??= {}; window.electron.menu = ${JSON.stringify(items)}`)

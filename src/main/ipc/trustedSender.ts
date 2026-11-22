@@ -9,7 +9,7 @@ import { isLocalPageUrl } from '../security/localPageGuard.js';
 /** Ce que le contrôle lit d'un évènement IPC (un sous-ensemble de `IpcMainInvokeEvent`). */
 export interface IpcOrigin {
   readonly senderFrame: { readonly url: string } | null;
-  readonly sender: { readonly mainFrame: unknown };
+  readonly sender: { readonly mainFrame: unknown; readonly id: number };
 }
 
 /**

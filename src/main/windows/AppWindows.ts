@@ -36,6 +36,9 @@ import type { WindowSpecContext } from './windowSpecs.js';
 /** Nom sous lequel chaque fenêtre de l'application est enregistrée. */
 export type WindowName = 'main' | 'toolbar' | 'media' | 'tooltip' | 'add_dialog' | 'edge' | 'apps' | 'settings';
 
+/** Tous les noms de fenêtres, pour retrouver celle d'un contenu web. */
+const WINDOW_NAMES: readonly WindowName[] = ['main', 'toolbar', 'media', 'tooltip', 'add_dialog', 'edge', 'apps', 'settings'];
+
 /** Ce dont `AppWindows` dépend, fourni par le processus principal. */
 export interface AppWindowsDeps {
   /** Ce dont les fenêtres ont besoin pour se décrire ; relu à chaque création (la disposition change). */
@@ -76,6 +79,24 @@ export class AppWindows {
   getBrowser(name: Exclude<WindowName, 'apps'>): BrowserWindow | undefined {
     const window = this.registry.get(name);
     return window instanceof BrowserWindow ? window : undefined;
+  }
+
+  /**
+   * @param webContentsId Identifiant du contenu web qui a émis un appel
+   * @returns La fenêtre de l'application à laquelle appartient ce contenu (la page d'en-tête pour la fenêtre des
+   * applications), `undefined` pour tout autre contenu, notamment les sites tiers
+   */
+  nameOfWebContents(webContentsId: number): WindowName | undefined {
+    for (const name of WINDOW_NAMES) {
+      const window = this.registry.get(name);
+      if (!window) continue;
+
+      const [first] = window instanceof BrowserWindow ? [window] : window.contentView.children;
+      const contents = first instanceof BrowserWindow ? first.webContents : first instanceof WebContentsView ? first.webContents : null;
+      if (contents?.id === webContentsId) return name;
+    }
+
+    return undefined;
   }
 
   /** Ferme la fenêtre si elle est ouverte, puis l'oublie. */
