@@ -184,9 +184,10 @@ export class HTMLToolbarButton extends HTMLPrimaryPressedButton {
   #createIcon(): HTMLElement {
     const { picture, path, link } = this.itemData;
 
-    if (picture?.includes('font:')) {
+    // Nom de police strict : un nom avec espace ferait lever `classList.add` et stopperait toute la barre
+    if (picture && /^font:[\w-]{1,64}$/.test(picture)) {
       const icon = document.createElement('i');
-      icon.classList.add(`icofont-${picture.replaceAll('font:', '')}`);
+      icon.classList.add(`icofont-${picture.replace('font:', '')}`);
 
       const stylesheet = document.createElement('link');
       stylesheet.setAttribute('rel', 'stylesheet');

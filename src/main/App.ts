@@ -261,11 +261,8 @@ export class App {
           store.save(data);
           this.contextMenu.updateSaves(data);
         },
-        loadAsync: async () => {
-          const data = await store.loadAsync();
-          if (data !== false) this.contextMenu.updateSaves(data);
-          return data;
-        },
+        loadAsync: () => store.loadAsync(),
+        keepCopy: () => store.keepCopy('invalid'),
       },
       toolbar: {
         appAdded: (entry) => this.toolbarMessage(pageEventList.appAdded, entry),
@@ -401,6 +398,8 @@ export class App {
   /** Charge les applications dans la barre et envoie les indicateurs des sites déjà ouverts. */
   private async sendInitialState(): Promise<void> {
     const loaded = await this.appList.load();
+    // Le menu contextuel reçoit la liste relue (et réparée), pas le contenu brut du fichier
+    if (loaded) this.contextMenu.updateSaves(this.appList.entries);
 
     this.toolbarMessage(loaded ? pageEventList.init : 'init', {
       saves: loaded ? this.appList.entries : [],

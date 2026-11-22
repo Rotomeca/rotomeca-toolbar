@@ -29,7 +29,7 @@ const MAX_BACKUPS = 5;
 /** Ce que ce module lit d'Electron : de petites parties de `app` et `session`, simples à simuler. */
 type UserDataApp = Pick<App, 'isPackaged' | 'getPath' | 'setPath'>;
 /** Partie de `app` nécessaire pour retrouver les données de la 1.x. */
-type LegacyDataApp = Pick<App, 'getAppPath' | 'getPath'>;
+type LegacyDataApp = Pick<App, 'getAppPath' | 'getPath' | 'isPackaged'>;
 /** Partie de `app` nécessaire pour nommer une sauvegarde avec la version. */
 type VersionedApp = Pick<App, 'getVersion'>;
 /** Partie de `app` nécessaire au journal de diagnostic des cookies. */
@@ -66,7 +66,10 @@ export function pinUserData(app: UserDataApp): void {
  * @returns Les dossiers candidats, y compris les `app-x.y.z` voisins de Squirrel
  */
 function legacyDataCandidates(app: LegacyDataApp): Set<string> {
-  const candidates = new Set([process.cwd(), path.dirname(app.getAppPath())]);
+  const candidates = new Set([path.dirname(app.getAppPath())]);
+  // Le dossier de lancement n'est une source de confiance qu'en développement : une application installée
+  // lancée depuis un dossier quelconque (Téléchargements…) y copierait un fichier posé par un tiers
+  if (!app.isPackaged) candidates.add(process.cwd());
   const exeDir = path.dirname(app.getPath('exe'));
   candidates.add(exeDir);
   candidates.add(path.dirname(exeDir));
@@ -84,20 +87,43 @@ function legacyDataCandidates(app: LegacyDataApp): Set<string> {
   return candidates;
 }
 
+/** @returns true si la valeur est un objet non nul (hors tableau) */
+const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Forme attendue du contenu de chaque fichier de données : un fichier qui ne la respecte pas n'est pas copié. */
+const DATA_FILE_SHAPES: Record<(typeof DATA_FILES)[number], (value: unknown) => boolean> = {
+  'data.rsft': (value) => Array.isArray(value),
+  'settings.rcft': isPlainObject,
+  'permissions.rcft': (value) => isPlainObject(value) && Array.isArray(value['decisions']),
+};
+
+/**
+ * @param file Nom du fichier de données
+ * @param source Chemin du fichier à contrôler
+ * @returns true si le fichier est un JSON de la forme attendue pour `file`
+ */
+function hasExpectedShape(file: (typeof DATA_FILES)[number], source: string): boolean {
+  try {
+    return DATA_FILE_SHAPES[file](JSON.parse(fs.readFileSync(source).toString()));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Cherche la version la plus à jour d'un fichier parmi plusieurs dossiers.
  * @param dirs Dossiers à parcourir
  * @param file Nom du fichier recherché
- * @returns Le plus récemment modifié des fichiers `file` trouvés dans les dossiers, ou null
+ * @returns Le plus récemment modifié des fichiers `file` trouvés dans les dossiers dont le contenu a la forme attendue, ou null
  */
-function newestFile(dirs: Iterable<string>, file: string): string | null {
+function newestFile(dirs: Iterable<string>, file: (typeof DATA_FILES)[number]): string | null {
   let best: { source: string; mtimeMs: number } | null = null;
 
   for (const dir of dirs) {
     const source = path.join(dir, file);
     try {
       const stat = fs.statSync(source);
-      if (stat.isFile() && (!best || stat.mtimeMs > best.mtimeMs)) best = { source, mtimeMs: stat.mtimeMs };
+      if (stat.isFile() && (!best || stat.mtimeMs > best.mtimeMs) && hasExpectedShape(file, source)) best = { source, mtimeMs: stat.mtimeMs };
     } catch {
       // Fichier absent dans cette version : on passe à la suivante
     }

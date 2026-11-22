@@ -32,8 +32,18 @@ export interface StoreFileSystem {
 /** Implémentation réelle, au-dessus de `node:fs`. */
 const nodeFileSystem: StoreFileSystem = {
   existsSync: (target) => fs.existsSync(target),
-  mkdirSync: (target, options) => fs.mkdirSync(target, options),
-  writeFileSync: (target, data) => fs.writeFileSync(target, data),
+  // Dossier et fichiers réservés à l'utilisateur (sans effet sous Windows, où les droits viennent du profil)
+  mkdirSync: (target, options) => fs.mkdirSync(target, { ...options, mode: 0o700 }),
+  // Forcé sur le disque avant le renommage : après une coupure de courant, le fichier est entier ou absent, jamais vide
+  writeFileSync: (target, data) => {
+    const descriptor = fs.openSync(target, 'w', 0o600);
+    try {
+      fs.writeSync(descriptor, data);
+      fs.fsyncSync(descriptor);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  },
   copyFileSync: (from, to) => fs.copyFileSync(from, to),
   renameSync: (from, to) => fs.renameSync(from, to),
   readFileSync: (target) => fs.readFileSync(target),
@@ -99,22 +109,52 @@ export class JsonFileStore {
     this.files.renameSync(temporary, this.path);
   }
 
-  /** @returns Les données, ou `false` si le fichier est absent ou illisible (lecture synchrone) */
+  /**
+   * @returns Les données ; si le fichier est corrompu, celles de la sauvegarde `.bak` ; `false` si le fichier
+   * est absent ou illisible (lecture synchrone)
+   */
   load(): unknown {
     try {
       return JSON.parse(this.files.readFileSync(this.path).toString());
     } catch (error) {
-      this.quarantineIfCorrupt(error);
-      return false;
+      return this.recoverFrom(error);
     }
   }
 
-  /** @returns Les données, ou `false` si le fichier est absent ou illisible */
+  /** @returns Les données (ou celles de la sauvegarde `.bak` si le fichier est corrompu), ou `false` si le fichier est absent ou illisible */
   async loadAsync(): Promise<unknown> {
     try {
       return JSON.parse(await this.files.readFile(this.path, 'utf-8'));
     } catch (error) {
-      this.quarantineIfCorrupt(error);
+      return this.recoverFrom(error);
+    }
+  }
+
+  /**
+   * Garde une copie du fichier tel qu'il est (`<fichier>.<label>`), par exemple avant qu'une version réparée
+   * ne le remplace. Une copie plus ancienne de même nom est remplacée ; sans fichier, rien n'est fait.
+   *
+   * @param label Suffixe de la copie (`invalid`)
+   */
+  keepCopy(label: string): void {
+    if (this.files.existsSync(this.path)) this.files.copyFileSync(this.path, `${this.path}.${label}`);
+  }
+
+  /**
+   * Après un échec de lecture : met de côté un fichier corrompu, puis lui substitue la sauvegarde `.bak`
+   * si elle est lisible (la prochaine écriture la remettra en place).
+   *
+   * @param error Erreur de lecture
+   * @returns Le contenu de la sauvegarde, ou `false`
+   */
+  private recoverFrom(error: unknown): unknown {
+    this.quarantineIfCorrupt(error);
+    if (!(error instanceof SyntaxError)) return false;
+
+    try {
+      return JSON.parse(this.files.readFileSync(`${this.path}.bak`).toString());
+    } catch {
+      // Pas de sauvegarde lisible : comme un fichier absent
       return false;
     }
   }
