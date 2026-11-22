@@ -483,6 +483,26 @@
         border-top: 1px solid var(--ds-border-subtle);
       }
 
+      /* Moments et météo : bloc en retrait sous le thème automatique */
+      #moments-block {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-left: 16px;
+        border-left: 2px solid var(--ds-border-subtle);
+      }
+
+      #moments-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: var(--ds-radius-full, 999px);
+        background: var(--ds-background-tone-neutral);
+        color: var(--ds-text-tone-neutral);
+        font: var(--text-caption);
+      }
+
       .season-row {
         display: flex;
         align-items: center;
@@ -618,6 +638,13 @@
               <span id="auto-badge" hidden></span>
             </div>
             <span class="helper" data-i18n="settings.autoHelp">Suit les dates officielles des saisons (équinoxes et solstices), avec Noël les 24 et 25 décembre. Au printemps : Cerisier jusqu’au 31 mars, puis Printemps. Choisir un thème à la main désactive ce mode.</span>
+            <div id="moments-block" hidden>
+              <div class="season-row">
+                <rds-switch id="moments" icons data-i18n="settings.moments">Moments et météo</rds-switch>
+                <span id="moments-badge" hidden><rds-icon id="moments-icon" name="sun"></rds-icon><span id="moments-label"></span></span>
+              </div>
+              <span class="helper" data-i18n="settings.momentsHelp">Aube 6 h – 9 h, journée 9 h – 17 h, crépuscule 17 h – 19 h, nuit 19 h – 6 h. Certains jours, il pleut toute la journée, à la fréquence moyenne du mois.</span>
+            </div>
           </div>
           <div class="season-row">
             <rds-switch id="fx" icons data-i18n="settings.effects">Effets de saison</rds-switch>

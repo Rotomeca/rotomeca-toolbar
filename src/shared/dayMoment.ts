@@ -1,8 +1,8 @@
 /**
  * Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale de la machine.
  *
- * Fonctions pures utilisées par `ThemeService` pour poser `data-moment` et pour armer le minuteur
- * sur la prochaine frontière, sans sondage régulier.
+ * Fonctions pures utilisées par `ThemeService` pour poser `data-moment` et armer le minuteur sur la
+ * prochaine frontière (sans sondage régulier), et par la page des paramètres pour sa pastille.
  */
 
 /** Moment de la journée, tel qu'écrit dans `data-moment`. */

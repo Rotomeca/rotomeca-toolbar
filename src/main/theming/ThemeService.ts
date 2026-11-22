@@ -9,8 +9,8 @@ import type { Settings } from '../settings/Settings.js';
 // [themeScript.ts] Génération du script qui applique le thème sur la racine d'une page locale
 import { buildThemeScript } from './themeScript.js';
 // [dayMoment.ts] Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale
-import { momentFor, nextMomentBoundary } from './dayMoment.js';
-import type { DayMoment } from './dayMoment.js';
+import { momentFor, nextMomentBoundary } from '../../shared/dayMoment.js';
+import type { DayMoment } from '../../shared/dayMoment.js';
 // [rainDay.ts] Tirage de la pluie : un jour est pluvieux ou non, de façon déterministe d'après la date
 import { canRain, isRainyDay } from '../../shared/rainDay.js';
 

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { momentFor, nextMomentBoundary } = require('../dist/src/main/theming/dayMoment.js');
+const { momentFor, nextMomentBoundary } = require('../dist/src/shared/dayMoment.js');
 
 /** Date locale à l'heure donnée (le moment dépend de l'heure locale de la machine). */
 const at = (hour, minute = 0, day = 15) => new Date(2026, 5, day, hour, minute);

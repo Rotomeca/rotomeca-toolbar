@@ -8,7 +8,7 @@
 import { SEASON_THEMES, resolveTheme } from '../settings/themes.js';
 import type { EffectDensity, ThemeAttributes } from '../settings/themes.js';
 // [dayMoment.ts] Moment de la journée (aube, journée, crépuscule, nuit) d'après l'heure locale
-import type { DayMoment } from './dayMoment.js';
+import type { DayMoment } from '../../shared/dayMoment.js';
 
 /** Ce dont dépend le script de thème. */
 export interface ThemeScriptInput {

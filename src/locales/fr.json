@@ -196,6 +196,15 @@
   "settings.auto": "Thème automatique",
   "settings.autoBadge": "{season} · {next} à partir du {date}",
   "settings.autoHelp": "Suit les dates officielles des saisons (équinoxes et solstices), avec Noël les 24 et 25 décembre. Au printemps : Cerisier jusqu’au 31 mars, puis Printemps. Choisir un thème à la main désactive ce mode.",
+  "settings.moments": "Moments et météo",
+  "settings.momentsHelp": "Aube 6 h – 9 h, journée 9 h – 17 h, crépuscule 17 h – 19 h, nuit 19 h – 6 h. Certains jours, il pleut toute la journée, à la fréquence moyenne du mois.",
+  "settings.momentAube": "Aube",
+  "settings.momentJour": "Journée",
+  "settings.momentCrepuscule": "Crépuscule",
+  "settings.momentNuit": "Nuit",
+  "settings.weatherRain": "Pluie",
+  "settings.weatherClear": "Beau temps",
+  "settings.momentsBadge": "{moment} · {weather}",
   "settings.display": "Écran",
   "settings.version": "Version :"
 }
