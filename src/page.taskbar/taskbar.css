@@ -78,6 +78,14 @@ html[data-fx='on'] #edit {
     transparent
   );
 }
+/* Avec un moment de la journée, le ciel coloré doit rester visible jusqu'en bas : voile allégé */
+html[data-fx='on'][data-moment] #edit {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ds-background-surface-variant) 22%, transparent) 75%,
+    transparent
+  );
+}
 /* Barre ancrée repliée : une bande fine aux angles carrés, entièrement
    cliquable (un clic ou le survol déplie la barre) */
 #rail-button {
