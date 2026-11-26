@@ -67,19 +67,11 @@ body {
   margin: 6px 0;
   border-radius: var(--ds-radius-full, 999px);
 }
-/* Effets de saison actifs : un voile sombre sous les boutons du bas (décor derrière)
-   pour qu'ils restent lisibles */
+/* Effets de saison actifs : un voile léger sous les boutons du bas (décor derrière)
+   pour qu'ils restent lisibles, sans cacher le ciel ni les cadeaux qui y tombent */
 html[data-fx='on'] #edit {
   margin-top: -20px;
   padding-top: 20px;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--ds-background-surface-variant) 60%, transparent) 75%,
-    transparent
-  );
-}
-/* Avec un moment de la journée, le ciel coloré doit rester visible jusqu'en bas : voile allégé */
-html[data-fx='on'][data-moment] #edit {
   background: linear-gradient(
     to top,
     color-mix(in srgb, var(--ds-background-surface-variant) 22%, transparent) 75%,
