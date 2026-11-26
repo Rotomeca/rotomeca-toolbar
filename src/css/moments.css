@@ -76,13 +76,14 @@
 @keyframes mo-nod { 0%, 70%, 100% { transform: rotate(0deg); } 74% { transform: rotate(14deg) translateY(1px); } 80% { transform: rotate(-5deg); } 86% { transform: rotate(3deg); } }
 @media (prefers-reduced-motion: reduce) { .mo-nod { animation: none; } }
 
-/* Noël : les cadeaux se posent au bas de la barre un instant avant de disparaître (chute rapide : sans cela
-   le bas n'en voyait passer qu'une fraction de seconde) */
-.fx-gift { animation-name: mo-gift-land; }
+/* Noël : les cadeaux se posent tout en bas de la barre un instant avant de disparaître. Le bas de leur zone de
+   chute remonte de la taille d'un cadeau, et la chute va jusqu'à 100 % : le cadeau touche le bord quelle que
+   soit la hauteur de la barre (avec 97 %, l'écart grandissait avec la hauteur) */
+.fx-gift { bottom: 17px; animation-name: mo-gift-land; }
 @keyframes mo-gift-land {
   0% { opacity: 1; transform: translateY(0); animation-timing-function: cubic-bezier(0.45, 0, 1, 1); }
-  18% { opacity: 1; transform: translateY(97%); }
-  27% { opacity: 1; transform: translateY(97%); }
-  31% { opacity: 0; transform: translateY(97%); }
-  100% { opacity: 0; transform: translateY(97%); }
+  18% { opacity: 1; transform: translateY(100%); }
+  27% { opacity: 1; transform: translateY(100%); }
+  31% { opacity: 0; transform: translateY(100%); }
+  100% { opacity: 0; transform: translateY(100%); }
 }
