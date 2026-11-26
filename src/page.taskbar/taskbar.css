@@ -78,6 +78,14 @@ html[data-fx='on'] #edit {
     transparent
   );
 }
+/* Les cadeaux de Noël tombent devant les boutons (sans capter les clics) : le calque d'effets ne forme plus
+   son propre empilement, ce qui laisse les cadeaux (z-index 2) passer au-dessus des boutons (z-index 1) */
+.fx {
+  z-index: auto;
+}
+.fx-gift {
+  z-index: 2;
+}
 /* Barre ancrée repliée : une bande fine aux angles carrés, entièrement
    cliquable (un clic ou le survol déplie la barre) */
 #rail-button {
